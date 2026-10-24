@@ -29,7 +29,7 @@ const check = (name, ok, detail = "") => {
 
 const app = read("src/App.tsx");
 const main = read("src/main.tsx");
-const pagesDir = path.join(root, "src", "pages");
+const pagesDir = path.join(root, "src", "features");
 const pageFiles = walk(pagesDir);
 const pageText = pageFiles.map((f) => fs.readFileSync(f, "utf8")).join("\n");
 
@@ -37,10 +37,10 @@ const pageText = pageFiles.map((f) => fs.readFileSync(f, "utf8")).join("\n");
 check("useFilters fora do App", !/export function useFilters/.test(app));
 check("filters.ts existe", exists("src/app/filters.ts"));
 check("páginas não importam App (ciclo morto)", !/from ["'][^"']*\/App["']/.test(pageText));
-check("páginas importam app/filters", /from ["']\.\.\/app\/filters["']/.test(pageText));
+check("páginas importam app/filters", /from ["'][^"']*app\/filters["']/.test(pageText));
 
 // 2 — code splitting por rota.
-const lazyCount = (app.match(/lazy\(\(\) => import\("\.\/pages\//g) ?? []).length;
+const lazyCount = (app.match(/lazy\(\(\) => import\("\.\/features\//g) ?? []).length;
 check("rotas lazy (>= 10)", lazyCount >= 10, `${lazyCount} rotas`);
 check("Suspense com fallback", /<Suspense\s+fallback=/.test(app));
 check("fallback acessível", /data-testid="route-loading"/.test(app));
@@ -59,14 +59,16 @@ check("shared/format exporta pct/num/ago", /export function pct/.test(fmt) && /e
 check("shared/format exporta signed/pp", /export function signed/.test(fmt) && /export function pp/.test(fmt));
 check("api reexporta shared/format", /export \{ ago, num, pct \} from "\.\.\/shared\/format"/.test(api));
 check("api não redefine pct/num", !/export const (pct|num) =/.test(api));
-check("sem signed local duplicado", !/function signed\(/.test(pageText) && !/function signed\(/.test(read("src/components/dashboard/BuildsTab.tsx")));
+check("sem signed local duplicado", !/function signed\(/.test(pageText) && !/function signed\(/.test(read("src/features/dashboard/BuildsTab.tsx")));
 
 // 5 — código morto.
 for (const p of [
+  "src/pages",
   "src/pages/.old",
+  "src/pages/hero/heroSeal.ts",
+  "src/components",
   "src/components/DddModal.tsx",
   "src/components/idd/ExportEvidence.tsx",
-  "src/pages/hero/heroSeal.ts",
 ]) {
   check(`sem código morto: ${p}`, !exists(p));
 }

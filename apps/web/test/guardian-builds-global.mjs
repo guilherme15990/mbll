@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 // Estático (sem rede): garante teto de requests, sem default de rota, sem
 // fan-out e sem copy vetada. Falha = tempestade ou honestidade quebrada.
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const tab = fs.readFileSync(path.join(root, "src/components/dashboard/BuildsTab.tsx"), "utf8");
+const tab = fs.readFileSync(path.join(root, "src/features/dashboard/BuildsTab.tsx"), "utf8");
 const api = fs.readFileSync(path.join(root, "src/lib/api.ts"), "utf8");
 const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 // Checks P0 valem sobre código (comentários citam os briefs por referência — honestidade, não copy).
@@ -38,7 +38,7 @@ check("global nao cria key paralela", !/builds-global/.test(code + api));
 
 // 4 · reuso (não duplicação): mesma função, mesmo aviso, mesma key via hook.
 check("getBuildTags reutilizada da ficha", /from "..\/..\/lib\/buildLabel"/.test(code) && (code.match(/getBuildTags/g) ?? []).length >= 2);
-check("silencio no inconclusivo (sem rotulo falado)", !/Lift Inconclusivo|Popular, Sem Lift Demonstrado|Possível Vantagem Emergente/.test(code + fs.readFileSync(path.join(root, "src/pages/panels/BuildsPanel.tsx"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "")));
+check("silencio no inconclusivo (sem rotulo falado)", !/Lift Inconclusivo|Popular, Sem Lift Demonstrado|Possível Vantagem Emergente/.test(code + fs.readFileSync(path.join(root, "src/features/builds/BuildsPanel.tsx"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "")));
 check("sem Aviso Central na global (removido por decisão do usuário)", !/SelectionWarning|Aviso Central de Domínio/.test(code));
 check("R2 usa sort=win&order=desc&size=25", /sort=win&order=desc/.test(code) && /LIST_SIZE = 25/.test(code));
 

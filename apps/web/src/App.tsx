@@ -1,27 +1,27 @@
 import { lazy, Suspense, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Compass, Eye, Menu, Radar } from "lucide-react";
-import { IddProvider, useIdd } from "./lib/idd";
-import { IddModal } from "./components/IddModal";
-import { Sidebar } from "./components/Sidebar";
+import { IddProvider, useIdd } from "./shared/idd";
+import { IddModal } from "./app/IddModal";
+import { Sidebar } from "./app/Sidebar";
 import { filtersQuery, useFilters } from "./app/filters";
 import { ErrorBoundary } from "./app/ErrorBoundary";
 
 // F4a: cada página é um chunk próprio. O shell (header/sidebar/footer) pinta
 // imediatamente; só o módulo da rota é baixado quando ela abre. `HeroDetails`
 // é declarado uma vez e reaproveitado pelos três caminhos da ficha.
-const Dashboard = lazy(() => import("./pages/Dashboard"));
-const Herois = lazy(() => import("./pages/Herois"));
-const Forca = lazy(() => import("./pages/Forca"));
-const Confianca = lazy(() => import("./pages/Confianca"));
-const Ranks = lazy(() => import("./pages/Ranks"));
-const Tempo = lazy(() => import("./pages/Tempo"));
-const Confrontos = lazy(() => import("./pages/Confrontos"));
-const Draft = lazy(() => import("./pages/Draft"));
-const Blind = lazy(() => import("./pages/Blind"));
-const Builds = lazy(() => import("./pages/Builds"));
-const Exposicao = lazy(() => import("./pages/Exposicao"));
-const HeroDetails = lazy(() => import("./pages/hero/HeroDetails"));
+const Dashboard = lazy(() => import("./features/dashboard/Dashboard"));
+const Herois = lazy(() => import("./features/heroes/Herois"));
+const Forca = lazy(() => import("./features/forca/Forca"));
+const Confianca = lazy(() => import("./features/confianca/Confianca"));
+const Ranks = lazy(() => import("./features/ranks/Ranks"));
+const Tempo = lazy(() => import("./features/tempo/Tempo"));
+const Confrontos = lazy(() => import("./features/confrontos/Confrontos"));
+const Draft = lazy(() => import("./features/draft/Draft"));
+const Blind = lazy(() => import("./features/blind/Blind"));
+const Builds = lazy(() => import("./features/builds/Builds"));
+const Exposicao = lazy(() => import("./features/exposicao/Exposicao"));
+const HeroDetails = lazy(() => import("./features/hero/HeroDetails"));
 
 function RouteFallback() {
   return (

@@ -10,10 +10,10 @@ const read = (p) => fs.readFileSync(path.join(root, p), "utf8");
 const strip = (s) =>
   s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^\S\n])\/\/[^\n]*$/gm, "$1");
 
-const hero = strip(read("src/pages/hero/HeroDetails.tsx"));
-const preview = strip(read("src/pages/hero/sections/ConfrontosPreview.tsx"));
-const section = strip(read("src/pages/hero/sections/ConfrontosSection.tsx"));
-const atoms = strip(read("src/pages/hero/sections/matchupAtoms.tsx"));
+const hero = strip(read("src/features/hero/HeroDetails.tsx"));
+const preview = strip(read("src/features/hero/sections/ConfrontosPreview.tsx"));
+const section = strip(read("src/features/hero/sections/ConfrontosSection.tsx"));
+const atoms = strip(read("src/features/hero/sections/matchupAtoms.tsx"));
 const api = read("src/lib/api.ts");
 
 let bad = 0;
