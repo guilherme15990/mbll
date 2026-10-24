@@ -90,3 +90,12 @@ tem de ser feita em passos com diff pequeno, nunca junto com mudanças de lógic
   lazy routes, remoção de código morto; **F4b** opcional: features por contexto.
 - **F5** portão: `checkJs` na API, script de fronteiras, coverage com thresholds,
   CI, README/ADRs.
+
+## Execução
+
+- **F0** concluída (ADR-032): testes herméticos + janela correta de `listSnapshots`; 28/28.
+- **F1** concluída: ver `F1-fatiamento-api.md`. `routes.js` 1066 → 14 linhas (shim);
+  20 endpoints em 9 rotas + 8 módulos de aplicação; auto-recursão e validação
+  duplicada eliminadas; cobertura de `apps/api/src` 47,32% → 93,92% de linhas;
+  API 59/59 e motor 219/219 em 3 execuções.
+
