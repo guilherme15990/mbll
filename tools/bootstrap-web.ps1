@@ -1,8 +1,8 @@
-# Bootstrap magro: instala node_modules do apps/web sem npm (npm OOM com 4GB RAM).
+# Bootstrap magro: instala node_modules do app/web sem npm (npm OOM com 4GB RAM).
 # Usa curl.exe + tar.exe (nativos, <20MB RAM). Resolve ranges ^ ~ exact >= *.
 # Uso: powershell -ExecutionPolicy Bypass -File tools\bootstrap-web.ps1
 $ErrorActionPreference = "Stop"
-$Web = Join-Path $PSScriptRoot "..\apps\web"
+$Web = Join-Path $PSScriptRoot "..\app\web"
 $Nm = Join-Path $Web "node_modules"
 New-Item -ItemType Directory -Force -Path $Nm | Out-Null
 $Tmp = Join-Path ([IO.Path]::GetTempPath()) "radar-bootstrap"

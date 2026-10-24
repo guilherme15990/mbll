@@ -1,7 +1,7 @@
 // Classificação de segurança blind (PRD Blind §10) — FONTE ÚNICA.
 // Unifica os DUPLICADOS `getSafetyClassification` de
-// apps/web/src/pages/hero/sections/BlindSection.tsx e
-// apps/web/src/pages/panels/BlindPanel.tsx (limiares, rótulos e cores idênticos;
+// app/web/src/pages/hero/sections/BlindSection.tsx e
+// app/web/src/pages/panels/BlindPanel.tsx (limiares, rótulos e cores idênticos;
 // motivos canônicos = versão do painel global; ver relatório da migração).
 // `safetyToGuide` (mapeamento fixo §1.3) vem junto. Puros, sem I/O.
 // Piso n canônico em ./thresholds.js (MIN_SUPPORT_N — RF-BLND-06).

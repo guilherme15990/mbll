@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { getBuildTags } from "../src/builds/build-tags.js";
 
-// Paridade com apps/web/src/lib/buildLabel.ts.
+// Paridade com app/web/src/shared/domain/buildLabel.ts.
 describe("build-tags: paridade getBuildTags", () => {
   it("popular é frequência (pick≥5%)", () => {
     const t = getBuildTags({ pick: 0.05, lift_vs_most_used: null });

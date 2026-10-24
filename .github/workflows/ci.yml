@@ -24,7 +24,7 @@ jobs:
           node-version: "24"
           cache: npm
 
-      # `npm ci` respeita o package-lock.json (inclui o layout de apps/web).
+      # `npm ci` respeita o package-lock.json (inclui o layout de app/web).
       - name: install
         run: npm ci --no-audit --no-fund
 

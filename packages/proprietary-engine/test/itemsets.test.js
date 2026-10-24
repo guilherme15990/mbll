@@ -5,7 +5,7 @@ import {
   itemIdsOf, scoreAtomicItemset, scoreRouteItemsets,
 } from "../src/builds/itemsets.js";
 
-// Paridade com apps/web/src/lib/itemsets.ts (itemset-score-v1).
+// Paridade com app/web/src/shared/domain/itemsets.ts (itemset-score-v1).
 const B = (ids, win, pick, refMost, refMean) => ({
   win, pick,
   items: ids.map((id) => ({ id, name: `Item${id}`, icon: null })),

@@ -11,7 +11,7 @@
 //     workspace removido `@radar/engine`.
 //  3. Apps — nenhum import relativo que escape da própria app (o motor entra
 //     pelo nome do workspace).
-//  4. Packages — não importam `apps/` (dependência é sempre app → package).
+//  4. Packages — não importam `app/` (dependência é sempre app → package).
 //  5. Web — `features/a` não importa `features/b`; `app|shared|lib` não importam
 //     `features`; só `App.tsx` carrega features; `src/pages` e `src/components`
 //     não existem; `lib → shared` só via `shared/format`.
@@ -45,8 +45,8 @@ function walk(dir, out = []) {
   return out;
 }
 
-const API = path.join(ROOT, "apps/api");
-const WEB = path.join(ROOT, "apps/web");
+const API = path.join(ROOT, "app/api");
+const WEB = path.join(ROOT, "app/web");
 const PACKAGES = path.join(ROOT, "packages");
 
 const files = [
@@ -141,14 +141,14 @@ for (const file of files) {
 }
 check("engine: sem import do interior nem do workspace removido", deep);
 
-// ── 3/4. apps não escapam; packages não dependem de apps ────────────────────
+// ── 3/4. apps não escapam; packages não dependem de app ─────────────────────
 const escapes = [];
 const appPackages = [];
 for (const file of files) {
   const inApi = isInside(file, API);
   const inWeb = isInside(file, WEB);
   const inPackages = isInside(file, PACKAGES);
-  const zone = inApi ? "apps/api" : inWeb ? "apps/web" : inPackages ? "packages" : null;
+  const zone = inApi ? "app/api" : inWeb ? "app/web" : inPackages ? "packages" : null;
   if (!zone) continue;
   for (const { spec } of importsOf(fs.readFileSync(file, "utf8"))) {
     if (!spec.startsWith(".")) continue;
@@ -157,13 +157,13 @@ for (const file of files) {
     if ((inApi && !isInside(target, API)) || (inWeb && !isInside(target, WEB))) {
       escapes.push(`${rel(file)} → ${spec} (sai de ${zone}; use o nome do workspace)`);
     }
-    if (inPackages && isInside(target, path.join(ROOT, "apps"))) {
+    if (inPackages && isInside(target, path.join(ROOT, "app"))) {
       appPackages.push(`${rel(file)} → ${spec} (package dependendo de app)`);
     }
   }
 }
-check("apps: nenhum import relativo escapa da app", escapes);
-check("packages: não importam apps", appPackages);
+check("app: nenhum import relativo escapa da app", escapes);
+check("packages: não importam app", appPackages);
 
 // ── 5. fronteiras da web ────────────────────────────────────────────────────
 const WEB_SRC = path.join(WEB, "src");
@@ -182,7 +182,6 @@ const webImports = webFiles.map((file) => {
 
 const crossFeature = [];
 const zoneToFeature = [];
-const libToShared = [];
 for (const { rel: from, imports } of webImports) {
   const fromFeature = /^features\/([^/]+)\//.exec(from);
   for (const { targetRel } of imports) {
@@ -190,23 +189,84 @@ for (const { rel: from, imports } of webImports) {
     if (fromFeature && toFeature && toFeature[1] !== fromFeature[1]) {
       crossFeature.push(`${from} → ${targetRel}`);
     }
-    const fromZone = /^(app|shared|lib)\//.exec(from);
-    if (fromZone && toFeature) zoneToFeature.push(`${from} → ${targetRel}`);
-    if (/^lib\//.test(from) && /^shared\//.test(targetRel) && !/^shared\/format(\.ts)?$/.test(targetRel)) {
-      libToShared.push(`${from} → ${targetRel} (lib só pode usar shared/format)`);
-    }
+    const fromZone = /^(app|shared)\//.exec(from);
+    // `app/router.tsx` é o único arquivo de shell que carrega features (ADR-043).
+    if (fromZone && toFeature && from !== "app/router.tsx") zoneToFeature.push(`${from} → ${targetRel}`);
   }
 }
 check("web: features não importam outras features", crossFeature);
-check("web: app|shared|lib não importam features", zoneToFeature);
-check("web: lib → shared só via shared/format", libToShared);
+check("web: app|shared não importam features (exceto app/router.tsx)", zoneToFeature);
+
+// ADR-043 / regra 12 da ADR-041: `shared/domain` é lógica pura — só o motor e
+// `shared/format`. Tipos podem vir de `shared/api` (`import type`): são apagados
+// no build e não criam dependência de runtime nem ciclo real.
+const DOMAIN_PKGS = new Set(["@radar/proprietary-engine"]);
+const domainImpure = [];
+for (const file of webFiles) {
+  const from = webRel(file);
+  if (!/^shared\/domain\//.test(from)) continue;
+  for (const { spec, clause } of importsOf(fs.readFileSync(file, "utf8"))) {
+    if (/^\s*type\b/.test(clause)) continue;
+    if (!spec.startsWith(".")) {
+      if (!DOMAIN_PKGS.has(spec)) domainImpure.push(`${from} → ${spec}`);
+      continue;
+    }
+    const target = resolveRel(file, spec);
+    const targetRel = target ? webRel(target) : spec;
+    if (!/^shared\/format(\.ts)?$/.test(targetRel)) domainImpure.push(`${from} → ${targetRel}`);
+  }
+}
+check("web: shared/domain puro (motor + shared/format)", domainImpure);
+
+// ADR-043 / regra 11 da ADR-041: `ui/primitives` é átomo — sem dado, sem
+// contexto, sem composição. Só `shared/format` (número/data) e
+// `shared/domain/present` (`cx`), ambos puros. Precisou de hook → é pattern.
+const PRIM_PKGS = new Set(["react", "react-router-dom", "lucide-react"]);
+const primViolations = [];
+const primShape = [];
+for (const file of webFiles) {
+  const from = webRel(file);
+  if (!from.startsWith("shared/ui/primitives/")) continue;
+  const text = fs.readFileSync(file, "utf8");
+  for (const { spec, clause } of importsOf(text)) {
+    if (/^\s*type\b/.test(clause)) continue;
+    if (!spec.startsWith(".")) {
+      if (!PRIM_PKGS.has(spec)) primViolations.push(`${from} → ${spec}`);
+      continue;
+    }
+    const target = resolveRel(file, spec);
+    const targetRel = target ? webRel(target) : spec;
+    const allowed =
+      /^shared\/format(\.ts)?$/.test(targetRel) ||
+      /^shared\/domain\/present(\.ts)?$/.test(targetRel) ||
+      targetRel.startsWith("shared/ui/primitives/");
+    if (!allowed) primViolations.push(`${from} → ${targetRel}`);
+  }
+  // Regra 14: 1 componente exportado por arquivo, com o nome do arquivo.
+  const fns = [...text.matchAll(/export function ([A-Za-z0-9_]+)/g)].map((m) => m[1]);
+  const expected = path.basename(file).replace(/\.tsx?$/, "");
+  if (fns.length !== 1 || fns[0] !== expected) {
+    primShape.push(`${from}: exporta ${fns.join(", ") || "nada"} (esperado ${expected})`);
+  }
+}
+check("web: ui/primitives sem dado/contexto (format + cx)", primViolations);
+check("web: 1 componente por arquivo em ui/primitives", primShape);
+
+// `lib/` foi dissolvido em `shared/{api,domain}` (ADR-043). Recriar a pasta
+// reabre a ambiguidade nº 1 da ADR-041 — é o que esta linha impede.
+check(
+  "web: sem src/lib (shared/api + shared/domain)",
+  fs.existsSync(path.join(WEB_SRC, "lib")) ? ["src/lib existe"] : [],
+);
 
 const featureImporters = webImports
   .filter(({ rel: from }) => !/^features\//.test(from))
   .filter(({ imports }) => imports.some(({ targetRel }) => targetRel.startsWith("features/")))
   .map(({ rel: from }) => from);
-const wrongLoaders = featureImporters.filter((f) => f !== "App.tsx");
-check("web: só App.tsx carrega features", wrongLoaders, featureImporters.join(", "));
+// Só o shell carrega features: o App e o mapa de rotas (ADR-043).
+const FEATURE_LOADERS = new Set(["App.tsx", "app/router.tsx"]);
+const wrongLoaders = featureImporters.filter((f) => !FEATURE_LOADERS.has(f));
+check("web: só App.tsx e app/router carregam features", wrongLoaders, featureImporters.join(", "));
 
 const legacy = ["pages", "components"].filter((d) => fs.existsSync(path.join(WEB_SRC, d)));
 check("web: sem src/pages e src/components", legacy.map((d) => `src/${d} existe`));

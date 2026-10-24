@@ -1,5 +1,5 @@
 // Scoring de itemsets — fórmula `itemset-score-v1`.
-// Movido de apps/web/src/lib/itemsets.ts (semântica idêntica): unidade honesta =
+// Movido de app/web/src/shared/domain/itemsets.ts (semântica idêntica): unidade honesta =
 // itemset DENTRO do mesmo herói+lane, coocorrência INTRA-build; entre contextos
 // só se CONTA (k/m); destaque por rota ordenado por cobertura desc(k, m) — nunca
 // por win poolado — corte `k ≥ 2 ∨ m ≥ 3`, teto de 5 linhas. Puro, sem I/O.

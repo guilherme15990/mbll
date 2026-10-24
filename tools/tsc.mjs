@@ -1,12 +1,12 @@
 // Resolvedor do TypeScript para os workspaces.
 //
-// O repo tem UMA instalação de `typescript` (devDependency de `apps/web`), e a
+// O repo tem UMA instalação de `typescript` (devDependency de `app/web`), e a
 // posição física depende de como o npm instalou: no install "lean" ela fica em
-// `apps/web/node_modules`; num install normal pode ser hoisted para a raiz.
+// `app/web/node_modules`; num install normal pode ser hoisted para a raiz.
 // Em vez de fixar um caminho (que quebra no outro layout), este runner procura
 // o pacote nos lugares possíveis e executa o `bin/tsc` real.
 //
-// Uso: node tools/tsc.mjs -p apps/api/jsconfig.json
+// Uso: node tools/tsc.mjs -p app/api/jsconfig.json
 import { createRequire } from "node:module";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const req = createRequire(import.meta.url);
-const searchPaths = [root, path.join(root, "apps/web"), path.join(root, "apps/api")];
+const searchPaths = [root, path.join(root, "app/web"), path.join(root, "app/api")];
 
 let main = null;
 for (const p of searchPaths) {

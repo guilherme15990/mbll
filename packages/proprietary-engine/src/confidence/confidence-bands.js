@@ -1,7 +1,7 @@
 // Faixas interpretativas da posterior (PRD Confidence §8) — FONTE ÚNICA.
 // Unifica os DUPLICADOS `interpretProbBand` de
-// apps/web/src/pages/hero/sections/ConfiancaSection.tsx ({label,color}) e
-// apps/web/src/pages/panels/ConfiancaPanel.tsx ({label,color,desc}).
+// app/web/src/pages/hero/sections/ConfiancaSection.tsx ({label,color}) e
+// app/web/src/pages/panels/ConfiancaPanel.tsx ({label,color,desc}).
 // Canônico = forma do painel (com `desc`); limiares e rótulos idênticos.
 // Puro, sem I/O.
 

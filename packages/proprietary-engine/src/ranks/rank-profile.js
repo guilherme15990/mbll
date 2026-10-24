@@ -1,7 +1,7 @@
 // Rótulos de perfil rank a×b (PRD Rank §9) — FONTE ÚNICA.
 // Unifica os DUPLICADOS `getRankProfileLabel` de
-// apps/web/src/pages/hero/sections/RanksSection.tsx e
-// apps/web/src/pages/panels/RanksPanel.tsx (limiares, rótulos e cores idênticos;
+// app/web/src/pages/hero/sections/RanksSection.tsx e
+// app/web/src/pages/panels/RanksPanel.tsx (limiares, rótulos e cores idênticos;
 // motivos canônicos = versão do painel global; ver relatório da migração).
 // Δr default = PRACTICAL_DELTA canônico (./thresholds.js — relevância prática).
 // Puro, sem I/O.

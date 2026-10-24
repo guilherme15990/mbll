@@ -12,8 +12,8 @@ evidência explícito (`provisional`, `inconclusivo`, `sem dado`) — ver
 
 | Camada | Tecnologia |
 |---|---|
-| Web (`apps/web`) | React 18, TypeScript, TanStack Query, React Router, Recharts, lucide-react, Tailwind |
-| API (`apps/api`) | Node 24, `node:http`, `node:sqlite`, `fetch` — **zero dependências externas** de runtime* |
+| Web (`app/web`) | React 18, TypeScript, TanStack Query, React Router, Recharts, lucide-react, Tailwind |
+| API (`app/api`) | Node 24, `node:http`, `node:sqlite`, `fetch` — **zero dependências externas** de runtime* |
 | Motor (`packages/proprietary-engine`) | JS puro, sem I/O: modelos, primitivas e agregados |
 | Persistência | SQLite **só cache** (TTL A=2h/B=6h/C=24h + SWR) e histórico append-only de snapshots |
 
@@ -23,19 +23,26 @@ Sem login/usuário (fora de escopo).
 ## Estrutura
 
 ```
-apps/api/src
+app/api/src
   http/          servidor, router, estáticos, erros, log (sem regra de negócio)
   routes/        handlers verticais por contexto (fio HTTP)
   application/   coleta, pontuação, catálogos, agregados (sem HTTP)
   infra/         arena, cache, snapshot history, config, db
 
-apps/web/src
-  App.tsx        rotas lazy (12) + shell
-  app/           shell e infra de UI (filters, ErrorBoundary, Sidebar, IddModal)
-  features/      um diretório por contexto: dashboard, heroes, hero, forca,
-                 confianca, ranks, tempo, confrontos, draft, blind, builds, exposicao
-  shared/        reuso sem dono de contexto (ui, charts, format, heroPanel, idd)
-  lib/           dados e lógica pura da web (api, combiner, buildLabel, itemsets)
+app/web/src
+  App.tsx        shell (header, sidebar, footer)
+  app/           shell e infra de UI (router, providers, filters, ErrorBoundary, Sidebar)
+  features/      um diretório por contexto (EN/kebab): dashboard, hero-list,
+                 hero-detail, strength, confidence, ranks, temporal, matchups,
+                 draft, blind, builds, exposure
+  shared/        reuso sem dono de contexto
+    format.ts    formatação numérica defensiva (fonte única)
+    api/         transporte + dados: http, errors, queries/<domínio>
+                 (filters, heroes, builds, matchups, insights) e o barrel
+    domain/      lógica pura, zero React: combiner, buildLabel, itemsets, present
+    idd/         contexto IDD: index, IddModal, IddZone e cards/
+    ui/          index (fachada) · primitives/ (1 componente por arquivo)
+                 · patterns/ (HeroPicker, HeroDossier, PickVerdict, charts…)
 
 packages/proprietary-engine
   src/index.js   barrel público (fronteira única)
@@ -44,10 +51,12 @@ packages/proprietary-engine
 tools/           bootstrap lean, resolvedor do tsc, gate de fronteiras
 ```
 
-Direções permitidas: `features/a` **não** importa `features/b`; `app|shared|lib`
-**não** importam `features`; só `App.tsx` carrega features. `apps/*` importam o
-motor pelo nome do workspace, nunca por caminho relativo. O gate
-`npm run check:boundaries` falha se qualquer regra quebrar.
+Direções permitidas: `features/a` **não** importa `features/b`; `app|shared`
+**não** importam `features`; só `app/router.tsx` carrega features (via `App.tsx`).
+`shared/domain` é lógica pura: importa o motor e `shared/format`, nunca React,
+fetch ou `shared/api` em runtime. `app/*` importam o motor pelo nome do
+workspace, nunca por caminho relativo. O gate `npm run check:boundaries` falha
+se qualquer regra quebrar.
 
 ## Rodar
 
@@ -65,7 +74,7 @@ npm run dev:api             # :3001
 Produção (origem única: estáticos + API):
 
 ```powershell
-npm run build               # engine + api + web -> apps/web/dist
+npm run build               # engine + api + web -> app/web/dist
 npm start                   # :3001
 ```
 
@@ -85,7 +94,7 @@ A API não precisa instalar nada (zero-dep). Ver `ADR-003-bootstrap.md`.
 | Comando | O que prova |
 |---|---|
 | `npm run check:boundaries` | direção de dependência entre zonas + contrato do motor (import declarado no `index.d.ts` e declaração existente no runtime) |
-| `npm run check:api` | `checkJs` da API (JS puro + JSDoc, `apps/api/jsconfig.json`) |
+| `npm run check:api` | `checkJs` da API (JS puro + JSDoc, `app/api/jsconfig.json`) |
 | `npm run check:web` | typecheck da web (`tsc --noEmit`) |
 | `npm test` | motor (`node:test`) + API (124 testes) + web (smoke + guardians) |
 | `npm run test:coverage` | cobertura da API com thresholds **linhas 90 / branches 60 / funções 85** |
@@ -97,7 +106,7 @@ build de produção.
 ## Configuração (env, fail-fast)
 
 Valor inválido derruba o processo no boot com o nome e o valor recebido — não há
-fallback silencioso (`apps/api/src/infra/config.js`).
+fallback silencioso (`app/api/src/infra/config.js`).
 
 | Variável | Default | Efeito |
 |---|---|---|
@@ -114,7 +123,7 @@ fallback silencioso (`apps/api/src/infra/config.js`).
 | `RATE_LIMIT_OFF` | `false` | desliga o token bucket |
 | `RATE_LIMIT_RPS` / `RATE_LIMIT_BURST` | `20` / `60` | taxa por cliente |
 | `SHUTDOWN_TIMEOUT_MS` | `10000` | prazo do shutdown gracioso |
-| `WEB_DIST` | `apps/web/dist` | diretório servido em produção |
+| `WEB_DIST` | `app/web/dist` | diretório servido em produção |
 
 ## API (`/v1`, JSON, GET)
 

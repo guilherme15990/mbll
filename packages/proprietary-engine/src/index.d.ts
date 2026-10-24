@@ -1,6 +1,6 @@
 // Tipagens da fronteira @radar/proprietary-engine consumidas por web E api.
 // Os módulos são JS puro; este arquivo dá as assinaturas para `tsc --noEmit`
-// (web), `tsc -p apps/api/jsconfig.json` (checkJs) e `vite build`.
+// (web), `tsc -p app/api/jsconfig.json` (checkJs) e `vite build`.
 // Campos opcionais: os apps passam objetos ricos da API que satisfazem
 // estruturalmente estes mínimos.
 //

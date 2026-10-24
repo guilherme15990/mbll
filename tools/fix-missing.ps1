@@ -3,7 +3,7 @@
 $ErrorActionPreference = "Stop"
 $env:BOOTSTRAP_LIBS_ONLY = "1"
 . (Join-Path $PSScriptRoot "bootstrap-web.ps1")
-$Nm = Join-Path $PSScriptRoot "..\apps\web\node_modules"
+$Nm = Join-Path $PSScriptRoot "..\app\web\node_modules"
 
 function Find-Range($mod) {
   $files = Get-ChildItem -Path $Nm -Filter package.json -Recurse -Depth 3 -ErrorAction SilentlyContinue

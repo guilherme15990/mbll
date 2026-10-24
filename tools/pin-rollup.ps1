@@ -1,6 +1,6 @@
 # Uso único: instala rollup@4.24.0 exato + binding msvc íntegro (sem npm, sem packument).
 $ErrorActionPreference = "Stop"
-$Nm = Join-Path $PSScriptRoot "..\apps\web\node_modules"
+$Nm = Join-Path $PSScriptRoot "..\app\web\node_modules"
 $Tmp = Join-Path ([IO.Path]::GetTempPath()) "radar-bootstrap"
 New-Item -ItemType Directory -Force -Path $Tmp | Out-Null
 function Install-Tgz($name, $ver, $url) {

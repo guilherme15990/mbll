@@ -1,5 +1,5 @@
 // Tags de build (PRD Build §10, Camada A) — FONTE ÚNICA.
-// Movido de apps/web/src/lib/buildLabel.ts (semântica idêntica).
+// Movido de app/web/src/shared/domain/buildLabel.ts (semântica idêntica).
 // Regra de silêncio: lift inconclusivo (|lift| ≤ 0,02 sem frequência que o
 // explique, ou sem suporte) NÃO gera tag. "popular" é fato de frequência
 // (pick ≥ 5%), nunca identidade de "a mais usada". Puro, sem I/O.

@@ -1,7 +1,7 @@
 // Padrões operacionais de draft (PRD Draft §7) — FONTE ÚNICA.
 // Unifica os DUPLICADOS `getDraftPatterns` de
-// apps/web/src/pages/hero/sections/DraftSection.tsx ({caso,leitura,ativo}) e
-// apps/web/src/pages/panels/DraftPanel.tsx (+badgeColor, leituras longas).
+// app/web/src/pages/hero/sections/DraftSection.tsx ({caso,leitura,ativo}) e
+// app/web/src/pages/panels/DraftPanel.tsx (+badgeColor, leituras longas).
 // Canônico = forma do painel (com `badgeColor`); casos e regras de ativação
 // idênticos. Puro, sem I/O.
 
