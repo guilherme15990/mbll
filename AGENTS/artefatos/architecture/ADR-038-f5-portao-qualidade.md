@@ -89,11 +89,12 @@ interno e resolvido por symlink do workspace.
 
 ### 4. Fronteiras como teste
 
-`tools/check-boundaries.mjs` (raiz, `npm run check:boundaries`) — 9 regras:
+`tools/check-boundaries.mjs` (raiz, `npm run check:boundaries`) — 10 regras:
 
 | # | Regra |
 |---|---|
 | 1 | todo nome importado de `@radar/proprietary-engine` está declarado no `index.d.ts` |
+| 1b | toda declaração de **valor** (`function`/`const`/`class`) existe no runtime |
 | 2 | ninguém importa `@radar/proprietary-engine/src/*` nem o workspace morto `@radar/engine` |
 | 3 | nenhum import relativo escapa da própria app (`apps/api`, `apps/web`) |
 | 4 | `packages/*` não importam `apps/*` |
@@ -119,7 +120,8 @@ packages. As regras 1–4 são novas.
 
 O escopo é `apps/api/src`: o motor tem suíte própria (219 testes) e seria
 medido como código de outro pacote; os arquivos de teste não são código de
-produção. Medido: **93,70% linhas / 65,82% branches / 89,27% funções**.
+produção. Medido: **93,70% linhas / 65,75–65,82% branches / 89,27% funções**
+(a variação de branches é ordem de execução entre arquivos, não código novo).
 
 ### 6. CI
 
@@ -187,6 +189,36 @@ resolvedor de `tsc`; `strict: false` deixa erros de null para uma fase futura;
 o `index.d.ts` precisa ser atualizado quando a API passar a importar um export
 novo — o gate avisa na hora, mas é trabalho manual; o relatório de cobertura do
 `node:test` é verboso no log.
+
+## 8. Revisão crítica e correções (pós-implementação)
+
+O commit inicial da F5 passou nos gates locais, mas a revisão de código achou um
+**P1** que os gates não podiam ver: o lockfile carregava só os binários nativos de
+**Windows**. Como rollup 4 e esbuild resolvem binding por plataforma, `npm ci` +
+`vite build` no runner Ubuntu falharia com `Cannot find module
+@rollup/rollup-linux-x64-gnu` — o CI nasceria vermelho exatamente no passo que
+existe para ser a autoridade.
+
+Corrigido por cirurgia no lock (36 variantes adicionadas com
+`resolved`/`integrity` do registry + `fsevents` para macOS, versões existentes
+preservadas; 177 → 215 entradas) e por scripts agnósticos de layout (`vite`/`tsc`
+pelo `PATH` do npm, `require.resolve` para o CLI do Tailwind). Regenerar o lock do
+zero resolveria as ranges de novo (rollup 4.24 → 4.65, postcss-load-config 4 → 6)
+e mudaria o layout aninhado que o bootstrap magro usa.
+
+Três P2 também foram fechados:
+
+1. **Contrato mentiroso.** `EMBLEM_MIN_CONTEXTS`, `EMBLEM_MIN_BUILDS` e
+   `EMBLEMS_MAX_ROWS` eram declarados no `index.d.ts` e não reexportados pelo
+   barrel — `undefined` em runtime. Além de exportá-los, o gate ganhou a regra
+   **declaração → runtime** (1b), que agora pega essa classe de drift para sempre.
+2. **`mean()` tipado como `number`.** Retorna `null` sem valores finitos; o
+   contrato passou a `number | null`.
+3. **`ApiServerOptions.rateLimit` exigia `rps`/`burst`.** O runtime aceita
+   `{ enabled: false }`; a declaração mentia e impedia testes parciais.
+
+Ficou registrado (não corrigido) que o `checkJs` cobre `src` e não `test`:
+incluir `apps/api/test/**` abre 15 erros, todos de fake de teste.
 
 ## Evidência
 

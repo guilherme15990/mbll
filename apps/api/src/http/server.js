@@ -43,7 +43,7 @@ function clientKey(req, trustProxy) {
  * @property {string} [webDist]
  * @property {string} [logLevel]
  * @property {boolean} [trustProxy]
- * @property {{ enabled: boolean, rps: number, burst: number }} [rateLimit]
+ * @property {{ enabled: boolean, rps?: number, burst?: number }} [rateLimit]
  * @property {{ info: Function, error: Function, debug?: Function, level?: string }} [logger]
  */
 

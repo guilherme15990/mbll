@@ -11,10 +11,10 @@
 
 | # | Gate | Comando | Falha quando |
 |---|---|---|---|
-| 1 | Direção de dependência + contrato do motor | `npm run check:boundaries` | import escapa de app/pacote, feature importa feature, import do motor sem declaração |
+| 1 | Direção de dependência + contrato do motor | `npm run check:boundaries` | import escapa de app/pacote, feature importa feature, import sem declaração no `d.ts`, declaração sem runtime |
 | 2 | Tipos da API (`checkJs`) | `npm run check:api` | qualquer erro de tipo em `apps/api/src/**/*.js` |
 | 3 | Tipos da web | `npm run check:web` | `tsc --noEmit` não passa |
-| 4 | Comportamento | `npm test` | motor, API (123) ou web falham |
+| 4 | Comportamento | `npm test` | motor, API (124) ou web falham |
 | 5 | Cobertura da API | `npm run test:coverage` | linhas < 90, branches < 60, funções < 85 (escopo `apps/api/src`) |
 | 6 | Tudo junto | `npm run verify` | 1–4 falham |
 
@@ -53,6 +53,7 @@ As correções foram todas no ponto frouxo, sem `any` global nem `@ts-ignore`:
 
 ```
 PASS engine: todo import tem contrato no index.d.ts — 239 nomes declarados, 43 imports
+PASS engine: toda declaração de valor existe no runtime — 164 valores declarados
 PASS engine: sem import do interior nem do workspace removido
 PASS apps: nenhum import relativo escapa da app
 PASS packages: não importam apps
@@ -63,6 +64,12 @@ PASS web: só App.tsx carrega features — App.tsx
 PASS web: sem src/pages e src/components
 BOUNDARIES OK
 ```
+
+A regra nova (**declaração → runtime**) existe porque o `index.d.ts` sombreia o
+`index.js`: um `export declare const` sem export real só aparece como `undefined`
+em runtime. Ela nasceu já mordendo — acusou 3 constantes declaradas e não
+reexportadas (`EMBLEM_MIN_CONTEXTS`, `EMBLEM_MIN_BUILDS`, `EMBLEMS_MAX_ROWS`),
+corrigidas no barrel do motor.
 
 **Validação negativa** (3 probes temporários, removidos depois — um gate que nunca
 falhou não é evidência):
@@ -78,24 +85,30 @@ falhou não é evidência):
 Escopo `apps/api/src` (`--test-coverage-exclude=**/packages/**` e `**/test/**`):
 
 ```
-ℹ all files | 93.70 | 65.82 | 89.27 |
+ℹ all files | 93.70 | 65.75 | 89.27 |
 ```
 
 | Métrica | Medido | Threshold |
 |---|---|---|
 | Linhas | **93,70%** | 90 |
-| Branches | **65,82%** | 60 |
+| Branches | **65,75–65,82%** | 60 |
 | Funções | **89,27%** | 85 |
 
 Exit **0**. Sem os excludes, o relatório misturava o motor (219 testes próprios) e
 os próprios arquivos de teste — número bonito e inútil.
+
+A variação de branches (0,07 pp) é ordem de execução entre arquivos de teste, não
+código novo; linhas e funções são estáveis. No caminho de `cacheStore` que variava
+mais (JSON corrompido = miss) foi adicionado um caso explícito em `db.test.js`:
+antes ele só era coberto por acidente de ordem, agora sempre. Foi o único teste
+novo da F5 — 123 → 124.
 
 ### 2.4 Suítes
 
 | Suíte | Resultado |
 |---|---|
 | Motor (`node:test`) | **219/219**, 0 falhas |
-| API (`node:test`) | **123/123**, 0 falhas |
+| API (`node:test`) | **124/124**, 0 falhas |
 | Web (`smoke` + itemsets + combiner + 4 guardians) | **24/24**, 0 falhas |
 
 Guardians da web na mesma execução: `SMOKE OK`, `GUARDIAN OK`,
@@ -181,6 +194,39 @@ Raiz: `check:boundaries`, `check:api`, `check:web`, `test:coverage` e
 `verify` (boundaries → typechecks → testes). `apps-api`: `typecheck` e
 `test:coverage`. Os comandos antigos não mudaram.
 
+### 3.5 Lockfile multiplataforma (achado da revisão)
+
+O lockfile tinha **só** os binários nativos do Windows
+(`@rollup/rollup-win32-x64-msvc`, `@esbuild/win32-x64`) — consequência do
+bootstrap magro, que baixa via `curl`+`tar` o que a máquina usa. Como o rollup 4 e
+o esbuild resolvem o binding nativo em runtime, `npm ci` + `vite build` num runner
+Ubuntu falharia com `Cannot find module @rollup/rollup-linux-x64-gnu`: todo gate
+verde no Windows e o CI vermelho no passo de build.
+
+Correção: as 36 variantes que faltavam (rollup e esbuild) entraram no lock com
+`resolved`/`integrity` do registry, **sem** regenerar o arquivo — regenerar
+resolveria as ranges de novo (rollup 4.24 → 4.65, postcss-load-config 4 → 6) e
+mudaria o layout. As duas entradas win32 que o bootstrap registrou sem integridade
+foram corrigidas também, e `fsevents` (opcional do rollup em macOS) entrou para
+fechar o último buraco. 177 → 215 entradas, versões existentes intactas.
+
+Validação: `npm ci --dry-run` (Windows), `--os=linux --cpu=x64 --libc=glibc` e
+`--os=darwin --cpu=arm64` — todos exit 0, sem aviso de lock dessincronizado.
+
+### 3.6 Scripts agnósticos de layout
+
+O lockfile do bootstrap é **aninhado** (`apps/web/node_modules/*`); um `npm ci`
+normal **hoisted** põe tudo na raiz. Scripts que fixavam
+`node node_modules/vite/bin/vite.js` só funcionavam no layout aninhado.
+
+- `apps/web`: `dev`/`build`/`preview`/`typecheck` usam `vite` e `tsc` pelo nome —
+  o npm injeta o `.bin` do workspace e da raiz no `PATH`. Resolve nos dois layouts.
+- `apps/web/build.mjs`: o CLI do Tailwind passou de caminho fixo para
+  `require.resolve("tailwindcss/lib/cli.js")`.
+- `tools/tsc.mjs` já procurava o compilador nos dois layouts.
+
+O build continua **idêntico**: mesmos hashes, 289,76 kB, 30 chunks.
+
 ## 4. Desvios registrados
 
 1. **`strict: false` no `checkJs`.** `strictNullChecks` habilitado abre **67**
@@ -198,6 +244,11 @@ Raiz: `check:boundaries`, `check:api`, `check:web`, `test:coverage` e
 3. **`typescript` fora da API.** Declará-lo em `apps/api` duplicaria o compilador
    no workspace e mexeria no layout do lockfile; `tools/tsc.mjs` resolve o
    existente.
+4. **`checkJs` cobre `src`, não `test`.** Incluir `apps/api/test/**` abre 15 erros,
+   todos de infraestrutura de teste (stub de `fetch` tipado como `typeof fetch`,
+   `assert` do `node:test` com `strict: false`, `server.address()`). Ampliar o
+   escopo exige tipar os fakes — trabalho próprio; o comportamento dos testes já é
+   verificado por `npm test`.
 
 ## 5. Como reproduzir
 
@@ -218,5 +269,7 @@ Ou, para 1–4 de uma vez: `npm run verify` (exit 0).
 1. `strictNullChecks` na API (67 erros, fase própria).
 2. Injeção de `infra` no composition root + eventual `packages/contracts`, se a
    fronteira passar a doer.
-3. Bancos SQLite órfãos fora de `DATA_DIR` na máquina de desenvolvimento (~15 MB)
-   — decisão do dono dos dados, não do código.
+3. `checkJs` nos testes da API (15 erros de fake, ver §4.4).
+4. Bancos SQLite órfãos fora de `DATA_DIR`: os 3 de `apps/web/data`,
+   `apps/api/data` e `apps/api/src/data` (~15 MB) foram removidos; sobrou só
+   `data/cache.sqlite`, que é o atual. Cache se reconstrói no próximo fetch.

@@ -129,10 +129,13 @@ tem de ser feita em passos com diff pequeno, nunca junto com mudanças de lógic
   (289,76 kB / 30 chunks); typecheck 0; guardian F4b 9/9; web 24/24.
 - **F5** concluída (ADR-038): ver `F5-gate.md`. `checkJs` na API **62 → 0 erros**
   (`tools/tsc.mjs` resolve o compilador nos dois layouts); `tools/check-boundaries.mjs`
-  com 9 regras (validado negativamente com 3 probes); contrato do motor completo no
-  `index.d.ts` (todo nome importado declarado); API consome o workspace
-  `@radar/proprietary-engine` (14 imports migrados); cobertura da API com thresholds
-  **93,70% linhas / 65,82% branches / 89,27% funções** (90/60/85); CI em Node 24;
-  README reescrito. `npm run verify` exit 0; motor 219/219, API 123/123, web 24/24;
-  build 289,76 kB / 30 chunks; runtime smoke `dbClosed:true`.
+  com 10 regras (validado negativamente com 3 probes); contrato do motor completo no
+  `index.d.ts` (todo nome importado declarado **e** toda declaração de valor
+  existente no runtime); API consome o workspace `@radar/proprietary-engine`
+  (14 imports migrados); cobertura da API com thresholds **93,70% linhas / 65,75%
+  branches / 89,27% funções** (90/60/85); CI em Node 24; README reescrito. O lock
+  ganhou as variantes Linux de rollup/esbuild (o CI buildava só no Windows) e os
+  scripts da web ficaram agnósticos de layout. `npm run verify` exit 0; motor
+  219/219, API 124/124, web 24/24; build 289,76 kB / 30 chunks; runtime smoke
+  `dbClosed:true`.
 

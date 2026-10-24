@@ -32,8 +32,10 @@ await esbuild.build({
 
 // 2. Tailwind -> dist/assets/app.css (usa postcss.config.cjs; sem --minify:
 // o flag quebra silencioso neste ambiente e 24KB não-minificado é irrelevante)
+// O CLI é resolvido pelo `require` do app: funciona com `node_modules` aninhado
+// (bootstrap magro) e com tudo hoisted na raiz (`npm ci`).
 execFileSync(process.execPath, [
-  join(root, "node_modules", "tailwindcss", "lib", "cli.js"),
+  require.resolve("tailwindcss/lib/cli.js"),
   "-i", join(root, "src", "index.css"),
   "-o", join(outdir, "app.css"),
 ], { stdio: "inherit" });

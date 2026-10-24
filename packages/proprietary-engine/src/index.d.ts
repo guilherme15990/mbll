@@ -452,7 +452,7 @@ export declare function trendDirectionOf(view: { delta?: number | null; delta_lo
 };
 
 // ---- utils: math (primitivas usadas pela api) ----
-export declare function mean(xs: readonly number[]): number;
+export declare function mean(xs: readonly number[]): number | null;
 export declare function median(xs: readonly number[]): number;
 export declare function medianNull(xs: readonly number[]): number | null;
 export declare function mad(xs: readonly number[], med?: number): number;

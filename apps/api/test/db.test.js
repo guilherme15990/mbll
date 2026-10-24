@@ -56,6 +56,16 @@ describe("infra/cacheStore: SQLite", () => {
     assert.equal(cacheStats().sqlite, true);
     assert.ok(cacheStats().rows >= 1);
   });
+
+  // Leitura quebrada = miss, nunca 500 (cacheStore.js: catch do JSON.parse).
+  // Sem este caso o caminho só era coberto por acidente de ordem entre arquivos.
+  it("linha corrompida vira miss (não lança)", () => {
+    const key = `f3:corrupt:${process.pid}`;
+    getDb()
+      .prepare("INSERT OR REPLACE INTO cache(key,at,body) VALUES(?,?,?)")
+      .run(key, Date.now(), "{nao-json");
+    assert.deepEqual(cacheGet(key), { hit: false });
+  });
 });
 
 describe("infra/db: close", () => {

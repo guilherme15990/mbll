@@ -84,10 +84,10 @@ A API não precisa instalar nada (zero-dep). Ver `ADR-003-bootstrap.md`.
 
 | Comando | O que prova |
 |---|---|
-| `npm run check:boundaries` | direção de dependência entre zonas + todo import do motor declarado no `index.d.ts` |
+| `npm run check:boundaries` | direção de dependência entre zonas + contrato do motor (import declarado no `index.d.ts` e declaração existente no runtime) |
 | `npm run check:api` | `checkJs` da API (JS puro + JSDoc, `apps/api/jsconfig.json`) |
 | `npm run check:web` | typecheck da web (`tsc --noEmit`) |
-| `npm test` | motor (`node:test`) + API (123 testes) + web (smoke + guardians) |
+| `npm test` | motor (`node:test`) + API (124 testes) + web (smoke + guardians) |
 | `npm run test:coverage` | cobertura da API com thresholds **linhas 90 / branches 60 / funções 85** |
 | `npm run verify` | boundaries + typechecks + todos os testes |
 

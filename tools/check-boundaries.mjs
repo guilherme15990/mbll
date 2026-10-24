@@ -5,7 +5,8 @@
 //
 // Regras
 //  1. Engine — todo nome importado de `@radar/proprietary-engine` tem declaração
-//     em `packages/proprietary-engine/src/index.d.ts` (o d.ts sombreia o JS).
+//     em `packages/proprietary-engine/src/index.d.ts` (o d.ts sombreia o JS), e
+//     toda declaração de VALOR (função/classe/const) existe no runtime.
 //  2. Engine — ninguém importa o interior do pacote (`/src/`, `/test/`) nem o
 //     workspace removido `@radar/engine`.
 //  3. Apps — nenhum import relativo que escape da própria app (o motor entra
@@ -16,7 +17,7 @@
 //     não existem; `lib → shared` só via `shared/format`.
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const toPosix = (p) => p.split(path.sep).join("/");
@@ -121,6 +122,14 @@ for (const file of files) {
   }
 }
 check("engine: todo import tem contrato no index.d.ts", undeclared, `${declared.size} nomes declarados, ${engineImports} imports`);
+
+// 1b. declaração → runtime: o .d.ts sombreia o JS, então uma declaração sem
+// export real é uma mentira que só aparece em runtime (`undefined`).
+const valueDecls = new Set();
+for (const m of dts.matchAll(/export\s+declare\s+(?:function|const|let|class)\s+([A-Za-z0-9_$]+)/g)) valueDecls.add(m[1]);
+const runtime = await import(pathToFileURL(path.join(PACKAGES, "proprietary-engine/src/index.js")).href);
+const phantom = [...valueDecls].filter((n) => !(n in runtime)).sort();
+check("engine: toda declaração de valor existe no runtime", phantom, `${valueDecls.size} valores declarados`);
 
 // ── 2. interior do pacote / workspace morto ─────────────────────────────────
 const deep = [];
