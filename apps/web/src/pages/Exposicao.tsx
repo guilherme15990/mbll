@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { CheckCircle2, HeartPulse, Info, Server, ShieldAlert, ShieldCheck, Sparkles, XCircle } from "lucide-react";
 import { ago, useHeroes, useMeta, useViews } from "../lib/api";
-import { useFilters } from "../App";
+import { useFilters } from "../app/filters";
 import {
   Avatar, CtxBar, ErrBox, IddZone, Loading,
   SectionTitle, StatusSeal, TierBadge

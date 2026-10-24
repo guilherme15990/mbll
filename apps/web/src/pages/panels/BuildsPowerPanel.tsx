@@ -13,6 +13,7 @@ import {
   type CombinerScore,
 } from "../../lib/combiner";
 import { CtxBar, Empty, ErrBox, FreshLine, Loading, SectionTitle } from "../../components/ui";
+import { signed } from "../../shared/format";
 
 /**
  * Builds + poder (ADR-030) — guia própria em `/builds?view=power`.
@@ -22,11 +23,6 @@ import { CtxBar, Empty, ErrBox, FreshLine, Loading, SectionTitle } from "../../c
  * O índice é a média dos pesos por contraste — não é previsão, não é
  * win rate da combinação e não é o "Poder da Build" oficial.
  */
-
-function signed(v: number | null | undefined, digits = 1, suffix = "") {
-  if (v == null || !Number.isFinite(v)) return "—";
-  return `${v >= 0 ? "+" : ""}${v.toFixed(digits)}${suffix}`;
-}
 
 function ItemSlot({ item, size = 34, added = false }: { item: AggregateItemShape; size?: number; added?: boolean }) {
   const ring = added ? " ring-1 ring-gold/70" : "";

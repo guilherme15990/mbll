@@ -11,6 +11,7 @@ import {
 import {
   CtxBar, Empty, ErrBox, FreshLine, Loading, SectionTitle,
 } from "../../components/ui";
+import { pp } from "../../shared/format";
 
 const ARCHETYPES: { key: string; label: string }[] = [
   { key: "physical_attack", label: "Ataque físico" },
@@ -22,10 +23,6 @@ const ARCHETYPES: { key: string; label: string }[] = [
 // Categorias separadas exigidas na revisão: híbridos, utilitários e não
 // classificados não entram nos quatro blocos principais. O que não for um dos
 // quatro arquétipos principais cai no bloco "outros" — nunca é descartado.
-
-function pp(v: number | null | undefined) {
-  return v == null || !Number.isFinite(v) ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(1)} pp`;
-}
 
 function deltaStatusOfPp(deltapp: number | null | undefined): AggregateDeltaStatus {
   if (deltapp == null || !Number.isFinite(deltapp)) return "insufficient";

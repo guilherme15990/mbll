@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Eye, FlaskConical, Gem, Search } from "lucide-react";
 import { GRID_SERVER_SORT, LANES, PAGE_SIZE, isServerSort, num, useGems, useHeroLanes, useHeroes, useMeta, useViews, type GridSort, type Hero } from "../lib/api";
 import { trustOf } from "@radar/proprietary-engine";
-import { useFilters } from "../App";
+import { useFilters } from "../app/filters";
 import HeroPicker from "../components/HeroPicker";
 import HeroCard from "../components/HeroCard";
 import RankingsTab from "../components/dashboard/RankingsTab";

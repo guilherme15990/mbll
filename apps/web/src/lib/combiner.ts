@@ -7,6 +7,7 @@ import type {
   AggregateTopBuild,
   AggregateValueSource,
 } from "./api";
+import { signed } from "../shared/format.ts";
 
 /**
  * Combinador (ADR-030/ADR-031) — índice aditivo de efeitos marginais.
@@ -196,7 +197,7 @@ export function valueText(
   valuePpEst: number | null | undefined,
   digits = 2,
 ): string {
-  const fmt = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(digits)} pp`;
+  const fmt = (v: number) => signed(v, digits, " pp");
   if (source === "observed" && valuePp != null) return fmt(valuePp);
   if (source === "estimated" && valuePpEst != null) return `~${fmt(valuePpEst)}`;
   if (source === "descriptive") return "descritivo";

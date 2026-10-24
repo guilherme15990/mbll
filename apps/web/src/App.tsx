@@ -1,47 +1,50 @@
-import { useState } from "react";
-import { Navigate, Routes, Route, useSearchParams } from "react-router-dom";
+import { lazy, Suspense, useState } from "react";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Compass, Eye, Menu, Radar } from "lucide-react";
 import { IddProvider, useIdd } from "./lib/idd";
 import { IddModal } from "./components/IddModal";
 import { Sidebar } from "./components/Sidebar";
-import Forca from "./pages/Forca";
-import Dashboard from "./pages/Dashboard";
-import Herois from "./pages/Herois";
-import Confianca from "./pages/Confianca";
-import Ranks from "./pages/Ranks";
-import Tempo from "./pages/Tempo";
-import Confrontos from "./pages/Confrontos";
-import Draft from "./pages/Draft";
-import Blind from "./pages/Blind";
-import Builds from "./pages/Builds";
-import Exposicao from "./pages/Exposicao";
-import HeroDetails from "./pages/hero/HeroDetails";
+import { filtersQuery, useFilters } from "./app/filters";
+import { ErrorBoundary } from "./app/ErrorBoundary";
 
-export function useFilters() {
-  const [sp, setSp] = useSearchParams();
-  const rank = sp.get("rank") ?? "mythic";
-  const window = sp.get("window") ?? "7";
-  const hero = sp.get("hero") ?? "";
-  const set = (k: string, v: string) => {
-    sp.set(k, v);
-    setSp(sp, { replace: true });
-  };
-  return { rank, window, hero, set };
+// F4a: cada página é um chunk próprio. O shell (header/sidebar/footer) pinta
+// imediatamente; só o módulo da rota é baixado quando ela abre. `HeroDetails`
+// é declarado uma vez e reaproveitado pelos três caminhos da ficha.
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Herois = lazy(() => import("./pages/Herois"));
+const Forca = lazy(() => import("./pages/Forca"));
+const Confianca = lazy(() => import("./pages/Confianca"));
+const Ranks = lazy(() => import("./pages/Ranks"));
+const Tempo = lazy(() => import("./pages/Tempo"));
+const Confrontos = lazy(() => import("./pages/Confrontos"));
+const Draft = lazy(() => import("./pages/Draft"));
+const Blind = lazy(() => import("./pages/Blind"));
+const Builds = lazy(() => import("./pages/Builds"));
+const Exposicao = lazy(() => import("./pages/Exposicao"));
+const HeroDetails = lazy(() => import("./pages/hero/HeroDetails"));
+
+function RouteFallback() {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="card p-6 flex items-center gap-3 text-mist"
+      data-testid="route-loading"
+    >
+      <span className="w-4 h-4 rounded-full border-2 border-gold/30 border-t-gold animate-spin" />
+      <span className="text-sm">Carregando módulo…</span>
+    </div>
+  );
 }
 
 function AppContent() {
   const { rank, window, hero, set } = useFilters();
+  const location = useLocation();
   const [isIddOpen, setIsIddOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { inspectorEnabled, toggleInspector } = useIdd();
 
-  const getNavUrl = (baseTo: string) => {
-    const params = new URLSearchParams();
-    if (rank) params.set("rank", rank);
-    if (window) params.set("window", window);
-    if (hero) params.set("hero", hero);
-    return `${baseTo}?${params.toString()}`;
-  };
+  const getNavUrl = (baseTo: string) => `${baseTo}?${filtersQuery({ rank, window, hero })}`;
 
   return (
     <div className="min-h-screen bg-abyss flex flex-col font-sans selection:bg-gold/30 selection:text-gold-light">
@@ -155,24 +158,29 @@ function AppContent() {
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} getNavUrl={getNavUrl} onOpenIdd={() => setIsIddOpen(true)} />
         {/* Main App Container */}
         <main className="flex-1 min-w-0 py-6 flex flex-col gap-6">
-          <Routes>
-            <Route path="/" element={<Navigate to={`/dashboard?rank=${rank}&window=${window}`} replace />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/hero" element={<Herois />} />
-            <Route path="/forca" element={<Forca />} />
-            <Route path="/confianca" element={<Confianca />} />
-            <Route path="/ranks" element={<Ranks />} />
-            <Route path="/tempo" element={<Tempo />} />
-            <Route path="/confrontos" element={<Confrontos />} />
-            <Route path="/draft" element={<Draft />} />
-            <Route path="/blind" element={<Blind />} />
-            <Route path="/builds" element={<Builds />} />
-            <Route path="/exposicao" element={<Exposicao />} />
-            <Route path="/hero/:id" element={<HeroDetails />} />
-            {/* Aliases permanentes da ficha (links antigos seguem válidos) */}
-            <Route path="/hero/detalhes" element={<HeroDetails />} />
-            <Route path="/heroi" element={<HeroDetails />} />
-          </Routes>
+          {/* key = pathname: navegar para outra rota limpa o erro da anterior. */}
+          <ErrorBoundary key={location.pathname}>
+            <Suspense fallback={<RouteFallback />}>
+              <Routes>
+                <Route path="/" element={<Navigate to={`/dashboard?rank=${rank}&window=${window}`} replace />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/hero" element={<Herois />} />
+                <Route path="/forca" element={<Forca />} />
+                <Route path="/confianca" element={<Confianca />} />
+                <Route path="/ranks" element={<Ranks />} />
+                <Route path="/tempo" element={<Tempo />} />
+                <Route path="/confrontos" element={<Confrontos />} />
+                <Route path="/draft" element={<Draft />} />
+                <Route path="/blind" element={<Blind />} />
+                <Route path="/builds" element={<Builds />} />
+                <Route path="/exposicao" element={<Exposicao />} />
+                <Route path="/hero/:id" element={<HeroDetails />} />
+                {/* Aliases permanentes da ficha (links antigos seguem válidos) */}
+                <Route path="/hero/detalhes" element={<HeroDetails />} />
+                <Route path="/heroi" element={<HeroDetails />} />
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
         </main>
       </div>
 

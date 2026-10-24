@@ -1,5 +1,5 @@
 import { useSearchParams } from "react-router-dom";
-import { useFilters } from "../App";
+import { useFilters } from "../app/filters";
 import HeroPicker from "../components/HeroPicker";
 import { HeroDossier } from "../components/HeroDossier";
 import DraftPanel from "./panels/DraftPanel";

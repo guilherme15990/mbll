@@ -109,6 +109,9 @@ Range/streaming); `startServer`/sinais são cobertos por smoke de runtime, não 
 4. **Dois gerenciadores**: `pnpm-workspace.yaml` + `workspaces` npm + `package-lock.json`.
    Padronizar npm e remover o arquivo pnpm.
 5. **Web**: `.old/` versionado e `pages/` como depósito de features — F4a.
+   → **Resolvido na F4a** (ADR-036): `.old/`, `DddModal`, `ExportEvidence` e
+   `heroSeal` removidos; ciclo `página → App` morto; rotas lazy e boundary.
+   `pages/` continuar como depósito de features fica para a F4b (opcional).
 
 ## Evidência de execução
 

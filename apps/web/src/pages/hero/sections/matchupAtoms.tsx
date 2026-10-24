@@ -1,6 +1,7 @@
 import { ListChecks, ShieldCheck, Swords, TriangleAlert, Users } from "lucide-react";
-import { cx, num, pct, type Pair } from "../../../lib/api";
+import { cx, pct, type Pair } from "../../../lib/api";
 import { Avatar } from "../../../components/ui";
+import { signed } from "../../../shared/format";
 
 /**
  * Átomos de confronto compartilhados pela aba Confrontos e pela prévia da
@@ -44,8 +45,7 @@ export function MatchupToneIcon({ tone, size = 14 }: { tone: MatchupTone; size?:
 }
 
 export function fmtDelta(d: number | null | undefined): string {
-  if (d == null || !Number.isFinite(d)) return "—";
-  return `${d >= 0 ? "+" : ""}${num(d, 3)}`;
+  return signed(d, 3);
 }
 
 export function profileLabel(profile: string | undefined): string {

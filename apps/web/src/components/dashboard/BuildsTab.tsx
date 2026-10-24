@@ -11,6 +11,7 @@ import { NeedsLane } from "../idd/NeedsRankLane";
 import {
   Avatar, Empty, ErrBox, IddZone, Loading, TierBadge,
 } from "../ui";
+import { signed } from "../../shared/format";
 
 /**
  * Aba Builds do /dashboard (v1, composição por rota — sem herói).
@@ -33,13 +34,6 @@ type CardState =
   | { kind: "empty"; motive: string }
   | { kind: "ready"; hero: Hero; builds: Build[]; audit: string; unfiltered: boolean };
 
-/** Refs da rota em `@radar/proprietary-engine` (refWinsOf). */
-
-function fmtLift(v: number | null | undefined): string {
-  if (v == null || !Number.isFinite(v)) return "—";
-  return `${v >= 0 ? "+" : ""}${num(v, 4)}`;
-}
-
 /** Cartão de herói com suas builds: win/pick + tags + referência por linha + ícones. */
 function BuildLine({ b, rank, lane }: { b: Build; rank: string; lane: string }) {
   const tags = getBuildTags(b);
@@ -60,8 +54,8 @@ function BuildLine({ b, rank, lane }: { b: Build; rank: string; lane: string }) 
         ))}
       </div>
       <p className="text-[11px] text-mist font-mono leading-relaxed">
-        vs Mais Usada {fmtLift(b.lift_vs_most_used)} (ref WR {pct(refs?.most_used_win)})
-        {" · "}vs Média {fmtLift(b.lift_vs_mean)} (ref {pct(refs?.hero_mean_win)})
+        vs Mais Usada {signed(b.lift_vs_most_used, 4)} (ref WR {pct(refs?.most_used_win)})
+        {" · "}vs Média {signed(b.lift_vs_mean, 4)} (ref {pct(refs?.hero_mean_win)})
         {" · "}{rank} · {lane} · {b.reference_kind ?? "mais-usada"}
       </p>
       <div className="flex items-center gap-1.5 flex-wrap">

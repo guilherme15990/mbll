@@ -12,6 +12,7 @@ import {
   type CombinerContribution, type CombinerPick,
 } from "../../lib/combiner";
 import { CtxBar, Empty, ErrBox, FreshLine, Loading, SectionTitle } from "../../components/ui";
+import { signed } from "../../shared/format";
 
 /**
  * Combinador (ADR-030) — guia própria em `/builds?view=combiner`.
@@ -32,11 +33,6 @@ const KIND_CLASS: Record<CombinerContribution["kind"], string> = {
   talent: "text-emerald-200 border-emerald-400/30 bg-emerald-400/10",
   spell: "text-purple-200 border-purple-400/30 bg-purple-400/10",
 };
-
-function signed(v: number | null | undefined, digits = 1, suffix = "") {
-  if (v == null || !Number.isFinite(v)) return "—";
-  return `${v >= 0 ? "+" : ""}${v.toFixed(digits)}${suffix}`;
-}
 
 function ScoreCard({
   combiner, index, meanPp, withData, observed, estimated, total, hero,

@@ -1,5 +1,9 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
+// F4a: a implementação vive em `shared/format`; reexportamos aqui porque o
+// restante da web ainda importa formatação junto dos hooks.
+export { ago, num, pct } from "../shared/format";
+
 export type Hero = {
   id: number; name: string; head: string | null;
   win: number; pick: number; ban: number;
@@ -550,15 +554,7 @@ export const useBlind = (id: string | null | undefined, rank: string, days: stri
     queryFn: () => getJSON<any>(`/v1/heroes/${id}/blind?rank=${rank}&days=${days}`),
   });
 
-// formatação defensiva: nunca quebra com undefined/NaN
-export const pct = (v: unknown, d = 1) => (typeof v === "number" && Number.isFinite(v) ? `${(v * 100).toFixed(d)}%` : "—");
-export const num = (v: unknown, d = 2) => (typeof v === "number" && Number.isFinite(v) ? v.toFixed(d) : "—");
+// formatação defensiva: nunca quebra com undefined/NaN (dono: shared/format)
 export const dir = (z: unknown) => (typeof z !== "number" || !Number.isFinite(z) ? "■" : z > 0.5 ? "▲" : z < -0.5 ? "▼" : "■");
 export const dirWord = (z: unknown) => (typeof z !== "number" || !Number.isFinite(z) ? "estável" : z > 0.5 ? "sobe" : z < -0.5 ? "cai" : "estável");
-export function ago(ms?: number) {
-  if (ms == null) return "agora";
-  const h = ms / 3600e3;
-  if (h < 1) return `há ${Math.max(1, Math.round(ms / 60e3))} min`;
-  return `há ${h.toFixed(h < 10 ? 1 : 0)} h`;
-}
 export const cx = (...xs: (string | false | null | undefined)[]) => xs.filter(Boolean).join(" ");

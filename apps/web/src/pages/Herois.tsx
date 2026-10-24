@@ -1,6 +1,6 @@
 import { Link, useSearchParams } from "react-router-dom";
 import { num, useHeroLanes, useHeroes } from "../lib/api";
-import { useFilters } from "../App";
+import { useFilters } from "../app/filters";
 import HeroPicker from "../components/HeroPicker";
 import { PrimaryAction } from "../components/idd/PrimaryAction";
 import {

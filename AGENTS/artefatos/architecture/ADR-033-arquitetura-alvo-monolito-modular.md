@@ -110,4 +110,13 @@ tem de ser feita em passos com diff pequeno, nunca junto com mudanças de lógic
   (`HISTORY_RETENTION_DAYS=0` default); single-flight compartilhado; `closeDb()`
   no shutdown. API 123/123 em 3 execuções; motor 219/219; web, build e runtime
   smoke (`dbClosed:true`) verdes; cobertura 93,75% de linhas.
+- **F4a** concluída (ADR-036): ver `F4a-web.md`. `app/filters.ts` (ciclo
+  página→App morto), `shared/format.ts` como fonte única, `ErrorBoundary` na raiz
+  e por rota, 12 rotas lazy sob `Suspense`, 9 arquivos de código morto removidos.
+  Entry 984,62 → 289,76 kB (−70,6%) em 30 chunks; typecheck 0; guardian F4a 20/20;
+  web 24/24; API 123/123; motor 219/219; build e runtime smoke verdes.
+- **F4b** (opcional, não executada): features por contexto; `pages/` deixa de ser
+  depósito.
+- **F5** pendente: `checkJs` na API, script de fronteiras, coverage com
+  thresholds, CI, README/ADRs.
 

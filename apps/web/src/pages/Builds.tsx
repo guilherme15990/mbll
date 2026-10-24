@@ -1,6 +1,6 @@
 import { useSearchParams } from "react-router-dom";
 import { Package, Hammer, FlaskConical, Boxes } from "lucide-react";
-import { useFilters } from "../App";
+import { useFilters } from "../app/filters";
 import { cx } from "../lib/api";
 import HeroPicker from "../components/HeroPicker";
 import { HeroDossier } from "../components/HeroDossier";

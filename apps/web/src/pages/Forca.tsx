@@ -1,4 +1,4 @@
-import { useFilters } from "../App";
+import { useFilters } from "../app/filters";
 import { HeroDossier } from "../components/HeroDossier";
 import ForcaPanel from "./panels/ForcaPanel";
 

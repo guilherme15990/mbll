@@ -1,5 +1,6 @@
 import { Sigma } from "lucide-react";
 import { IddZone } from "../ui";
+import { num } from "../../shared/format";
 
 /**
  * IDD C2 — SigmaBanCard · casa /exposicao (Snapshot) + selo compacto /forca.
@@ -22,7 +23,6 @@ export function SigmaBanCard({
   stale?: boolean;
   capId?: string;
 }) {
-  const fmt = (v: number | null) => (typeof v === "number" && Number.isFinite(v) ? v.toFixed(4) : "—");
   return (
     <IddZone zone="state" capId={capId}>
       <div className="card p-4 bg-panel border-line space-y-2.5" data-testid="sigma-ban-card">
@@ -39,7 +39,7 @@ export function SigmaBanCard({
           <div className="p-2.5 rounded-xl bg-abyss/60 border border-line">
             <p className="text-[11px] text-mist">Σ pick ≈ 1</p>
             <p className="num text-lg font-bold text-foam">
-              {fmt(sigmaPickSum)}{" "}
+              {num(sigmaPickSum, 4)}{" "}
               <span className="text-[10px] font-mono text-mist border border-line rounded px-1 py-0.5 align-middle">
                 slot_share · unvalidated
               </span>
@@ -49,7 +49,7 @@ export function SigmaBanCard({
           <div className="p-2.5 rounded-xl bg-abyss/60 border border-line">
             <p className="text-[11px] text-mist">Σ ban (unidade própria)</p>
             <p className="num text-lg font-bold text-foam">
-              {fmt(sigmaBanSum)}{" "}
+              {num(sigmaBanSum, 4)}{" "}
               <span className="text-[10px] font-mono text-mist border border-line rounded px-1 py-0.5 align-middle">
                 slot_share · unvalidated
               </span>

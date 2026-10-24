@@ -6,12 +6,8 @@ import { getBuildTags, orderBuildsByLift, selectBuildsAboveMostUsed } from "@rad
 import { NeedsLane } from "../../../components/idd/NeedsRankLane";
 import BuildLoadout from "../../../components/BuildLoadout";
 import { Empty, ErrBox, Loading } from "../../../components/ui";
+import { signed } from "../../../shared/format";
 
-function signed(v: number, digits = 4): string {
-  return `${v >= 0 ? "+" : ""}${num(v, digits)}`;
-}
-
-/** Barra L divergente: emerald + / rose −, zero = linha, escala fixa ±0,10. */
 function LiftBar({ lift }: { lift: number | null | undefined }) {
   const has = lift != null && Number.isFinite(lift);
   const v = has ? (lift as number) : 0;
@@ -21,7 +17,7 @@ function LiftBar({ lift }: { lift: number | null | undefined }) {
       role="img"
       aria-label={
         has
-          ? `lift ${signed(v)} em pontos percentuais vs mais-usada — escala fixa de menos 0,10 a mais 0,10`
+          ? `lift ${signed(v, 4)} em pontos percentuais vs mais-usada — escala fixa de menos 0,10 a mais 0,10`
           : "lift sem referência — sem barra"
       }
       className="relative h-2 w-full rounded-full bg-abyss border border-line overflow-hidden"
@@ -181,7 +177,7 @@ export default function BuildsSection({
         <Kpi label="Média do herói" value={pct(meanWin)} hint="win rate na lane e elo" />
         <Kpi
           label="Maior lift"
-          value={bestLift != null && Number.isFinite(bestLift) ? signed(bestLift) : "—"}
+          value={bestLift != null && Number.isFinite(bestLift) ? signed(bestLift, 4) : "—"}
           hint="vs build mais usada"
         />
       </div>
@@ -270,7 +266,7 @@ export default function BuildsSection({
                           !liftOk ? "text-mist" : (lift as number) >= 0 ? "text-emerald-300" : "text-rose-300",
                         )}
                       >
-                        {liftOk ? signed(lift as number) : "—"}
+                        {liftOk ? signed(lift as number, 4) : "—"}
                       </span>
                     </div>
                     <LiftBar lift={lift} />
