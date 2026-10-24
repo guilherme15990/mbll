@@ -98,4 +98,10 @@ tem de ser feita em passos com diff pequeno, nunca junto com mudanças de lógic
   20 endpoints em 9 rotas + 8 módulos de aplicação; auto-recursão e validação
   duplicada eliminadas; cobertura de `apps/api/src` 47,32% → 93,92% de linhas;
   API 59/59 e motor 219/219 em 3 execuções.
+- **F2** concluída (ADR-034): ver `F2-http-e-operacao.md`. Config fail-fast,
+  taxonomia 500/502 + `HttpError`, request-id validado, log JSON, rate limit
+  20/60 por IP, estático binário-safe com ETag/cache, headers de segurança e
+  shutdown gracioso. API 104/104 em 3 execuções; motor 219/219; build e runtime
+  smoke verdes. Dívidas de estrutura (bancos espalhados, `src/infra/`, fronteira
+  do engine, pnpm, `.old/`, `web/pages`) registradas para F3/F4a/F5.
 

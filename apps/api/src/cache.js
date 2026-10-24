@@ -12,13 +12,14 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { createHash } from "node:crypto";
+import { config } from "./config.js";
 
 const TTL = { A: 2 * 3600e3, B: 6 * 3600e3, C: 24 * 3600e3 };
 const mem = new Map(); // key -> {at, body}
 const memHistory = []; // fallback append-only quando SQLite indisponível
 let memHistSeq = 0;
 let db = null;
-let useSqlite = process.env.SQLITE_CACHE !== "off";
+let useSqlite = config.cache.sqlite;
 
 const HISTORY_DDL = `CREATE TABLE IF NOT EXISTS snapshot_history(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -38,7 +39,7 @@ if (useSqlite) {
   try {
     const { DatabaseSync } = await import("node:sqlite").catch(() => ({}));
     if (DatabaseSync) {
-      const file = process.env.SQLITE_FILE ?? "./data/cache.sqlite";
+      const file = config.cache.file;
       mkdirSync(dirname(file), { recursive: true });
       db = new DatabaseSync(file);
       db.exec(`CREATE TABLE IF NOT EXISTS cache (key TEXT PRIMARY KEY, at INTEGER, body TEXT)`);

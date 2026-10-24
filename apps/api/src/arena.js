@@ -1,12 +1,13 @@
 // Cliente tipado da Rone Arena API — R-ING-1: timeout, retry backoff+jitter, concorrência.
 // Base padrão: fastapicloud (respondeu 14/14 sem 429). rone.dev fica como alt host
 // quando configurado em ARENA_ALT_HOSTS; o mirror devolve 500 HTML em rajada.
-const BASE = (process.env.ARENA_BASE ?? "https://arena.fastapicloud.dev").replace(/\/+$/, "");
+import { config } from "./config.js";
+
+// F2: nenhuma leitura solta de process.env — tudo vem de config.js (fail-fast).
+const BASE = config.arena.base;
 // SEC H-01: failover só segue host alternativo explícito e permitido.
-const ALT_ALLOW = new Set(
-  (process.env.ARENA_ALT_HOSTS ?? "").split(",").map((s) => s.trim()).filter(Boolean)
-);
-const CONC = Number(process.env.ARENA_CONC ?? 4);
+const ALT_ALLOW = new Set(config.arena.altHosts);
+const CONC = config.arena.conc;
 const BREAKER_THRESHOLD = 5;
 const BREAKER_COOLDOWN_MS = 60_000;
 
