@@ -1,0 +1,15 @@
+node_modules
+dist
+data
+*.sqlite
+*.log
+.DS_Store
+
+# Backups/arquivos compactados de distribuição (33 MB+) — não versionar.
+*.zip
+*.bak
+
+# Segredos locais; o modelo versionado é .env.example
+.env
+.env.*
+!.env.example

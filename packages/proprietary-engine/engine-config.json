@@ -1,0 +1,22 @@
+{
+  "model_version": "hero-engine-v2.1.0",
+  "strength_model": "eb_rate_proxy_v1",
+  "minimum_hero_rows_for_relative_tiers": 10,
+  "fdr_alpha": 0.05,
+  "gem_pick_quantile_max": 0.25,
+  "gem_ban_quantile_max": 0.25,
+  "trend_points_min": 5,
+  "trend_practical_delta_pp": 0.5,
+  "trend_version": "theil-sen-date-v2",
+  "practical_lift_pp": null,
+  "posterior_probability_strong": null,
+  "posterior_probability_exploratory": null,
+  "rate_proxy_c": null,
+  "rate_proxy_c_reference": 100000,
+  "rate_proxy_c_grid": [10000, 100000, 1000000, 10000000],
+  "rate_proxy_calibration_version": null,
+  "allow_confirmatory_q_values": false,
+  "null_model_version": "unvalidated_eb_z_v1",
+  "sample_size_method": "not_provided_by_api",
+  "source_api_version": "1.2.3"
+}

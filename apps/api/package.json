@@ -1,0 +1,1 @@
+{"name":"apps-api","version":"0.2.0","type":"module","scripts":{"dev":"node src/index.js","start":"node src/index.js","build":"node --check src/index.js && node --check src/cache.js && node --check src/arena.js && node --check src/routes.js && echo api-ok","test":"node --test ./test/routes.test.js ./test/builds-aggregate.test.js"}}
