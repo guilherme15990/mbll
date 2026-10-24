@@ -97,9 +97,12 @@ Range/streaming); `startServer`/sinais são cobertos por smoke de runtime, não 
 1. **Bancos SQLite espalhados**: `SQLITE_FILE` relativo ao CWD criou 4 bancos
    (`data/`, `apps/api/data`, `apps/web/data` com 14,5 MB e `apps/api/src/data`).
    Corrigir na **F3** com `DATA_DIR` ancorado na raiz do repo + WAL + retenção.
+   → **Resolvido na F3** (ADR-035): default passa a ser `$DATA_DIR/cache.sqlite`.
+   Os arquivos antigos continuam no disco aguardando limpeza manual.
 2. **Infra na raiz de `src/`**: `config.js`, `arena.js`, `cache.js` deveriam estar em
    `src/infra/` conforme a tabela de dependências da ADR-033. Movimento mecânico,
    adiado para não misturar reorg com F2.
+   → **Resolvido na F3** (ADR-035): `src/infra/{config,db,cacheStore,snapshotHistory,arena}.js`.
 3. **Fronteira do engine**: 9 imports `../../../../packages/proprietary-engine/src/index.js`
    ignoram o pacote `@radar/proprietary-engine`. Decidir workspace dep × caminho
    relativo (trade-off: rodar sem `npm install`) na F3/F5.

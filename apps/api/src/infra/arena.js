@@ -1,6 +1,8 @@
 // Cliente tipado da Rone Arena API — R-ING-1: timeout, retry backoff+jitter, concorrência.
 // Base padrão: fastapicloud (respondeu 14/14 sem 429). rone.dev fica como alt host
 // quando configurado em ARENA_ALT_HOSTS; o mirror devolve 500 HTML em rajada.
+//
+// F3: movido de `src/arena.js` para `src/infra/` (transporte externo é infra).
 import { config } from "./config.js";
 
 // F2: nenhuma leitura solta de process.env — tudo vem de config.js (fail-fast).

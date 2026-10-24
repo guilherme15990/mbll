@@ -1,0 +1,107 @@
+// Conexão SQLite única (node:sqlite) + WAL + cache de statements preparados.
+//
+// Antes: cada chamada de cacheGet/cacheSet fazia `db.prepare(...)` de novo e o
+// banco abria sem PRAGMA nenhum (rollback journal, sem busy_timeout). Agora:
+// - `prepare(sql)` reaproveita StatementSync por SQL (o driver não prepara de novo);
+// - WAL + synchronous=NORMAL: leitura concorrente com escrita, menos fsync;
+// - busy_timeout=5s: duas instâncias não falham na hora com SQLITE_BUSY;
+// - schema criado no boot (cache, histórico e arquivo frio).
+//
+// Se `node:sqlite` não existir/falhar, `db` fica null e os módulos caem no
+// fallback em memória — comportamento antigo preservado.
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
+import { config } from "./config.js";
+
+const SCHEMA = [
+  `CREATE TABLE IF NOT EXISTS cache (key TEXT PRIMARY KEY, at INTEGER, body TEXT)`,
+  `CREATE TABLE IF NOT EXISTS snapshot_history(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fonte TEXT NOT NULL, rank TEXT NOT NULL, janela INTEGER NOT NULL,
+    versao_jogo TEXT NOT NULL, coletado_em INTEGER NOT NULL,
+    payload_hash TEXT NOT NULL, payload_json TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'verificado', motivo TEXT
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_snapshot_history_serie
+    ON snapshot_history(fonte, rank, janela, coletado_em)`,
+  // F3: índice próprio para a retenção (WHERE coletado_em < cutoff).
+  `CREATE INDEX IF NOT EXISTS idx_snapshot_history_ts ON snapshot_history(coletado_em)`,
+  // Arquivo frio: MESMO schema + quando foi arquivado. Nada é apagado sem estar aqui.
+  `CREATE TABLE IF NOT EXISTS snapshot_history_archive(
+    id INTEGER PRIMARY KEY,
+    fonte TEXT NOT NULL, rank TEXT NOT NULL, janela INTEGER NOT NULL,
+    versao_jogo TEXT NOT NULL, coletado_em INTEGER NOT NULL,
+    payload_hash TEXT NOT NULL, payload_json TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'verificado', motivo TEXT,
+    archived_at INTEGER NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_snapshot_history_archive_ts
+    ON snapshot_history_archive(coletado_em)`,
+];
+
+let db = null;
+const statements = new Map(); // sql -> StatementSync
+
+if (config.cache.sqlite) {
+  try {
+    const { DatabaseSync } = await import("node:sqlite").catch(() => ({}));
+    if (DatabaseSync) {
+      // DATA_DIR e o diretório do arquivo podem diferir (SQLITE_FILE override).
+      mkdirSync(config.dataDir, { recursive: true });
+      mkdirSync(dirname(config.cache.file), { recursive: true });
+      const conn = new DatabaseSync(config.cache.file);
+      // PRAGMAs são otimização: se um falhar, seguimos com o banco (não perdemos dados).
+      for (const pragma of [
+        "PRAGMA journal_mode=WAL",
+        "PRAGMA synchronous=NORMAL",
+        "PRAGMA busy_timeout=5000",
+        "PRAGMA foreign_keys=ON",
+      ]) {
+        try { conn.exec(pragma); } catch { /* mantém o default do driver */ }
+      }
+      for (const ddl of SCHEMA) conn.exec(ddl);
+      db = conn;
+    }
+  } catch {
+    // SQLite indisponível/corrompido: memória volátil é melhor que derrubar a API.
+    db = null;
+    statements.clear();
+  }
+}
+
+export function getDb() {
+  return db;
+}
+
+export function isSqlite() {
+  return !!db;
+}
+
+/** StatementSync reaproveitado por SQL. Lança se não houver banco (chamador decide). */
+export function prepare(sql) {
+  if (!db) throw new Error("sqlite indisponível");
+  let st = statements.get(sql);
+  if (!st) {
+    st = db.prepare(sql);
+    statements.set(sql, st);
+  }
+  return st;
+}
+
+/** Fecha a conexão e limpa o cache de statements (shutdown gracioso). */
+export function closeDb() {
+  if (!db) return false;
+  statements.clear();
+  try { db.close(); } finally { db = null; }
+  return true;
+}
+
+/** Diagnóstico para /meta/status e testes. */
+export function dbInfo() {
+  return {
+    sqlite: !!db,
+    file: config.cache.file,
+    data_dir: config.dataDir,
+    prepared: statements.size,
+  };
+}

@@ -2,11 +2,13 @@
 // Cache derivado C 24 h + SWR. Fan-out limitado: 4 catálogos + páginas de rank
 // + 1 request por herói do top-N (máx. 20). Computações serializadas para não
 // somar rajadas de lanes/ranks diferentes.
-import { arenaGet, mapConc } from "../arena.js";
-import { cacheGet, cacheSet, payloadHash } from "../cache.js";
+import { arenaGet, mapConc } from "../infra/arena.js";
+import { cacheGet, cacheSet } from "../infra/cacheStore.js";
 import { scoreLot } from "./scoring.js";
 import { fetchRankAll, lastVerifiedPosterior, lanesFromRoadsort } from "./rankLot.js";
 import { currentGameVersion } from "./versions.js";
+import { payloadHash } from "./canonical.js";
+import { createSingleFlight } from "./singleFlight.js";
 import {
   buildAggregate,
   normalizeEquipmentCatalog,
@@ -17,7 +19,8 @@ import {
 export const AGG_TOP_VALUES = new Set([10, 20]);
 const AGG_INTERACTIVE_LIMIT = 30;
 let aggChain = Promise.resolve();
-const aggInFlight = new Map();
+// F3: dedupe por chave com a implementação compartilhada (era um Map local).
+const aggFlight = createSingleFlight();
 
 function aggEnqueue(fn) {
   const run = aggChain.then(fn, fn);
@@ -318,18 +321,17 @@ export function withAggCacheMeta(body, hit) {
 }
 
 export function aggBackgroundRevalidate(key, params) {
-  if (aggInFlight.has(key)) return;
-  const run = aggEnqueue(() => computeBuildsAggregate(params))
-    .then((out) => { cacheSet(key, out.body); return out; })
-    .catch(() => null)
-    .finally(() => { if (aggInFlight.get(key) === run) aggInFlight.delete(key); });
-  aggInFlight.set(key, run);
+  if (aggFlight.has(key)) return;
+  aggFlight
+    .run(key, () => aggEnqueue(() => computeBuildsAggregate(params))
+      .then((out) => { cacheSet(key, out.body); return out; }))
+    .catch(() => null);
 }
 
 // Executa (ou reaproveita) o fan-out do agregado. O dedupe por chave vive aqui,
 // não na rota: duas abas na mesma lane não disparam dois fan-outs.
 export async function runBuildsAggregate(params, key) {
-  const pending = aggInFlight.get(key);
+  const pending = aggFlight.peek(key);
   if (pending) {
     try {
       const out = await pending;
@@ -340,8 +342,9 @@ export async function runBuildsAggregate(params, key) {
     } catch { /* segue para nova tentativa */ }
   }
 
-  const run = aggEnqueue(() => computeBuildsAggregate(params));
-  aggInFlight.set(key, run);
+  // run() devolve a promise em andamento se outra chamada registrou a chave
+  // entre o peek e este ponto (não há await no meio: é atômico no event loop).
+  const run = aggFlight.run(key, () => aggEnqueue(() => computeBuildsAggregate(params)));
   try {
     const out = await run;
     cacheSet(key, out.body);
@@ -350,7 +353,5 @@ export async function runBuildsAggregate(params, key) {
     const stale = cacheGet(key, "C");
     if (stale.hit) return { status: 200, body: withAggCacheMeta(stale.body, stale) };
     return { status: 502, body: { error: "upstream_unavailable", message: "Upstream unavailable, try again", detail: String(e?.message ?? e).slice(0, 200) } };
-  } finally {
-    if (aggInFlight.get(key) === run) aggInFlight.delete(key);
   }
 }

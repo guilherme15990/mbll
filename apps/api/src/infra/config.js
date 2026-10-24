@@ -1,15 +1,21 @@
-// Fonte ÚNICA de configuração da API (F2).
+// Fonte ÚNICA de configuração da API (F2) + diretório de dados (F3).
 //
 // Regra: o processo NÃO sobe com valor inválido. Cada variável é validada no
 // import e o erro aponta o nome e o valor recebido — sem fallback silencioso
 // para NaN/undefined (era a causa de `ARENA_CONC=abc` virar fan-out vazio).
 //
 // `parseConfig(env)` é pura e testável; `config` é a leitura do process.env.
+//
+// F3: `DATA_DIR` ancora TODO estado persistente na raiz do repo (não no CWD).
+// Antes, `SQLITE_FILE=./data/cache.sqlite` criava um banco por diretório de
+// execução (data/, apps/api/data, apps/web/data, apps/api/src/data).
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const HERE = dirname(fileURLToPath(import.meta.url)); // apps/api/src
-const DEFAULT_WEB_DIST = join(HERE, "..", "..", "web", "dist");
+const HERE = dirname(fileURLToPath(import.meta.url)); // apps/api/src/infra
+const REPO_ROOT = resolve(HERE, "..", "..", "..", "..");
+const DEFAULT_WEB_DIST = join(REPO_ROOT, "apps", "web", "dist");
+const DEFAULT_DATA_DIR = join(REPO_ROOT, "data");
 const LOG_LEVELS = ["silent", "error", "info", "debug"];
 
 function fail(name, value, expected) {
@@ -62,9 +68,27 @@ function logLevel(env) {
   return v;
 }
 
+// DATA_DIR relativo é relativo à RAIZ DO REPO (não ao CWD): é o que impede
+// `node apps/api/src/index.js` e `node src/index.js` de criarem bancos diferentes.
+function dataDirOf(env) {
+  const raw = env.DATA_DIR;
+  if (raw === undefined || raw === "") return DEFAULT_DATA_DIR;
+  return resolve(REPO_ROOT, String(raw));
+}
+
+// SQLITE_FILE é OVERRIDE explícito e mantém a semântica antiga (relativo ao CWD).
+// O default, porém, é absoluto e vive em DATA_DIR.
+function sqliteFileOf(env, dataDir) {
+  const raw = env.SQLITE_FILE;
+  if (raw === undefined || raw === "") return join(dataDir, "cache.sqlite");
+  return resolve(String(raw));
+}
+
 export function parseConfig(env = process.env) {
-  const webDist = env.WEB_DIST ? resolve(String(env.WEB_DIST)) : DEFAULT_WEB_DIST;
+  const dataDir = dataDirOf(env);
   return {
+    repoRoot: REPO_ROOT,
+    dataDir,
     port: int(env, "PORT", 3001, { min: 0, max: 65535 }),
     arena: {
       base: urlString(env, "ARENA_BASE", "https://arena.fastapicloud.dev"),
@@ -75,10 +99,15 @@ export function parseConfig(env = process.env) {
     cache: {
       // compat: só "off" desliga o SQLite; qualquer outro valor mantém ligado.
       sqlite: env.SQLITE_CACHE !== "off",
-      file: env.SQLITE_FILE || "./data/cache.sqlite",
+      file: sqliteFileOf(env, dataDir),
+    },
+    history: {
+      // 0 = retenção desligada (default): histórico cresce append-only.
+      // >0 = arquiva em snapshot_history_archive e poda a tabela quente.
+      retentionDays: int(env, "HISTORY_RETENTION_DAYS", 0, { min: 0, max: 36_500 }),
     },
     http: {
-      webDist,
+      webDist: env.WEB_DIST ? resolve(REPO_ROOT, String(env.WEB_DIST)) : DEFAULT_WEB_DIST,
       logLevel: logLevel(env),
       // X-Forwarded-For só é confiável atrás de proxy conhecido.
       trustProxy: bool(env, "TRUST_PROXY", false),

@@ -1,6 +1,7 @@
 // Ficha do herói e módulos derivados por herói (sem nova coleta quando possível).
-import { arenaGet } from "../arena.js";
-import { cacheGet, cacheSet, listSnapshots } from "../cache.js";
+import { arenaGet } from "../infra/arena.js";
+import { cacheGet, cacheSet } from "../infra/cacheStore.js";
+import { listSnapshots } from "../infra/snapshotHistory.js";
 import {
   confidenceTrio, rankDifference, temporalDelta, assessSeries,
   distortionResidual, medianPickOf, medianBanOf, classOf, C_REFERENCE,

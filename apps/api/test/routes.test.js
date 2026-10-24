@@ -84,7 +84,7 @@ describe("SnapshotHistory append-only (ADR-021-09, DDD-V4-05)", () => {
     { id: 2, name: "B", win: 0.5, pick: 0.2, ban: 0.2 },
   ];
   it("re-coleta gera 2 linhas (INSERT sempre, nunca REPLACE)", async () => {
-    const { recordSnapshot, listSnapshots, payloadHash } = await import("../src/cache.js");
+    const { recordSnapshot, listSnapshots, payloadHash } = await import("../src/infra/snapshotHistory.js");
     const before = listSnapshots({ fonte: FONTE }).length;
     const r1 = recordSnapshot({ fonte: FONTE, rank: "mythic", janela: 7, versao_jogo: "t1", rows: rowsA });
     const r2 = recordSnapshot({ fonte: FONTE, rank: "mythic", janela: 7, versao_jogo: "t1", rows: rowsA });
@@ -98,7 +98,7 @@ describe("SnapshotHistory append-only (ADR-021-09, DDD-V4-05)", () => {
     // Regressão: `ASC LIMIT n` devolvia as mais antigas e escondia o snapshot novo
     // quando a série passava de `limit` coletas (foi o que derrubou o teste
     // "violado ENTRA marcado" em bases de dev acumuladas).
-    const { recordSnapshot, listSnapshots } = await import("../src/cache.js");
+    const { recordSnapshot, listSnapshots } = await import("../src/infra/snapshotHistory.js");
     const f = `${FONTE}_janela`;
     const ts = [];
     for (let i = 0; i < 5; i++) {
@@ -114,7 +114,7 @@ describe("SnapshotHistory append-only (ADR-021-09, DDD-V4-05)", () => {
     assert.equal(completa.at(-1).coletado_em, Math.max(...ts));
   });
   it("violado ENTRA marcado (L2) e some da T5", async () => {
-    const { recordSnapshot } = await import("../src/cache.js");
+    const { recordSnapshot } = await import("../src/infra/snapshotHistory.js");
     const { assessSeries } = await import("../../../packages/proprietary-engine/src/index.js");
     const { router } = await import("../src/routes.js");
     const v = recordSnapshot({ fonte: FONTE, rank: "mythic", janela: 7, versao_jogo: "t1", rows: rowsA, status: "violado", motivo: "sigma_pick:0.9" });
@@ -131,7 +131,7 @@ describe("SnapshotHistory append-only (ADR-021-09, DDD-V4-05)", () => {
     assert.equal(serie.status, "serie_curta");
   });
   it("diff detecta mudança p/ C-105 sem despejar payload", async () => {
-    const { recordSnapshot } = await import("../src/cache.js");
+    const { recordSnapshot } = await import("../src/infra/snapshotHistory.js");
     const { router } = await import("../src/routes.js");
     const f = `${FONTE}_diff`;
     const b = recordSnapshot({ fonte: f, rank: "mythic", janela: 7, versao_jogo: "t1", rows: rowsA });
@@ -447,7 +447,7 @@ describe("walk-forward API ADR-023 (L2-WF-01/04/05)", () => {
   });
 
   it("round-trip: snapshot N alimenta N+1 com apêndice (L2-WF-04/05)", async () => {
-    const { recordSnapshot, listSnapshots, getSnapshot } = await import("../src/cache.js");
+    const { recordSnapshot, listSnapshots, getSnapshot } = await import("../src/infra/snapshotHistory.js");
     const { summarizeWalkPosterior } = await import("../../../packages/proprietary-engine/src/index.js");
     // N: primeiro lote, sem prior → posterior do lote corrente
     const rowsA = mkRows();
@@ -482,7 +482,7 @@ describe("walk-forward API ADR-023 (L2-WF-01/04/05)", () => {
 
   it("violado nunca vira prior; verificado sem apêndice = flat honesto", async () => {
     const F = `${FONTE}_viol`;
-    const { recordSnapshot } = await import("../src/cache.js");
+    const { recordSnapshot } = await import("../src/infra/snapshotHistory.js");
     const { summarizeWalkPosterior } = await import("../../../packages/proprietary-engine/src/index.js");
     const rows = mkRows();
     const st = batchStats(rows);

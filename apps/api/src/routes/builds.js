@@ -1,6 +1,6 @@
 // Builds — visão de sistema (/builds/aggregate) e lifts por herói.
-import { arenaGet, RANKS } from "../arena.js";
-import { cacheGet, cacheSet } from "../cache.js";
+import { arenaGet, RANKS } from "../infra/arena.js";
+import { cacheGet, cacheSet } from "../infra/cacheStore.js";
 import { requireLane, buildLift, buildReferences } from "../../../../packages/proprietary-engine/src/index.js";
 import { isRank, isWindow, WINDOWS } from "../application/validation.js";
 import {

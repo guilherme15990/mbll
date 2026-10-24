@@ -2,12 +2,20 @@
 // Ids = lista do rank pedido (janela 7; lane é estática por herói, o rank só diz
 // quem listar). Desconhecido = herói SEM lane (aparece sem filtro). Falha do
 // upstream = lista vazia/mapa sem lanes — degradação honesta, nunca 502.
-import { arenaGet, mapConc } from "../arena.js";
-import { cacheGet, cacheSet } from "../cache.js";
+import { arenaGet, mapConc } from "../infra/arena.js";
+import { cacheGet, cacheSet } from "../infra/cacheStore.js";
 import { fetchRankAll, lanesFromRoadsort } from "./rankLot.js";
 import { catalogMap } from "./catalogs.js";
+import { createSingleFlight } from "./singleFlight.js";
 
-export async function heroLanesBody(rank) {
+// F3: uma coleta de lanes por rank, mesmo com várias abas (single-flight).
+const flights = createSingleFlight();
+
+export function heroLanesBody(rank) {
+  return flights.run(`lanes:${rank}`, () => heroLanesBodyImpl(rank));
+}
+
+async function heroLanesBodyImpl(rank) {
   const key = `lanes:${rank}`;
   const hit = cacheGet(key, "C");
   if (hit.hit) return { data: hit.body, total: Object.keys(hit.body).length, stale: hit.stale, ageMs: hit.ageMs };

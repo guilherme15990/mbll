@@ -1,5 +1,5 @@
 // GET /views/:view — visões agregadas (semana, elo, tier).
-import { mapConc, RANKS } from "../arena.js";
+import { mapConc, RANKS } from "../infra/arena.js";
 import { fetchRankAll } from "../application/rankLot.js";
 import { score } from "../application/scoring.js";
 

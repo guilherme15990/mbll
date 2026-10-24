@@ -1,8 +1,10 @@
 // Coleta e normalização do lote de heróis por rank/janela.
 // Porta fina para a Arena API (arena.js) + SnapshotHistory (cache.js); o resto
 // do sistema consome `fetchRankAll` e nunca fala com o upstream diretamente.
-import { arenaGet, rankPath, mapConc } from "../arena.js";
-import { cacheGet, cacheSet, recordSnapshot, listSnapshots } from "../cache.js";
+import { arenaGet, rankPath, mapConc } from "../infra/arena.js";
+import { cacheGet, cacheSet } from "../infra/cacheStore.js";
+import { recordSnapshot, listSnapshots } from "../infra/snapshotHistory.js";
+import { createSingleFlight } from "./singleFlight.js";
 import { checkPickSum, median, summarizeWalkPosterior, isValidWalkPrior } from "../../../../packages/proprietary-engine/src/index.js";
 import { currentGameVersion } from "./versions.js";
 
@@ -38,7 +40,21 @@ export function lastVerifiedPosterior({ fonte = "heroes", rank, janela } = {}) {
   return null;
 }
 
-export async function fetchRankAll({ days, rank, retries = 3, timeoutMs = 12000 }) {
+// F3: chamadas concorrentes idênticas compartilham UMA coleta. Isso também evita
+// snapshots duplicados no histórico (duas rotas pedindo o mesmo lote ao mesmo tempo).
+// A chave inclui retries/timeout: um agregado com deadline curto não "pega carona"
+// numa coleta configurada para esperar mais.
+const rankFlights = createSingleFlight();
+
+export function fetchRankAll(opts) {
+  const { days, rank, retries = 3, timeoutMs = 12000 } = opts;
+  return rankFlights.run(
+    `rank:${rank}:${days}:${retries}:${timeoutMs}`,
+    () => fetchRankAllImpl({ days, rank, retries, timeoutMs }),
+  );
+}
+
+async function fetchRankAllImpl({ days, rank, retries = 3, timeoutMs = 12000 }) {
   const key = `rank:${rank}:${days}`;
   const hit = cacheGet(key, "A");
   if (hit.hit && !hit.stale) {

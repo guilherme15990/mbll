@@ -12,7 +12,8 @@ import { serveStatic } from "./static.js";
 import { HTTP, errorBody, toErrorResponse } from "./errors.js";
 import { createLogger } from "./log.js";
 import { createRateLimiter } from "../application/rateLimit.js";
-import { config } from "../config.js";
+import { config } from "../infra/config.js";
+import { closeDb } from "../infra/db.js";
 
 const REQUEST_ID = /^[A-Za-z0-9._:-]{1,64}$/;
 
@@ -140,7 +141,9 @@ export function startServer({ port = config.port, ...opts } = {}) {
     stopping = true;
     log.info("shutdown", { signal, timeoutMs: config.http.shutdownTimeoutMs });
     const { forced } = await stopServer(server);
-    log.info("shutdown_done", { signal, forced });
+    // F3: fecha o SQLite depois de parar de aceitar requests (WAL checkpoint no close).
+    const closed = closeDb();
+    log.info("shutdown_done", { signal, forced, dbClosed: closed });
     process.exit(forced ? 1 : 0);
   };
   process.once("SIGINT", () => { void shutdown("SIGINT"); });

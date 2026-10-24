@@ -1,5 +1,5 @@
 // GET /heroes — lote pontuado com paginação/ordenação no servidor.
-import { cacheGet } from "../cache.js";
+import { cacheGet } from "../infra/cacheStore.js";
 import { checkPickSum, walkPriorStamp, STRENGTH_INDEX_VERSION } from "../../../../packages/proprietary-engine/src/index.js";
 import { fetchRankAll, lastVerifiedPosterior } from "../application/rankLot.js";
 import { qHeroes, scoreLot, paginate } from "../application/scoring.js";

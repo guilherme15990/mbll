@@ -1,12 +1,12 @@
-// Contrato de config.js (F2): defaults e fail-fast.
+// Contrato de config.js (F2/F3): defaults, DATA_DIR e fail-fast.
 //
 // O ponto destes testes é a PROMESSA de operação: valor inválido não vira
 // NaN/undefined em silêncio, vira exceção com o nome da variável. `parseConfig`
 // é pura (recebe env), então nada aqui depende do ambiente da máquina.
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { isAbsolute } from "node:path";
-import { parseConfig } from "../src/config.js";
+import { isAbsolute, join, resolve } from "node:path";
+import { parseConfig } from "../src/infra/config.js";
 
 function throwsWith(fn, needle) {
   assert.throws(fn, (e) => {
@@ -26,9 +26,16 @@ describe("config: defaults", () => {
     assert.equal(c.arena.conc, 4);
   });
 
-  it("cache ligado por padrão e arquivo relativo preservado", () => {
+  it("cache ligado e arquivo ancorado em DATA_DIR (não no CWD)", () => {
     assert.equal(c.cache.sqlite, true);
-    assert.equal(c.cache.file, "./data/cache.sqlite");
+    assert.ok(isAbsolute(c.dataDir), c.dataDir);
+    assert.match(c.dataDir, /data$/);
+    assert.equal(c.cache.file, join(c.dataDir, "cache.sqlite"));
+    assert.ok(isAbsolute(c.cache.file), c.cache.file);
+  });
+
+  it("retenção de histórico desligada por padrão", () => {
+    assert.equal(c.history.retentionDays, 0);
   });
 
   it("http: webDist absoluto, log info, proxy off, limite 20/60, shutdown 10s", () => {
@@ -60,7 +67,26 @@ describe("config: valores válidos", () => {
     assert.equal(parseConfig({ SQLITE_CACHE: "off" }).cache.sqlite, false);
     assert.equal(parseConfig({ SQLITE_CACHE: "on" }).cache.sqlite, true);
     assert.equal(parseConfig({ SQLITE_CACHE: "qualquer" }).cache.sqlite, true);
-    assert.equal(parseConfig({ SQLITE_FILE: "C:/tmp/x.sqlite" }).cache.file, "C:/tmp/x.sqlite");
+    assert.equal(parseConfig({ SQLITE_FILE: "C:/tmp/x.sqlite" }).cache.file, resolve("C:/tmp/x.sqlite"));
+  });
+
+  it("DATA_DIR: relativo ancora na raiz do repo; absoluto é mantido", () => {
+    const rel = parseConfig({ DATA_DIR: "dados-teste" });
+    assert.ok(isAbsolute(rel.dataDir), rel.dataDir);
+    assert.match(rel.dataDir, /dados-teste$/);
+    assert.equal(rel.cache.file, join(rel.dataDir, "cache.sqlite"));
+    assert.equal(parseConfig({ DATA_DIR: rel.dataDir }).dataDir, rel.dataDir);
+  });
+
+  it("SQLITE_FILE override relativo continua absoluto (sem CWD implícito)", () => {
+    const c = parseConfig({ SQLITE_FILE: "meu-cache.sqlite" });
+    assert.ok(isAbsolute(c.cache.file), c.cache.file);
+    assert.match(c.cache.file, /meu-cache\.sqlite$/);
+  });
+
+  it("HISTORY_RETENTION_DAYS aceita 0 (desligado) e até 36500", () => {
+    assert.equal(parseConfig({ HISTORY_RETENTION_DAYS: "30" }).history.retentionDays, 30);
+    assert.equal(parseConfig({ HISTORY_RETENTION_DAYS: "36500" }).history.retentionDays, 36_500);
   });
 
   it("LOG_LEVEL normaliza caixa", () => {
@@ -123,6 +149,12 @@ describe("config: fail-fast", () => {
     throwsWith(() => parseConfig({ RATE_LIMIT_BURST: "0" }), "RATE_LIMIT_BURST");
     throwsWith(() => parseConfig({ SHUTDOWN_TIMEOUT_MS: "50" }), "SHUTDOWN_TIMEOUT_MS");
     throwsWith(() => parseConfig({ SHUTDOWN_TIMEOUT_MS: "abc" }), "SHUTDOWN_TIMEOUT_MS");
+  });
+
+  it("retenção inválida não vira NaN", () => {
+    throwsWith(() => parseConfig({ HISTORY_RETENTION_DAYS: "-1" }), "HISTORY_RETENTION_DAYS");
+    throwsWith(() => parseConfig({ HISTORY_RETENTION_DAYS: "36501" }), "HISTORY_RETENTION_DAYS");
+    throwsWith(() => parseConfig({ HISTORY_RETENTION_DAYS: "abc" }), "HISTORY_RETENTION_DAYS");
   });
 
   it("vazio explícito usa o default (não vira 0/NaN)", () => {

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 // Cache em memória: o teste não deve gravar um corpo sintético no SQLite local.
 process.env.SQLITE_CACHE = "off";
-const { cacheSet } = await import("../src/cache.js");
+const { cacheSet } = await import("../src/infra/cacheStore.js");
 const { router, aggCacheKey } = await import("../src/routes.js");
 
 describe("validação da rota de agregado sem tocar no upstream", () => {

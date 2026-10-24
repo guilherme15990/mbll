@@ -1,5 +1,6 @@
 // Metadados do sistema: catálogo dos 9 módulos e saúde/cache/histórico.
-import { cacheStats, historyStats } from "../cache.js";
+import { cacheStats } from "../infra/cacheStore.js";
+import { historyStats } from "../infra/snapshotHistory.js";
 import { C_REFERENCE, LANES } from "../../../../packages/proprietary-engine/src/index.js";
 import { versions } from "../application/versions.js";
 import { startedAtIso, layerHealthState } from "../application/health.js";

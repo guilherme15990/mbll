@@ -104,4 +104,10 @@ tem de ser feita em passos com diff pequeno, nunca junto com mudanças de lógic
   shutdown gracioso. API 104/104 em 3 execuções; motor 219/219; build e runtime
   smoke verdes. Dívidas de estrutura (bancos espalhados, `src/infra/`, fronteira
   do engine, pnpm, `.old/`, `web/pages`) registradas para F3/F4a/F5.
+- **F3** concluída (ADR-035): ver `F3-cache-historico.md`. `DATA_DIR` ancorado na
+  raiz do repo; `src/infra/{config,db,cacheStore,snapshotHistory,arena}.js`;
+  WAL + statements preparados; retenção por arquivamento opt-in
+  (`HISTORY_RETENTION_DAYS=0` default); single-flight compartilhado; `closeDb()`
+  no shutdown. API 123/123 em 3 execuções; motor 219/219; web, build e runtime
+  smoke (`dbClosed:true`) verdes; cobertura 93,75% de linhas.
 

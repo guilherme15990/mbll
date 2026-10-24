@@ -1,7 +1,7 @@
 // Versão do jogo / patches (cache de 1 h, alimentado pela Arena API).
 // Extraído do routes.js sem mudança de comportamento: `versions()` continua
 // devolvendo a lista crua e `patchFlag()` o carimbo postPatch/latest do /heroes.
-import { arenaGet } from "../arena.js";
+import { arenaGet } from "../infra/arena.js";
 
 let patchCache = { at: 0, versions: [] };
 

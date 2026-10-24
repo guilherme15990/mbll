@@ -2,7 +2,7 @@
 // arredondamento NA BORDA (mesmos campos/casas do fio anterior). Sem cópia local
 // do modelo: a matemática vive no motor.
 import { scoreBatch, classOf } from "../../../../packages/proprietary-engine/src/index.js";
-import { RANKS } from "../arena.js";
+import { RANKS } from "../infra/arena.js";
 import { WINDOWS, isRank } from "./validation.js";
 
 export function qHeroes(sp) {

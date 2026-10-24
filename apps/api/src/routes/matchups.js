@@ -1,7 +1,7 @@
 // Confrontos (counters/sinergias) e o proxy BPS derivado deles.
 // O δ é efeito do par, nunca veredito; par ausente = desconhecido, nunca 0.
-import { arenaGet, RANKS } from "../arena.js";
-import { cacheGet, cacheSet } from "../cache.js";
+import { arenaGet, RANKS } from "../infra/arena.js";
+import { cacheGet, cacheSet } from "../infra/cacheStore.js";
 import {
   durationCurve, classifyDuration, makePairKey, evidenceQuality, blindProxy,
 } from "../../../../packages/proprietary-engine/src/index.js";
