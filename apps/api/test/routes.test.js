@@ -3,7 +3,7 @@ import "./support/env.mjs";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { score, scoreLot, lastVerifiedPosterior } from "../src/routes.js";
-import { classOf, confidenceToTrust } from "../../../packages/proprietary-engine/src/index.js";
+import { classOf, confidenceToTrust } from "@radar/proprietary-engine";
 
 describe("contratos internos Fase 1 (zero-dep)", () => {
   const rows = [
@@ -115,7 +115,7 @@ describe("SnapshotHistory append-only (ADR-021-09, DDD-V4-05)", () => {
   });
   it("violado ENTRA marcado (L2) e some da T5", async () => {
     const { recordSnapshot } = await import("../src/infra/snapshotHistory.js");
-    const { assessSeries } = await import("../../../packages/proprietary-engine/src/index.js");
+    const { assessSeries } = await import("@radar/proprietary-engine");
     const { router } = await import("../src/routes.js");
     const v = recordSnapshot({ fonte: FONTE, rank: "mythic", janela: 7, versao_jogo: "t1", rows: rowsA, status: "violado", motivo: "sigma_pick:0.9" });
     assert.equal(v.status, "violado");
@@ -163,7 +163,7 @@ describe("SnapshotHistory append-only (ADR-021-09, DDD-V4-05)", () => {
     assert.equal((await router("/snapshots", new URLSearchParams({ fonte: FONTE, rank: "mythic", janela: "7" }))).status, 200);
   });
   it("assessSeries: <14d ou 1 snapshot → serie_curta/inconclusivo (INV4-015)", async () => {
-    const { assessSeries } = await import("../../../packages/proprietary-engine/src/index.js");
+    const { assessSeries } = await import("@radar/proprietary-engine");
     const T0 = Date.now(), D = 86400e3;
     assert.equal(assessSeries([]).status, "serie_curta");
     assert.equal(assessSeries([{ coletado_em: T0, janela: 7, payload_hash: "h1", status: "verificado" }]).status, "serie_curta");
@@ -448,7 +448,7 @@ describe("walk-forward API ADR-023 (L2-WF-01/04/05)", () => {
 
   it("round-trip: snapshot N alimenta N+1 com apêndice (L2-WF-04/05)", async () => {
     const { recordSnapshot, listSnapshots, getSnapshot } = await import("../src/infra/snapshotHistory.js");
-    const { summarizeWalkPosterior } = await import("../../../packages/proprietary-engine/src/index.js");
+    const { summarizeWalkPosterior } = await import("@radar/proprietary-engine");
     // N: primeiro lote, sem prior → posterior do lote corrente
     const rowsA = mkRows();
     const stA = batchStats(rowsA);
@@ -483,7 +483,7 @@ describe("walk-forward API ADR-023 (L2-WF-01/04/05)", () => {
   it("violado nunca vira prior; verificado sem apêndice = flat honesto", async () => {
     const F = `${FONTE}_viol`;
     const { recordSnapshot } = await import("../src/infra/snapshotHistory.js");
-    const { summarizeWalkPosterior } = await import("../../../packages/proprietary-engine/src/index.js");
+    const { summarizeWalkPosterior } = await import("@radar/proprietary-engine");
     const rows = mkRows();
     const st = batchStats(rows);
     const post = summarizeWalkPosterior({ muBatch: st.mu, tau2Batch: st.tau2, nBatch: st.n, prior: null, gameVersion: "patch-1" });

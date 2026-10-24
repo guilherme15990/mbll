@@ -4,7 +4,7 @@ import { arenaGet, RANKS } from "../infra/arena.js";
 import { cacheGet, cacheSet } from "../infra/cacheStore.js";
 import {
   durationCurve, classifyDuration, makePairKey, evidenceQuality, blindProxy,
-} from "../../../../packages/proprietary-engine/src/index.js";
+} from "@radar/proprietary-engine";
 import { isRank, isWindow, WINDOWS } from "../application/validation.js";
 import { catalogMap } from "../application/catalogs.js";
 

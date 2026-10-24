@@ -109,6 +109,9 @@ function rowMeta(r) {
 // Antes era `ASC LIMIT n`, que devolvia as mais ANTIGAS: numa série com mais de
 // `limit` coletas o snapshot recém-gravado nunca aparecia. A ordem de saída
 // continua ASC — só a janela de seleção mudou.
+/**
+ * @param {{ fonte?: string, rank?: string, janela?: number, limit?: number }} [serie]
+ */
 export function listSnapshots({ fonte, rank, janela, limit = 200 } = {}) {
   const lim = Math.min(1000, Math.max(1, Number(limit) || 200));
   if (getDb()) {
@@ -129,6 +132,10 @@ export function listSnapshots({ fonte, rank, janela, limit = 200 } = {}) {
 }
 
 // Snapshot completo (com payload) para o diff C-105. ts = coletado_em em ms.
+/**
+ * @param {unknown} coletado_em
+ * @param {{ fonte?: string, rank?: string, janela?: number }} [serie]
+ */
 export function getSnapshot(coletado_em, { fonte, rank, janela } = {}) {
   const ts = Number(coletado_em);
   if (!Number.isInteger(ts) || ts <= 0) return null;
@@ -140,7 +147,9 @@ export function getSnapshot(coletado_em, { fonte, rank, janela } = {}) {
   };
   if (getDb()) {
     try {
-      const w = ["coletado_em=?"], args = [ts];
+      const w = ["coletado_em=?"];
+      /** @type {(string | number)[]} */
+      const args = [ts];
       if (fonte !== undefined) { w.push("fonte=?"); args.push(fonte); }
       if (rank !== undefined) { w.push("rank=?"); args.push(rank); }
       if (janela !== undefined) { w.push("janela=?"); args.push(janela); }

@@ -5,7 +5,7 @@ import { arenaGet, rankPath, mapConc } from "../infra/arena.js";
 import { cacheGet, cacheSet } from "../infra/cacheStore.js";
 import { recordSnapshot, listSnapshots } from "../infra/snapshotHistory.js";
 import { createSingleFlight } from "./singleFlight.js";
-import { checkPickSum, median, summarizeWalkPosterior, isValidWalkPrior } from "../../../../packages/proprietary-engine/src/index.js";
+import { checkPickSum, median, summarizeWalkPosterior, isValidWalkPrior } from "@radar/proprietary-engine";
 import { currentGameVersion } from "./versions.js";
 
 export function normalize(rec) {
@@ -27,6 +27,10 @@ export function normalize(rec) {
 
 // ADR-023: último posterior VERIFICADO da série (mesmo fonte+rank+janela) vira o prior.
 // Leitura local do SnapshotHistory (sem fetch ao upstream). Sem histórico/posterior ⇒ null (flat).
+/**
+ * @param {{ fonte?: string, rank?: string, janela?: number }} [serie]
+ * @returns {{ mu: number, tau2: number, n: number, game_version: string } | null}
+ */
 export function lastVerifiedPosterior({ fonte = "heroes", rank, janela } = {}) {
   try {
     const serie = listSnapshots({ fonte, rank, janela, limit: 1000 });

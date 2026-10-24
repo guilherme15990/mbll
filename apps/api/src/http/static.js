@@ -59,6 +59,12 @@ function insideRoot(root, file) {
  * Tenta servir um arquivo de `webDist`. Devolve `true` se respondeu (inclui 304);
  * `false` deixa o chamador responder 404. Nunca lança.
  */
+/**
+ * @param {import("node:http").IncomingMessage} req
+ * @param {import("node:http").ServerResponse} res
+ * @param {string} pathname
+ * @param {{ webDist?: string }} [options]
+ */
 export async function serveStatic(req, res, pathname, { webDist } = {}) {
   if (!webDist) return false;
   if (req.method !== "GET" && req.method !== "HEAD") return false;

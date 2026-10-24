@@ -44,7 +44,11 @@ const statements = new Map(); // sql -> StatementSync
 
 if (config.cache.sqlite) {
   try {
-    const { DatabaseSync } = await import("node:sqlite").catch(() => ({}));
+    // `node:sqlite` é experimental e pode não existir: o fallback devolve `{}`.
+    // O cast mantém o tipo do módulo real (a guarda abaixo cobre o ausente).
+    const { DatabaseSync } = /** @type {{ DatabaseSync?: typeof import("node:sqlite").DatabaseSync }} */ (
+      await import("node:sqlite").catch(() => ({}))
+    );
     if (DatabaseSync) {
       // DATA_DIR e o diretório do arquivo podem diferir (SQLITE_FILE override).
       mkdirSync(config.dataDir, { recursive: true });

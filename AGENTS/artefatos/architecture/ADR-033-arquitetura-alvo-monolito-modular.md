@@ -1,7 +1,7 @@
 # ADR-033 — Arquitetura-alvo: monólito modular com rotas verticais e portas finas
 
 - Data: 2026-10-24
-- Status: aceito (implementação incremental, fases F0–F5)
+- Status: implementada (F0–F5); portão final em ADR-038 e `F5-gate.md`
 - Substitui: nada. Complementa ADR-025 (fronteira única do motor).
 
 ## Contexto
@@ -67,6 +67,13 @@ Portas (interfaces) só para as duas fronteiras reais: **ArenaGateway** e
 | `apps/api` → engine por caminho relativo | **não** (declarar dependência de workspace) |
 | `web/pages/*` → `App.tsx` (`useFilters`) | **não** (mover para `app/filters.ts`) |
 
+**Implementado na F5** (`tools/check-boundaries.mjs`): engine por nome de
+workspace, nada de import de interior de pacote, apps não escapam da própria
+árvore, packages não importam apps, e as fronteiras da web. **Não implementado:**
+`routes ↛ infra` e `application ↛ infra` (injeção no composition root) — o código
+consolidado importa `infra` direto; e `packages/contracts`, substituído pelo
+`index.d.ts` do motor. Registrado na ADR-038 §Desvios.
+
 ## Consequências
 
 Positivas: cada endpoint testável sem rede e sem SQLite; `router()` vira dispatch
@@ -120,6 +127,12 @@ tem de ser feita em passos com diff pequeno, nunca junto com mudanças de lógic
   eliminados; `HeroPanelProps` em `shared/heroPanel.ts`; zero import entre
   features. 46 arquivos movidos, 200 imports reescritos, build idêntico
   (289,76 kB / 30 chunks); typecheck 0; guardian F4b 9/9; web 24/24.
-- **F5** pendente: `checkJs` na API, script de fronteiras, coverage com
-  thresholds, CI, README/ADRs.
+- **F5** concluída (ADR-038): ver `F5-gate.md`. `checkJs` na API **62 → 0 erros**
+  (`tools/tsc.mjs` resolve o compilador nos dois layouts); `tools/check-boundaries.mjs`
+  com 9 regras (validado negativamente com 3 probes); contrato do motor completo no
+  `index.d.ts` (todo nome importado declarado); API consome o workspace
+  `@radar/proprietary-engine` (14 imports migrados); cobertura da API com thresholds
+  **93,70% linhas / 65,82% branches / 89,27% funções** (90/60/85); CI em Node 24;
+  README reescrito. `npm run verify` exit 0; motor 219/219, API 123/123, web 24/24;
+  build 289,76 kB / 30 chunks; runtime smoke `dbClosed:true`.
 

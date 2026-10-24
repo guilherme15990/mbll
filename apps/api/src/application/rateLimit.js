@@ -4,6 +4,9 @@
 // O relógio é injetável para teste determinístico. O mapa tem teto (`maxKeys`):
 // ao atingir, remove primeiro buckets cheios (ociosos) e depois os mais antigos,
 // para que um ataque de IPs forjados não cresça a memória sem limite.
+/**
+ * @param {{ rps?: number, burst?: number, now?: () => number, maxKeys?: number }} [opts]
+ */
 export function createRateLimiter({ rps, burst, now = Date.now, maxKeys = 10_000 } = {}) {
   if (!(rps > 0)) throw new Error("rateLimit: rps deve ser > 0");
   if (!(burst > 0)) throw new Error("rateLimit: burst deve ser > 0");

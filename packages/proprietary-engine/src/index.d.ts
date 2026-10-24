@@ -1,7 +1,13 @@
-// Tipagens da fronteira @radar/proprietary-engine consumidas pela web (tsc).
+// Tipagens da fronteira @radar/proprietary-engine consumidas por web E api.
 // Os módulos são JS puro; este arquivo dá as assinaturas para `tsc --noEmit`
-// e `vite build`. Campos opcionais: a web passa objetos ricos da API que
-// satisfazem estruturalmente estes mínimos.
+// (web), `tsc -p apps/api/jsconfig.json` (checkJs) e `vite build`.
+// Campos opcionais: os apps passam objetos ricos da API que satisfazem
+// estruturalmente estes mínimos.
+//
+// Cobertura: todo nome importado de `@radar/proprietary-engine` pelos apps tem
+// declaração aqui — `npm run check:boundaries` falha se faltar. Classes e
+// helpers internos que nenhum app consome permanecem sem declaração de propósito
+// (o runtime é a verdade; declarar assinatura não usada só cria drift).
 
 export type TrustLevel = "Robusto" | "Situacional" | "Inconclusivo";
 
@@ -347,7 +353,13 @@ export declare function parseRawBuilds(
 export declare function detectPackages(
   contexts: readonly Record<string, unknown>[], equipment: Record<number, unknown>,
 ): Record<string, unknown>[];
-export declare function buildAggregate(input?: Record<string, unknown>): Record<string, unknown>;
+export interface AggregateBody {
+  /** Metadados da rodada (cache_hit, deadline_ms, prep_ms, ...) — escritos na borda. */
+  context: Record<string, any>;
+  sources: Record<string, any>;
+  [k: string]: any;
+}
+export declare function buildAggregate(input?: Record<string, any>): AggregateBody;
 
 // ---- builds-ordering ----
 export interface BuildOrderRow {
@@ -404,7 +416,9 @@ export interface HeroScore {
   q: number; strong: boolean; weak: boolean; isGem: boolean;
   degenerate: boolean; smallSample: boolean;
   posterior_mean: number | null; z: number;
-  [k: string]: unknown;
+  // Eco do input: o motor repassa os campos extras da API (head, class, etc.).
+  // `any` (não `unknown`) porque o checkJs da API faz aritmética/indexação neles.
+  [k: string]: any;
 }
 export interface HeroLotMeta {
   n: number; n_dropped: number; mu: number | null; tau: number | null;
@@ -436,3 +450,170 @@ export declare function resolveTemporalSignal(
 export declare function trendDirectionOf(view: { delta?: number | null; delta_logit?: number | null } | undefined | null): {
   word: "subindo" | "caindo" | "estável" | "sem direção"; delta: number | null;
 };
+
+// ---- utils: math (primitivas usadas pela api) ----
+export declare function mean(xs: readonly number[]): number;
+export declare function median(xs: readonly number[]): number;
+export declare function medianNull(xs: readonly number[]): number | null;
+export declare function mad(xs: readonly number[], med?: number): number;
+export declare function quantile(sortedAsc: readonly number[], q: number): number;
+
+// ---- utils: config ----
+export declare const C_REFERENCE: number;
+export declare const DELTA_DEFAULT: number;
+export declare const DURATION_BANDS: readonly string[];
+export declare const LANES: readonly ["exp", "mid", "roam", "jungle", "gold"];
+
+export type LaneCheck = { ok: true; lane: string } | { ok: false; allowed: readonly string[] };
+export declare function requireLane(lane: unknown): LaneCheck;
+
+// ---- governance: exposure ----
+export declare function makeExposure(pick: number): { unit: "slot_share"; status: "unvalidated" };
+export declare function checkPickSum(picks: readonly number[] | null | undefined): {
+  sum: number; ok: boolean; expectedApprox: number;
+};
+
+// ---- walkforward ----
+export declare const WF_VERSION_BREAK_VARIANCE_FACTOR: number;
+export interface WalkPrior { mu: number; tau2: number; n: number; game_version: string }
+export declare function isValidWalkPrior(p: unknown): p is WalkPrior;
+export declare function walkPriorStamp(prior: unknown): string;
+export declare function summarizeWalkPosterior(input?: {
+  muBatch?: number; tau2Batch?: number; nBatch?: number;
+  prior?: WalkPrior | null; gameVersion?: string | null;
+}): WalkPrior;
+
+// ---- confidence: trio ----
+export interface ConfidenceTrio {
+  posterior_mean: number | null;
+  credible_interval_95: [number, number] | null;
+  posterior_prob_above_threshold: number | null;
+  delta_threshold?: number;
+  c_reference: number;
+  uncertainty_status: "provisional" | "unavailable";
+  exposure: { unit: "slot_share"; status: "unvalidated" };
+}
+export declare function confidenceTrio(input?: {
+  wrAdj?: number; med?: number; se?: number; c?: number; delta?: number;
+}): ConfidenceTrio;
+
+// ---- ranks: difference ----
+export interface RankDifference {
+  diff: number | null;
+  interval_95: [number, number] | null;
+  prob_above: number | null;
+  delta_r?: number;
+  c_reference: number;
+  classification_status: "provisional_model_based" | "unavailable";
+  uncertainty_method: "model_based_proxy";
+  exposure_status: "unvalidated";
+}
+export declare function rankDifference(input?: {
+  thetaA?: number; thetaB?: number; seA?: number; seB?: number; c?: number; deltaR?: number;
+}): RankDifference;
+
+// ---- meta: temporal ----
+export interface TemporalDelta {
+  delta: number | null;
+  delta_logit: number | null;
+  delta_unit?: string;
+  interval_95: [number, number] | null;
+  delta_threshold?: number;
+  c_reference?: number;
+  temporal_status: "initial" | "persistent" | "inconclusive";
+  patch_association_status: "temporal_association" | "not_evaluated";
+  exposure_status: "unvalidated";
+}
+export declare function temporalDelta(input?: {
+  thetaNow?: number; thetaBase?: number; se?: number;
+  threshold?: number; c?: number; confirmed?: boolean;
+}): TemporalDelta;
+
+// ---- meta: assess-series ----
+export interface SeriesSnapshot {
+  coletado_em?: number; ts?: number; janela?: number;
+  payload_hash?: string; hash?: string; status?: string;
+}
+export interface SeriesAssessment {
+  n_snapshots: number; n_distintos: number; span_dias: number;
+  nao_sobrepostos: boolean; lacunas: number;
+  status: "serie_curta" | "inconclusivo" | "avaliavel";
+  motivo: string;
+}
+export declare function assessSeries(snaps?: readonly SeriesSnapshot[]): SeriesAssessment;
+
+// ---- counters: distortion ----
+export interface DistortionResidual {
+  kind: string;
+  observed: number | null;
+  expected: number | null;
+  residual: number | null;
+  unit_status?: "unvalidated";
+  classification_status: "provisional" | "inconclusive";
+  exposure_status: "unvalidated";
+}
+export declare function distortionResidual(input?: {
+  observed?: number; expected?: number; kind?: "pick" | "ban";
+}): DistortionResidual;
+
+// ---- counters: duration ----
+export interface DurationPoint { label: string; mid: number; win: number }
+export declare function durationCurve(src: unknown): DurationPoint[];
+export declare function durationCurveDetailed(src: unknown): {
+  curve: DurationPoint[]; quarantined: { key: string; reason: string }[];
+};
+export declare function durationCurveV2(src: unknown): {
+  curve: (DurationPoint & { evidence: "proxy_no_n" })[]; quarantined: { key: string; reason: string }[];
+};
+export declare function classifyDuration(curve: readonly DurationPoint[] | null | undefined): string;
+
+// ---- counters: pair key / evidence / blind proxy ----
+export declare function makePairKey(a: unknown, b: unknown, type?: string): string | null;
+export interface EvidenceQuality {
+  quality: string; reasons: string[];
+  exposure_status: "unvalidated"; interval_status: "indisponivel";
+  uncertainty_method: null; causal_status: "nao-avaliado";
+}
+export declare function evidenceQuality(input?: {
+  coverage?: string; stable?: boolean | null; hetero?: boolean | null;
+}): EvidenceQuality;
+export interface BlindProxy {
+  safety_status: "proxy" | "inconclusive";
+  robustness_status: string;
+  adverse_p10: number | null;
+  worst_counter?: unknown;
+  worst_observed: number | null;
+  spread?: number;
+  n_pairs: number;
+  classification_status: "provisional" | "inconclusive";
+  exposure_status: "unvalidated";
+  note: string;
+}
+export declare function blindProxy(deltas?: readonly number[]): BlindProxy;
+
+// ---- builds: lift ----
+export interface BuildLift {
+  lift_raw: number | null;
+  lift_adjusted: number | null;
+  adjusted_association: number | null;
+  causal_build_lift: number | null;
+  reference_kind: string;
+  unit?: string;
+  reference_semantics_validated?: boolean;
+  sample_size_available?: boolean;
+  uncertainty_method: string | null;
+  causal_status: string;
+  exposure_status: "unvalidated";
+  classification_status: string;
+}
+export declare function buildLift(input?: {
+  win?: number; refWin?: number; hasSupport?: boolean; refKind?: string;
+}): BuildLift;
+export interface BuildReferenceRow { win?: number | null; pick?: number | null; [k: string]: unknown }
+export declare function buildReferences<T extends BuildReferenceRow>(builds?: readonly T[]): {
+  mostUsed: T | null; heroMean: number | null;
+};
+
+// ---- hero: strength index ----
+export declare const STRENGTH_INDEX_VERSION: "strength-index-v1";
+

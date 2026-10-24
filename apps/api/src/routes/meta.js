@@ -1,7 +1,7 @@
 // Metadados do sistema: catálogo dos 9 módulos e saúde/cache/histórico.
 import { cacheStats } from "../infra/cacheStore.js";
 import { historyStats } from "../infra/snapshotHistory.js";
-import { C_REFERENCE, LANES } from "../../../../packages/proprietary-engine/src/index.js";
+import { C_REFERENCE, LANES } from "@radar/proprietary-engine";
 import { versions } from "../application/versions.js";
 import { startedAtIso, layerHealthState } from "../application/health.js";
 

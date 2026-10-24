@@ -1,6 +1,6 @@
 // GET /heroes — lote pontuado com paginação/ordenação no servidor.
 import { cacheGet } from "../infra/cacheStore.js";
-import { checkPickSum, walkPriorStamp, STRENGTH_INDEX_VERSION } from "../../../../packages/proprietary-engine/src/index.js";
+import { checkPickSum, walkPriorStamp, STRENGTH_INDEX_VERSION } from "@radar/proprietary-engine";
 import { fetchRankAll, lastVerifiedPosterior } from "../application/rankLot.js";
 import { qHeroes, scoreLot, paginate } from "../application/scoring.js";
 import { versions, patchFlag, currentGameVersion } from "../application/versions.js";

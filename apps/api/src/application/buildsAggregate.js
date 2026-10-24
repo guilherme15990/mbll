@@ -14,14 +14,22 @@ import {
   normalizeEquipmentCatalog,
   normalizeEmblemCatalog,
   normalizeSpellCatalog,
-} from "../../../../packages/proprietary-engine/src/index.js";
+} from "@radar/proprietary-engine";
 
 export const AGG_TOP_VALUES = new Set([10, 20]);
 const AGG_INTERACTIVE_LIMIT = 30;
+/** @type {Promise<any>} */
 let aggChain = Promise.resolve();
 // F3: dedupe por chave com a implementação compartilhada (era um Map local).
 const aggFlight = createSingleFlight();
 
+/**
+ * Serializa o fan-out (uma execução por vez). O tipo do resultado é o da tarefa.
+ *
+ * @template T
+ * @param {() => Promise<T>} fn
+ * @returns {Promise<T>}
+ */
 function aggEnqueue(fn) {
   const run = aggChain.then(fn, fn);
   aggChain = run.catch(() => {});

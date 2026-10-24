@@ -34,6 +34,22 @@ function clientKey(req, trustProxy) {
   return req.socket.remoteAddress ?? "unknown";
 }
 
+/**
+ * Opções injetáveis do servidor. `logger` aceita o logger de `http/log.js`
+ * (`{ info, warn, error }`) ou um espião de teste.
+ *
+ * @typedef {Object} ApiServerOptions
+ * @property {(path: string, sp: URLSearchParams) => Promise<any>} [router]
+ * @property {string} [webDist]
+ * @property {string} [logLevel]
+ * @property {boolean} [trustProxy]
+ * @property {{ enabled: boolean, rps: number, burst: number }} [rateLimit]
+ * @property {{ info: Function, error: Function, debug?: Function, level?: string }} [logger]
+ */
+
+/**
+ * @param {ApiServerOptions} [options]
+ */
 export function createApiServer({
   router = defaultRouter,
   webDist = config.http.webDist,
@@ -123,17 +139,25 @@ export function stopServer(server, { timeoutMs = config.http.shutdownTimeoutMs }
   });
 }
 
+/**
+ * @param {ApiServerOptions & { port?: number }} [options]
+ */
 export function startServer({ port = config.port, ...opts } = {}) {
   const log = opts.logger ?? createLogger(opts.logLevel ?? config.http.logLevel);
   const server = createApiServer({ ...opts, logger: log });
 
   server.on("error", (e) => {
-    log.error("listen_failed", { err: String(e?.message ?? e), code: e?.code ?? null });
+    const err = /** @type {NodeJS.ErrnoException} */ (e);
+    log.error("listen_failed", { err: String(err?.message ?? err), code: err?.code ?? null });
     process.exitCode = 1;
   });
 
   // Loga a porta EFETIVA (com PORT=0 o SO escolhe uma), não a solicitada.
-  server.listen(port, () => log.info("server_listening", { port: server.address()?.port ?? port, zeroDep: true }));
+  server.listen(port, () => {
+    const addr = server.address();
+    const effective = addr && typeof addr === "object" ? addr.port : port;
+    log.info("server_listening", { port: effective, zeroDep: true });
+  });
 
   let stopping = false;
   const shutdown = async (signal) => {

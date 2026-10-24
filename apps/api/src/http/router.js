@@ -29,8 +29,8 @@ export async function router(path, sp) {
   if ((m = HERO.exec(path))) return heroRoute(sp, Number(m[1]));
   if (path.startsWith("/views/")) return viewsRoute(path, sp);
   if (path === "/gems") return gemsRoute(sp);
-  if (path === "/catalog") return heroCatalogRoute(sp);
-  if (path === "/equipment") return equipmentRoute(sp);
+  if (path === "/catalog") return heroCatalogRoute();
+  if (path === "/equipment") return equipmentRoute();
   if (path === "/heroes/lanes") return heroLanesRoute(sp);
   if ((m = MATCHUPS.exec(path))) return matchupsRoute(sp, Number(m[1]));
   if (path === "/builds/aggregate") return aggregateRoute(sp);

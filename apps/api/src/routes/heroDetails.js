@@ -5,7 +5,7 @@ import { listSnapshots } from "../infra/snapshotHistory.js";
 import {
   confidenceTrio, rankDifference, temporalDelta, assessSeries,
   distortionResidual, medianPickOf, medianBanOf, classOf, C_REFERENCE,
-} from "../../../../packages/proprietary-engine/src/index.js";
+} from "@radar/proprietary-engine";
 import { fetchRankAll } from "../application/rankLot.js";
 import { score, scoreLot } from "../application/scoring.js";
 import { isRank, isWindow, isDays } from "../application/validation.js";

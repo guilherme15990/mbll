@@ -1,7 +1,7 @@
 // Builds — visão de sistema (/builds/aggregate) e lifts por herói.
 import { arenaGet, RANKS } from "../infra/arena.js";
 import { cacheGet, cacheSet } from "../infra/cacheStore.js";
-import { requireLane, buildLift, buildReferences } from "../../../../packages/proprietary-engine/src/index.js";
+import { requireLane, buildLift, buildReferences } from "@radar/proprietary-engine";
 import { isRank, isWindow, WINDOWS } from "../application/validation.js";
 import {
   AGG_TOP_VALUES, aggCacheKey, withAggCacheMeta,
@@ -13,7 +13,7 @@ import { equipmentMap, emblemCatalog } from "../application/catalogs.js";
 // population=pro NÃO entra no MVP (fase 2); o recorte é ranked.
 export async function aggregateRoute(sp) {
   const chk = requireLane(sp.get("lane"));
-  if (!chk.ok) {
+  if (chk.ok === false) {
     return { status: 422, body: { error: "lane_required", message: "Lane query param is required", allowed: chk.allowed, hint: "use ?lane=exp|mid|roam|jungle|gold (no silent default)" } };
   }
   const lane = chk.lane;
@@ -52,7 +52,7 @@ export async function heroBuildsRoute(sp, id) {
   if (!isRank(rank)) return { status: 400, body: { error: "rank_invalid", message: "Invalid rank", ranks: RANKS } };
   const laneRaw = sp.get("lane");
   const chk = requireLane(laneRaw);
-  if (!chk.ok) return { status: 422, body: { error: "lane_required", message: "Lane query param is required", allowed: chk.allowed, hint: "use ?lane=exp|mid|roam|jungle|gold (no silent default)" } };
+  if (chk.ok === false) return { status: 422, body: { error: "lane_required", message: "Lane query param is required", allowed: chk.allowed, hint: "use ?lane=exp|mid|roam|jungle|gold (no silent default)" } };
   const lane = chk.lane;
   const key = `builds:v4:${id}:${rank}:${lane}`;
   const hit = cacheGet(key, "C");

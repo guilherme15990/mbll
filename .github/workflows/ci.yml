@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Um run por branch: push novo cancela o anterior.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: gates (node 24)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      # `npm ci` respeita o package-lock.json (inclui o layout de apps/web).
+      - name: install
+        run: npm ci --no-audit --no-fund
+
+      # 1. direção de dependência + contrato do motor (index.d.ts)
+      - name: boundaries
+        run: npm run check:boundaries
+
+      # 2. checkJs da API (JS puro + JSDoc) e typecheck da web
+      - name: typecheck api
+        run: npm run check:api
+
+      - name: typecheck web
+        run: npm run check:web
+
+      # 3. testes: motor, api (node:test) e web (smoke + guardians)
+      - name: tests
+        run: npm test
+
+      # 4. cobertura da API com thresholds (90/60/85) — falha o job se cair
+      - name: coverage api
+        run: npm run test:coverage
+
+      # 5. build de produção (engine + api + web)
+      - name: build
+        run: npm run build
