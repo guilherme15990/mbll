@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AlertTriangle, ShieldCheck, Sparkles } from "lucide-react";
 import { num, pct, useDistortion, useHeroes } from "../../shared/api";
-import { PrimaryAction } from "../../shared/idd/cards/PrimaryAction";
+import { PrimaryAction } from "../../shared/ui/patterns/PrimaryAction";
 import {
   Avatar, CtxBar, Loading,
   SectionTitle, StatusSeal, TierBadge, ErrBox
@@ -82,8 +82,6 @@ export default function DraftPanel({ rank, window, hero, dossier, picker }: Hero
       {picker}
 
       <PrimaryAction
-        contextId="DRF"
-        capId="CAP-DRF-01"
         label="Marcar p/ acompanhar"
         to={`/tempo?hero=${hero}&rank=${rank}&window=${window}`}
         disabledReason={!hero ? "selecione um herói" : null}

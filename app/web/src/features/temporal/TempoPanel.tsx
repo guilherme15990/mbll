@@ -1,7 +1,7 @@
 import { useSearchParams } from "react-router-dom";
 import { Clock, Info, LineChart } from "lucide-react";
 import { ago, num, useMeta, useTemporal, useTrends } from "../../shared/api";
-import { PrimaryAction } from "../../shared/idd/cards/PrimaryAction";
+import { PrimaryAction } from "../../shared/ui/patterns/PrimaryAction";
 import {
   CtxBar, Empty, ErrBox, Loading,
   SectionTitle
@@ -60,8 +60,6 @@ export default function TempoPanel({ rank, window, hero, dossier, picker }: Hero
       {picker}
 
       <PrimaryAction
-        contextId="TMP"
-        capId="CAP-TMP-01"
         label="Copiar série CSV"
         to={`/tempo?hero=${hero}&rank=${rank}&window=${window}`}
         disabledReason={!hero ? "selecione um herói" : null}

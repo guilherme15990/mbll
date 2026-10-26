@@ -1,5 +1,5 @@
 // Builds — visão de sistema (/builds/aggregate) e lifts por herói.
-import { arenaGet, RANKS } from "../infra/arena.js";
+import { getHeroBuilds, RANKS } from "../providers/arena/index.js";
 import { cacheGet, cacheSet } from "../infra/cacheStore.js";
 import { requireLane, buildLift, buildReferences } from "@radar/proprietary-engine";
 import { isRank, isWindow, WINDOWS } from "../application/validation.js";
@@ -62,7 +62,7 @@ export async function heroBuildsRoute(sp, id) {
   let emblemMap = {};
   try {
     [raw, eqMap, emblemMap] = await Promise.all([
-      arenaGet(`/api/academy/heroes/${id}/builds?lane=${lane}&rank=${rank}&size=6&index=1`),
+      getHeroBuilds({ id, lane, rank }),
       equipmentMap(),
       emblemCatalog(),
     ]);

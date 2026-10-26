@@ -69,7 +69,6 @@ for (const p of [
   "src/pages/hero/heroSeal.ts",
   "src/components",
   "src/components/DddModal.tsx",
-  "src/components/idd/ExportEvidence.tsx",
 ]) {
   check(`sem código morto: ${p}`, !exists(p));
 }

@@ -1,6 +1,6 @@
 // Confrontos (counters/sinergias) e o proxy BPS derivado deles.
 // O δ é efeito do par, nunca veredito; par ausente = desconhecido, nunca 0.
-import { arenaGet, RANKS } from "../infra/arena.js";
+import { getCounters, getCompatibility, RANKS } from "../providers/arena/index.js";
 import { cacheGet, cacheSet } from "../infra/cacheStore.js";
 import {
   durationCurve, classifyDuration, makePairKey, evidenceQuality, blindProxy,
@@ -37,8 +37,8 @@ export async function matchupsRoute(sp, id) {
   const hit = cacheGet(key, "C");
   if (hit.hit && !hit.stale) return { status: 200, body: { ...hit.body, stale: false } };
   const [ct, cp, cat] = await Promise.all([
-    arenaGet(`/api/heroes/${id}/counters?days=${days}&rank=${rank}&size=20&index=1`).catch(() => null),
-    arenaGet(`/api/heroes/${id}/compatibility?days=${days}&rank=${rank}&size=20&index=1`).catch(() => null),
+    getCounters({ id, rank, days }).catch(() => null),
+    getCompatibility({ id, rank, days }).catch(() => null),
     catalogMap(),
   ]);
   const c0 = ct?.data?.records?.[0]?.data ?? {};

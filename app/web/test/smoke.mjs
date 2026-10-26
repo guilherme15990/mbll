@@ -8,7 +8,6 @@ const must = [
   "src/app/filters.ts",
   "src/app/ErrorBoundary.tsx",
   "src/app/Sidebar.tsx",
-  "src/shared/idd/IddModal.tsx",
   "src/shared/format.ts",
   "src/shared/ui/index.tsx",
   "src/shared/ui/primitives/Avatar.tsx",
@@ -17,8 +16,9 @@ const must = [
   "src/shared/ui/patterns/HeroPicker.tsx",
   "src/shared/ui/patterns/HeroDossier.tsx",
   "src/shared/ui/patterns/heroPanel.ts",
-  "src/shared/idd/index.tsx",
-  "src/shared/idd/cards/SigmaBanCard.tsx",
+  "src/shared/ui/patterns/PrimaryAction.tsx",
+  "src/shared/ui/patterns/SigmaBanCard.tsx",
+  "src/shared/ui/patterns/NeedsRankLane.tsx",
   "src/features/dashboard/Dashboard.tsx",
   "src/features/dashboard/BuildsTab.tsx",
   "src/features/hero-list/HeroList.tsx",
@@ -39,7 +39,7 @@ const must = [
 let bad = 0;
 for (const f of must) if (!fs.existsSync(path.join(root, f))) { console.error("falta " + f); bad++; }
 // F4b: a árvore é feature-first; `pages/` e `components/` não podem voltar.
-for (const dead of ["src/pages", "src/components"]) {
+for (const dead of ["src/pages", "src/components", "src/shared/idd"]) {
   if (fs.existsSync(path.join(root, dead))) { console.error("estrutura antiga: " + dead); bad++; }
 }
 const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json")));

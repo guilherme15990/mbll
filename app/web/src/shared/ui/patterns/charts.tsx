@@ -53,11 +53,6 @@ export function DurationChart({ curve, heroWin }: { curve: { label: string; win:
   );
 }
 
-/** @deprecated Quadrant removido na Wave 0 IDD v4 — código morto (nenhum uso). Mantido como stub para compat de import. */
-export function Quadrant(_props: { data: { id: number; name: string; presence: number; wrAdj: number }[]; avg: number }) {
-  return null;
-}
-
 /** PRD Draft RF-DIST-02: Matrizes 2D de Força Estimada vs Pressão (Pick ou Ban separadas). */
 export function PressureScatter({
   data,

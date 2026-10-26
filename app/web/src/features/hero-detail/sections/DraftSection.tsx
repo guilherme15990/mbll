@@ -6,7 +6,7 @@ import {
 import {
   classifyBlindPick, classifyFirstPick, getDraftPatterns,
 } from "@radar/proprietary-engine";
-import { NeedsRank } from "../../../shared/idd/cards/NeedsRankLane";
+import { NeedsRank } from "../../../shared/ui/patterns/NeedsRankLane";
 import { PickVerdictCard, PickVerdictPill } from "../../../shared/ui/patterns/PickVerdict";
 import {
   Empty, ErrBox, Loading, SectionTitle,
@@ -54,7 +54,7 @@ function SummaryCell({ label, value, hint, tone }: { label: string; value: strin
 }
 
 /**
- * Aba Draft (fundida) da ficha isolada — IDD: um Contexto de Interface,
+ * Aba Draft (fundida) da ficha isolada — um Contexto de Interface,
  * três leituras de uma decisão:
  * - Blind Pick (BPS): escolher sem ver nenhum inimigo.
  * - First Pick (BPS): travar primeiro e ver o inimigo responder.
@@ -91,7 +91,6 @@ export default function DraftSection({
           <p className="text-xs text-mist">Proxy exige elo explícito — blind, first pick e pressão ficam sem número.</p>
         </header>
         <NeedsRank
-          capId="CAP-BPS-01"
           onPick={(r) => {
             sp.set("rank", r);
             setSp(sp);

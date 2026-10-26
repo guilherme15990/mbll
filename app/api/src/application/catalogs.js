@@ -2,7 +2,7 @@
 // Antes eram closures dentro de router() que se chamavam via `router("/catalog")`
 // (auto-recursão). Agora são funções com dono próprio; a rota e os agregados
 // consomem a mesma implementação, sem reentrar no dispatcher.
-import { arenaGet } from "../infra/arena.js";
+import { getHeroesPage, getEquipmentPage, getEmblems } from "../providers/arena/index.js";
 import { cacheGet, cacheSet } from "../infra/cacheStore.js";
 import { createSingleFlight } from "./singleFlight.js";
 import { normalizeEmblemCatalog } from "@radar/proprietary-engine";
@@ -16,7 +16,7 @@ export async function heroCatalog() {
   const hit = cacheGet("catalog", "C");
   if (hit.hit) return { data: hit.body, total: Object.keys(hit.body).length, stale: hit.stale, ageMs: hit.ageMs };
   return flights.run("catalog", async () => {
-    const raw = await arenaGet(`/api/heroes?size=133&index=1`);
+    const raw = await getHeroesPage();
     const map = {};
     for (const rec of raw?.data?.records ?? []) {
       const d = rec?.data ?? {};
@@ -43,7 +43,7 @@ export async function equipmentCatalog() {
     const map = {};
     const SIZE = 100;
     for (let index = 1; index <= 50; index++) {
-      const raw = await arenaGet(`/api/academy/equipment?size=${SIZE}&index=${index}`);
+      const raw = await getEquipmentPage({ size: SIZE, index });
       const records = raw?.data?.records ?? [];
       for (const rec of records) {
         const d = rec?.data ?? {};
@@ -68,7 +68,7 @@ export async function emblemCatalog() {
   if (hit.hit && !hit.stale) return hit.body;
   return flights.run("emblems:v1", async () => {
     try {
-      const raw = await arenaGet("/api/academy/emblems?size=200&index=1");
+      const raw = await getEmblems();
       const map = normalizeEmblemCatalog(raw?.data?.records ?? []);
       cacheSet("emblems:v1", map);
       return map;

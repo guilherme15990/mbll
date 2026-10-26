@@ -271,6 +271,42 @@ check("web: só App.tsx e app/router carregam features", wrongLoaders, featureIm
 const legacy = ["pages", "components"].filter((d) => fs.existsSync(path.join(WEB_SRC, d)));
 check("web: sem src/pages e src/components", legacy.map((d) => `src/${d} existe`));
 
+// ── 6. camada providers (ADR-045) ───────────────────────────────────────────
+// `providers/` é a base da pilha do backend: providers → application → routes →
+// http. Se um provider importar uma camada de cima, o cliente externo passa a
+// depender de regra de negócio e deixa de ser substituível. O compilador não vê
+// direção de dependência; este gate vê.
+const API_SRC = path.join(API, "src");
+const PROVIDERS_DIR = path.join(API_SRC, "providers");
+const apiRel = (f) => toPosix(path.relative(API_SRC, f));
+const providersUp = [];
+const arenaImports = [];
+for (const file of files) {
+  if (!isInside(file, API_SRC)) continue; // só o backend é regido por esta seção
+  const from = apiRel(file);
+  for (const { spec } of importsOf(fs.readFileSync(file, "utf8"))) {
+    if (!spec.startsWith(".")) continue;
+    const target = resolveRel(file, spec);
+    if (!target) continue;
+    const targetRel = apiRel(target);
+    // O cliente externo tem UMA casa (`providers/arena`). `infra/arena` era a
+    // duplicata que a ADR-045 eliminou — recriar o arquivo reabre o segundo cliente.
+    if (/^infra\/arena(\.js)?$/.test(targetRel)) {
+      arenaImports.push(`${from} → ${targetRel}`);
+    }
+    if (!isInside(file, PROVIDERS_DIR)) continue;
+    if (/^(application|routes|http)\//.test(targetRel)) {
+      providersUp.push(`${from} → ${targetRel}`);
+    }
+  }
+}
+check("providers: não importa application/routes/http", providersUp);
+check("api: cliente externo só em providers/arena", arenaImports);
+check(
+  "api: infra/arena.js removido (ADR-045)",
+  fs.existsSync(path.join(API_SRC, "infra", "arena.js")) ? ["app/api/src/infra/arena.js existe"] : [],
+);
+
 // ── resultado ───────────────────────────────────────────────────────────────
 console.log(bad ? `BOUNDARIES FAIL (${bad} regra(s))` : "BOUNDARIES OK");
 process.exit(bad ? 1 : 0);

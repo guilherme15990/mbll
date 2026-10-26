@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { scoreHeroes, classOf, confidenceToTrust } from "../src/index.js";
+import { scoreHeroes, classOf } from "../src/index.js";
 import { tierOf } from "../src/hero/tierOf.js";
 
 // Contrato das vistas de θ̂ (tier-v2 + strength-index-v1): tier e strength_index são funções
@@ -59,7 +59,6 @@ describe("vistas de θ̂: monotonicidade estrita", () => {
         assert.ok(k in h, `campo do contrato faltando em ${h.id}: ${k}`);
       }
       assert.ok(typeof classOf(h) === "string");
-      assert.ok(["Situacional", "Inconclusivo"].includes(confidenceToTrust(h).level));
     }
   });
 });

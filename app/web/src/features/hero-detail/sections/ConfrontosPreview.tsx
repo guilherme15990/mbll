@@ -109,7 +109,6 @@ function RankPrompt({ onPick }: { onPick: (rank: string) => void }) {
   return (
     <div
       data-testid="preview-needs-rank"
-      data-capid="CAP-M6-01"
       className="rounded-xl border border-line bg-abyss/30 p-3 space-y-2"
     >
       <p className="text-[11px] text-mist">

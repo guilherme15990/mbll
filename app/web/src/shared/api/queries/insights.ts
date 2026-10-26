@@ -12,10 +12,18 @@ import type { Hero } from "./heroes";
 
 export type TrendPoint = { date: string; win: number; pick: number; ban: number };
 
-export const useTrends = (id: string | null | undefined, rank: string, days = "30") =>
+export const useTrends = (
+  id: string | null | undefined,
+  rank: string,
+  days = "30",
+  // Opcionais: chamadas em grade (1 por card) usam staleTime longo e sem retry.
+  opts: { staleTime?: number; retry?: number } = {},
+) =>
   useQuery({
     queryKey: ["trends", id, rank, days],
     enabled: !!id,
+    ...(opts.staleTime != null ? { staleTime: opts.staleTime } : {}),
+    ...(opts.retry != null ? { retry: opts.retry } : {}),
     queryFn: () => getJSON<{ data: TrendPoint[] }>(`/v1/heroes/${id}/trends?rank=${rank}&days=${days}`),
   });
 

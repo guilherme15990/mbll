@@ -1,148 +1,120 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronRight, Minus, TrendingDown, TrendingUp } from "lucide-react";
-import { num, pct, useMatchups, useTrends, type Hero, type TrendPoint } from "../../shared/api";
-import { TREND_N, classOf, dominantProfileOf, trendOfDated } from "@radar/proprietary-engine";
-import { Avatar, ClassSeal, DomainStateBadge, TierBadge, TrustSeal, type TrustLevel } from "../../shared/ui";
-
-// Derivação em `@radar/proprietary-engine` (trendOfDated — Theil–Sen com datas reais,
-// V2 §11); geometria SVG sparkPath é presentacional e fica aqui.
-
-function sparkPath(wins: number[], w: number, h: number, pad: number): string {
-  if (!wins.length) return "";
-  const min = Math.min(...wins);
-  const max = Math.max(...wins);
-  const span = max - min < 1e-9 ? 1 : max - min;
-  return wins
-    .map((v, i) => {
-      const x = wins.length === 1 ? w / 2 : pad + (i / (wins.length - 1)) * (w - pad * 2);
-      const y = h - pad - ((v - min) / span) * (h - pad * 2);
-      return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
-}
+import { ChevronRight } from "lucide-react";
+import { num, pct, useMatchups, useTrends, type Hero } from "../../shared/api";
+import { classOf, dominantProfileOf, trendOfDated } from "@radar/proprietary-engine";
+import { withLanes } from "../../app/filters";
+import { Avatar, ClassSeal, DomainStateBadge, TierBadge } from "../../shared/ui";
 
 /**
- * Faísca de tendência por herói — 1 request por card VISÍVEL.
- * IntersectionObserver liga/desliga o `useTrends` (enabled = visível).
- * Sem prefetch da grade: cards fora da viewport nunca disparam fetch.
+ * Visibilidade na viewport (fetch lazy por card). UM IntersectionObserver de
+ * módulo atende todos os cards — antes eram 2 observers por card (~100 por página).
+ * Sem suporte a IntersectionObserver, assume visível (degrada p/ fetch imediato).
  */
-function HeroTrend({ heroId, rank, days }: { heroId: number; rank: string; days: string }) {
-  const boxRef = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
+let viewObserver: IntersectionObserver | null = null;
+const viewWatchers = new WeakMap<Element, (visible: boolean) => void>();
 
-  useEffect(() => {
-    const el = boxRef.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
+function observeView(el: Element, cb: (visible: boolean) => void): () => void {
+  if (typeof IntersectionObserver === "undefined") {
+    cb(true);
+    return () => {};
+  }
+  if (!viewObserver) {
+    viewObserver = new IntersectionObserver(
       (entries) => {
-        const entry = entries[0];
-        setVisible(entry ? entry.isIntersecting : false);
+        for (const entry of entries) viewWatchers.get(entry.target)?.(entry.isIntersecting);
       },
       { threshold: 0.1 }
     );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
+  }
+  viewWatchers.set(el, cb);
+  viewObserver.observe(el);
+  return () => {
+    viewWatchers.delete(el);
+    viewObserver?.unobserve(el);
+  };
+}
 
-  const q = useTrends(visible ? String(heroId) : null, rank, days);
-  const title = `${TREND_N} pontos · janela ${days}d`;
+function useInView<T extends HTMLElement>() {
+  const ref = useRef<T>(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    return observeView(el, setVisible);
+  }, []);
+  return [ref, visible] as const;
+}
+
+/**
+ * Tendência por herói — 1 request por card VISÍVEL.
+ * `useTrends` só é habilitado quando o card entra na viewport (id null = pausado).
+ * Sem prefetch da grade: cards fora da viewport nunca disparam fetch.
+ * A UI mostra só a direção (subindo/caindo/estável); números no tooltip.
+ */
+function HeroTrend({ heroId, rank, days }: { heroId: number; rank: string; days: string }) {
+  const [boxRef, visible] = useInView<HTMLSpanElement>();
+
+  const q = useTrends(visible ? String(heroId) : null, rank, days, {
+    staleTime: 15 * 60e3,
+    retry: 0,
+  });
 
   if (!visible || q.isLoading) {
-    return (
-      <div ref={boxRef} className="flex items-center gap-1.5" title={visible ? "carregando série…" : title} aria-label="tendência carregando">
-        <svg width="72" height="22" viewBox="0 0 72 22" aria-hidden="true" className="text-mist/40">
-          <line x1="2" y1="11" x2="70" y2="11" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 3" />
-        </svg>
-        <span className="text-[11px] text-mist font-mono" aria-hidden="true">
-          …
-        </span>
-      </div>
-    );
+    return <span ref={boxRef} role="img" className="text-[11px] text-mist" title="carregando série…" aria-label="tendência carregando">…</span>;
   }
-
   if (q.isError || !q.data) {
-    return (
-      <div ref={boxRef} className="flex items-center gap-1.5" title={`${title} · sem série neste recorte`} aria-label="tendência sem dado">
-        <svg width="72" height="22" viewBox="0 0 72 22" aria-hidden="true" className="text-mist/40">
-          <line x1="2" y1="11" x2="70" y2="11" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 3" />
-        </svg>
-        <span className="text-[11px] text-mist font-mono">—</span>
-        <span className="text-[11px] text-mist">sem dado</span>
-      </div>
-    );
+    return <span ref={boxRef} role="img" className="text-[11px] text-mist" aria-label="tendência sem dado">sem dado</span>;
   }
 
-  const points: TrendPoint[] = q.data.data ?? [];
-  // V2 §11.1: denominador em dias reais (lacunas não viram dias seguidos), 3 séries
-  // separadas — a faísca usa só win_rate; pick/ban têm radar próprio na ficha.
-  const radar = trendOfDated(points);
-  const w = radar.win_rate;
+  // V2 §11.1: denominador em dias reais (lacunas não viram dias seguidos).
+  const w = trendOfDated(q.data.data ?? []).win_rate;
   if (w.direction === "insufficient_data") {
     return (
-      <div ref={boxRef} className="flex items-center gap-1.5" title={`${w.n_points} ponto(s) · janela ${days}d · sem série suficiente`} aria-label="tendência sem dado">
-        <svg width="72" height="22" viewBox="0 0 72 22" aria-hidden="true" className="text-mist/40">
-          <line x1="2" y1="11" x2="70" y2="11" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 3" />
-        </svg>
-        <span className="text-[11px] text-mist font-mono">—</span>
-        <span className="text-[11px] text-mist">sem dado</span>
-      </div>
+      <span ref={boxRef} role="img" className="text-[11px] text-mist" title={`${w.n_points} ponto(s) · janela ${days}d · sem série suficiente`} aria-label="tendência sem dado">
+        sem dado
+      </span>
     );
   }
 
-  const wins = points.filter((p) => Number.isFinite(p.win)).slice(-TREND_N).map((p) => p.win);
-  const d = sparkPath(wins, 72, 22, 3);
-  const dir = w.direction === "rising" ? "subindo" : w.direction === "falling" ? "caindo" : "estável";
-  const color = dir === "subindo" ? "text-emerald-300" : dir === "caindo" ? "text-rose-300" : "text-slate-300";
-  const Icon = dir === "subindo" ? TrendingUp : dir === "caindo" ? TrendingDown : Minus;
-  const word = dir;
-  const markerId = `trend-arr-${heroId}`;
+  const word = w.direction === "rising" ? "subindo" : w.direction === "falling" ? "caindo" : "estável";
+  const tone = word === "subindo"
+    ? "text-emerald-300 border-emerald-400/30"
+    : word === "caindo"
+    ? "text-rose-300 border-rose-400/30"
+    : "text-slate-300 border-line";
 
   return (
-    <div ref={boxRef} className={`flex items-center gap-1.5 ${color}`} title={`${w.n_points} pontos · ${w.window_days}d reais · ${word} (${w.delta_pp_window ?? "—"} pp)`} aria-label={`tendência ${word}, ${w.n_points} pontos em ${days} dias`}>
-      <svg width="72" height="22" viewBox="0 0 72 22" aria-hidden="true" className="shrink-0">
-        <defs>
-          <marker id={markerId} markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto" markerUnits="strokeWidth">
-            <path d="M0,0 L6,3 L0,6 z" fill="currentColor" />
-          </marker>
-        </defs>
-        <path d={d} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" markerEnd={`url(#${markerId})`} />
-      </svg>
-      <Icon size={13} aria-hidden="true" className="shrink-0" />
-      <span className="text-[11px] font-medium">{word}</span>
-    </div>
+    <span
+      ref={boxRef}
+      role="img"
+      className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border bg-abyss/40 ${tone}`}
+      title={`${w.n_points} pontos · ${w.window_days}d reais · ${word} (${w.delta_pp_window ?? "—"} pp)`}
+      aria-label={`tendência ${word}, ${w.n_points} pontos em ${days} dias`}
+    >
+      {word}
+    </span>
   );
 }
 
 /**
  * Perfil dominante do herói (snowball/scaling/uniforme) — agregado honesto dos
  * pares listados em confrontos, 1 request por card VISÍVEL (mesmo padrão lazy
- * da faísca). Perfil existe por PAR, nunca na lista: o selo diz "N/M pares" e
- * aponta a ficha. Sem pares ou erro → sem selo (o link "perfil na ficha" segue abaixo).
+ * da tendência). Perfil existe por PAR, nunca na lista: o selo mostra só o nome
+ * ("Scaling"); a contagem de pares fica no tooltip/aria. Sem pares ou erro →
+ * sem selo.
  */
 function HeroProfileChip({ heroId, rank, days }: { heroId: number; rank: string; days: string }) {
-  const boxRef = useRef<HTMLSpanElement>(null);
-  const [visible, setVisible] = useState(false);
+  const [boxRef, visible] = useInView<HTMLSpanElement>();
 
-  useEffect(() => {
-    const el = boxRef.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0];
-        setVisible(entry ? entry.isIntersecting : false);
-      },
-      { threshold: 0.1 }
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-
-  const q = useMatchups(visible ? String(heroId) : null, rank, days);
+  const q = useMatchups(visible ? String(heroId) : null, rank, days, {
+    staleTime: 15 * 60e3,
+    retry: 0,
+  });
   if (!visible || q.isLoading) {
     return (
-      <span ref={boxRef} className="text-[10px] font-mono text-mist/60" aria-label="perfil carregando">
-        tipo: …
+      <span ref={boxRef} role="img" className="text-[10px] font-mono text-mist/60" aria-label="perfil carregando">
+        …
       </span>
     );
   }
@@ -161,125 +133,128 @@ function HeroProfileChip({ heroId, rank, days }: { heroId: number; rank: string;
   if (!dom) return <span ref={boxRef} />;
   const { top, n } = dom;
   const total = dom.total;
+  // Só o nome do perfil no selo; contagem de pares fica no tooltip/aria.
+  const label = top.charAt(0).toUpperCase() + top.slice(1);
   return (
     <span
       ref={boxRef}
-      className="text-[10px] font-bold px-1.5 py-0.5 rounded-md border border-violet-400/50 text-violet-300 bg-violet-400/10"
+      role="img"
+      className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-violet-400/50 text-violet-300 bg-violet-400/10"
       title={`perfil dominante entre os ${total} pares listados (fonte só expõe extremos); curva por par na ficha`}
-      aria-label={`perfil dominante ${top}, ${n} de ${total} pares`}
+      aria-label={`perfil dominante ${label}, ${n} de ${total} pares`}
     >
-      tipo: {top} {n}/{total}
+      {label}
     </span>
   );
 }
 
-export type HeroTrust = { level: TrustLevel; motive: string };
-
 /**
  * Card de herói da grade do /dashboard.
  * Reaproveita o objeto `Hero` já carregado pelo `useHeroes` da página
- * (nenhum fetch novo de lista aqui). O único fetch deste card é a
- * faísca de tendência, lazy por viewport (ver `HeroTrend`).
+ * (nenhum fetch novo de lista aqui). Fetches do card, ambos lazy por
+ * viewport: direção da tendência (`HeroTrend`) e perfil de duração
+ * (`HeroProfileChip`).
  * `lanes` (opcional) vem do mapa `/heroes/lanes` já carregado pela
  * página — selo só p/ lane mapeada; herói sem lane não recebe selo.
+ *
+ * Hierarquia de leitura: índice (0–100) como métrica primária; tier e tipo
+ * de herói ao lado do nome; win/pick/ban e tendência em blocos próprios.
+ * θ̂ (wrAdj) e diagnósticos B/z/q ficam no tooltip do índice — precisão sem
+ * poluir a leitura de panorama.
  */
-export default function HeroCard({ hero, rank, window, trust, lanes, indexN }: { hero: Hero; rank: string; window: string; trust: HeroTrust; lanes?: string[]; indexN?: number }) {
-  const detalhesTo = `/hero/${hero.id}?rank=${rank}&window=${window}`;
-  // Perfil de duração (snowball/scaling/uniforme) existe por PAR em confrontos,
-  // nunca na lista — link p/ a aba certa da ficha em vez de selo fabricado.
-  const perfilTo = `/hero/${hero.id}?rank=${rank}&window=${window}&tab=confrontos`;
+export default function HeroCard({ hero, rank, window, lanes, filterLanes, indexN }: { hero: Hero; rank: string; window: string; lanes?: string[]; filterLanes?: string[]; indexN?: number }) {
+  const detalhesTo = withLanes(`/hero/${hero.id}?rank=${rank}&window=${window}`, filterLanes ?? []);
+  const idx = typeof hero.strength_index === "number" ? hero.strength_index : null;
+  // Classe só quando discrimina: "Na media" é o padrão do lote, e Joia/Amostra
+  // pequena já aparecem como flags próprios abaixo.
+  const cls = classOf(hero);
+  const showCls = cls === "Forte" || cls === "Fraco";
 
   return (
-    <article className="card card-h p-3.5 bg-panel border-line space-y-2.5" aria-label={`Herói ${hero.name}`}>
-      <div className="flex items-center gap-2.5">
-        <Avatar src={hero.head} name={hero.name} size={40} />
-        <span className="min-w-0 flex-1">
-          <span className="block text-xs font-bold text-foam truncate">{hero.name}</span>
-          <span className="block text-[11px] text-mist font-mono" title="Força estimada (shrinkage) na grade c">
-            θ̂ {num(hero.wrAdj, 3)}
-          </span>
-        </span>
-        {/* Índice 0–100 ADR-024: percentil do θ̂ no meta (posição, não probabilidade) */}
-        <span
+    <article className="card card-h h-full flex flex-col gap-3 p-3.5 bg-panel border-line" aria-label={`Herói ${hero.name}`}>
+      {/* Identidade + índice em destaque: índice é posição no meta (0–100), não probabilidade. */}
+      <div className="flex items-start gap-3">
+        <Avatar src={hero.head} name={hero.name} size={44} />
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-sm font-bold text-foam truncate">{hero.name}</span>
+            <TierBadge tier={hero.tier} />
+            <HeroProfileChip heroId={hero.id} rank={rank} days={window} />
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {showCls ? <ClassSeal cls={cls} /> : null}
+            {hero.isGem ? <DomainStateBadge status="gem" label="joia" /> : null}
+            {hero.smallSample ? <DomainStateBadge status="inconclusive" label="amostra pequena" /> : null}
+            {hero.degenerate ? <DomainStateBadge status="warning" label="taxa degenerada" /> : null}
+          </div>
+        </div>
+        <div
           className="text-right shrink-0"
-          title={`Índice de força ${hero.strength_index ?? "—"} de 0–100: posição normalizada do θ̂ entre ${indexN ?? "?"} heróis do meta ${rank.toUpperCase()}, janela ${window}d (strength-index-v1, empates dividem posição). Posição, nunca probabilidade.`}
-          aria-label={typeof hero.strength_index === "number" ? `Índice de força ${hero.strength_index} de 100` : "Índice de força sem dado"}
+          title={`Índice de força ${idx ?? "—"} de 0–100: posição do θ̂ (${num(hero.wrAdj, 3)}) entre ${indexN ?? "?"} heróis do meta ${rank.toUpperCase()}, janela ${window}d (strength-index-v1, empates dividem posição). B ${num(hero.B, 2)} · z ${num(hero.z, 2)} · q ${num(hero.q, 4)}. Posição, nunca probabilidade.`}
         >
-          <span className="block num text-xl font-bold text-gold leading-none">
-            {typeof hero.strength_index === "number" ? num(hero.strength_index, 1) : "—"}
+          {/* Número visível é só o valor; o rótulo entra pelo sr-only (div+aria-label
+              sem role é ignorado por parte dos leitores de tela). */}
+          <span className="sr-only">
+            {idx !== null ? `Índice de força ${num(idx, 1)} de 100` : "Índice de força sem dado"}
           </span>
-          <span className="block text-[9px] uppercase tracking-wider text-mist mt-0.5">índice</span>
-        </span>
-        <TierBadge tier={hero.tier} />
-        <HeroProfileChip heroId={hero.id} rank={rank} days={window} />
+          <span aria-hidden="true" className="block num text-2xl font-bold text-gold leading-none">{idx !== null ? num(idx, 1) : "—"}</span>
+          <span aria-hidden="true" className="block text-[10px] uppercase tracking-wider text-mist mt-0.5">índice</span>
+          {idx !== null ? (
+            <span aria-hidden="true" className="block h-1 w-16 ml-auto mt-1 rounded-full bg-abyss overflow-hidden">
+              <span className="block h-full rounded-full bg-gold/70" style={{ width: `${Math.max(0, Math.min(100, idx))}%` }} />
+            </span>
+          ) : null}
+        </div>
       </div>
 
-      {/* Rotas do herói (múltiplas): linha própria abaixo do nome; sem lane = sem linha. */}
+      {/* Rotas do herói (múltiplas): sem lane = sem linha. */}
       {(lanes ?? []).length ? (
-        <p className="flex items-center gap-1.5 flex-wrap" aria-label={`Rotas: ${(lanes ?? []).join(", ")}`}>
-          <span className="text-[10px] text-mist">rotas:</span>
+        <p className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[10px] text-mist">rotas</span>
           {(lanes ?? []).map((l) => (
             <DomainStateBadge key={l} status="neutral" label={l} />
           ))}
         </p>
       ) : null}
 
-      {/* Selos do que a lista já traz: classe + estados (sem request por herói). */}
-      <div className="flex items-center gap-1.5 flex-wrap" aria-label="Selos do herói">
-        <ClassSeal cls={classOf(hero)} />
-        {hero.isGem ? <DomainStateBadge status="gem" label="joia" /> : null}
-        {hero.smallSample ? <DomainStateBadge status="inconclusive" label="amostra pequena" /> : null}
-        {hero.degenerate ? <DomainStateBadge status="warning" label="taxa degenerada" /> : null}
-      </div>
-
-      {/* Valores calculados pelo sistema (shrinkage M1), como na tela de Força. */}
-      <p
-        className="text-[10px] font-mono text-mist"
-        title="B = quanto a estimativa foi puxada à média (0 = dado puro, 1 = só média); z = distância da média em erros-padrão; q = taxa de falsa descoberta (BH)"
-        aria-label={`Fator B ${num(hero.B, 2)}, z ${num(hero.z, 2)}, q ${num(hero.q, 4)}`}
-      >
-        B {num(hero.B, 2)} · z {num(hero.z, 2)} · q {num(hero.q, 4)}
-      </p>
-
-      <dl className="grid grid-cols-3 gap-1.5 text-center">
-        <div className="rounded-lg bg-abyss/60 border border-line px-1 py-1">
-          <dt className="text-[9px] uppercase tracking-wider text-mist">win obs.</dt>
-          <dd className="text-[11px] font-mono text-foam">{Number.isFinite(hero.win) ? pct(hero.win, 1) : "—"}</dd>
+      {/* Números-chave da faixa (unidade só no tooltip: win = partidas com vitória;
+          pick = participação nos slots de herói — slot_share, denominador não
+          validado; ban = fração de partidas com ban). */}
+      <dl className="grid grid-cols-3 gap-1.5 text-center" aria-label="Win, pick e ban do herói">
+        <div className="rounded-lg bg-abyss/60 border border-line px-1 py-1.5">
+          <dt className="text-[10px] uppercase tracking-wider text-mist">win</dt>
+          <dd className="text-sm font-bold text-foam" title="win rate observado na janela (sem ajuste de shrinkage)">
+            {Number.isFinite(hero.win) ? pct(hero.win, 1) : "—"}
+          </dd>
         </div>
-        <div className="rounded-lg bg-abyss/60 border border-line px-1 py-1">
-          <dt className="text-[9px] uppercase tracking-wider text-mist">pick</dt>
-          <dd className="text-[11px] font-mono text-foam">{Number.isFinite(hero.pick) ? pct(hero.pick, 1) : "—"}</dd>
+        <div className="rounded-lg bg-abyss/60 border border-line px-1 py-1.5">
+          <dt className="text-[10px] uppercase tracking-wider text-mist">pick</dt>
+          <dd className="text-sm font-bold text-foam" title="pick = participação nos slots de herói da partida (slot_share; denominador de partidas não validado)">
+            {Number.isFinite(hero.pick) ? pct(hero.pick, 1) : "—"}
+          </dd>
         </div>
-        <div className="rounded-lg bg-abyss/60 border border-line px-1 py-1">
-          <dt className="text-[9px] uppercase tracking-wider text-mist">ban</dt>
-          <dd className="text-[11px] font-mono text-foam">{Number.isFinite(hero.ban) ? pct(hero.ban, 1) : "—"}</dd>
+        <div className="rounded-lg bg-abyss/60 border border-line px-1 py-1.5">
+          <dt className="text-[10px] uppercase tracking-wider text-mist">ban</dt>
+          <dd className="text-sm font-bold text-foam" title="ban = fração de partidas da faixa em que o herói foi banido">
+            {Number.isFinite(hero.ban) ? pct(hero.ban, 1) : "—"}
+          </dd>
         </div>
       </dl>
-      <p className="text-[10px] font-mono text-mist" title="Unidade de exposição da fonte">
-        slot_share·unvalidated
-      </p>
 
-      <HeroTrend heroId={hero.id} rank={rank} days={window} />
+      {/* Tendência (subindo / caindo / estável) — só a palavra; números no tooltip. */}
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] uppercase tracking-wider text-mist">tendência</span>
+        <HeroTrend heroId={hero.id} rank={rank} days={window} />
+      </div>
 
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <TrustSeal level={trust.level} motive={trust.motive} />
-        <span className="inline-flex items-center gap-1.5">
-          <Link
-            to={perfilTo}
-            className="text-[11px] text-mist hover:text-gold transition-colors"
-            title="Curva de duração por par (snowball/scaling/uniforme) só na ficha"
-            aria-label={`Ver perfil de duração de ${hero.name} na ficha`}
-          >
-            perfil na ficha →
-          </Link>
-          <Link
-            to={detalhesTo}
-            className="btn-ghost !py-1 !px-2.5 text-[11px] inline-flex items-center gap-1"
-            aria-label={`Abrir detalhes de ${hero.name}`}
-          >
-            Detalhes <ChevronRight size={13} aria-hidden="true" />
-          </Link>
-        </span>
+      <div className="mt-auto flex items-center justify-end gap-2 flex-wrap">
+        <Link
+          to={detalhesTo}
+          className="btn-ghost !py-1 !px-2.5 text-[11px] inline-flex items-center gap-1"
+          aria-label={`Abrir detalhes de ${hero.name}`}
+        >
+          Detalhes <ChevronRight size={13} aria-hidden="true" />
+        </Link>
       </div>
     </article>
   );

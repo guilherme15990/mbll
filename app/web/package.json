@@ -8,7 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "build:fast": "tsc --noEmit && node build.mjs",
     "preview": "vite preview",
-    "test": "node ./test/smoke.mjs && node --test ./test/itemsets.test.mjs ./test/combiner.test.mjs && node ./test/guardian-builds-global.mjs && node ./test/guardian-hero-confrontos.mjs && node ./test/guardian-f4a.mjs && node ./test/guardian-f4b.mjs",
+    "test": "node ./test/smoke.mjs && node --test ./test/itemsets.test.mjs ./test/combiner.test.mjs ./test/loadout.test.mjs && node ./test/guardian-builds-global.mjs && node ./test/guardian-hero-confrontos.mjs && node ./test/guardian-f4a.mjs && node ./test/guardian-f4b.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -7,7 +7,7 @@ const TONE_CLASS: Record<PickFavorability["tone"], string> = {
   slate: "text-mist border-line bg-abyss",
 };
 
-/** Cor do Evento (IDD): verde = favorável, âmbar = situacional, vermelho = desfavorável, neutro = sem dado. */
+/** Cor do Evento: verde = favorável, âmbar = situacional, vermelho = desfavorável, neutro = sem dado. */
 export function pickToneClass(tone: PickFavorability["tone"]): string {
   return TONE_CLASS[tone];
 }

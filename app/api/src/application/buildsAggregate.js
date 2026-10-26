@@ -2,7 +2,9 @@
 // Cache derivado C 24 h + SWR. Fan-out limitado: 4 catálogos + páginas de rank
 // + 1 request por herói do top-N (máx. 20). Computações serializadas para não
 // somar rajadas de lanes/ranks diferentes.
-import { arenaGet, mapConc } from "../infra/arena.js";
+import {
+  getPositions, getExpandedEquipment, getEmblems, getSpells, getHeroBuilds, mapConc,
+} from "../providers/arena/index.js";
 import { cacheGet, cacheSet } from "../infra/cacheStore.js";
 import { scoreLot } from "./scoring.js";
 import { fetchRankAll, lastVerifiedPosterior, lanesFromRoadsort } from "./rankLot.js";
@@ -36,11 +38,12 @@ function aggEnqueue(fn) {
   return run;
 }
 
-async function aggCatalog(key, path, normalize) {
+async function aggCatalog(key, load, normalize) {
   const hit = cacheGet(key, "C");
   if (hit.hit) return { data: hit.body ?? {}, stale: !!hit.stale, ageMs: hit.ageMs ?? 0, source: "cache" };
-  const raw = await arenaGet(path, { retries: 1, timeoutMs: 7000 });
-  const data = normalize(raw?.data?.records ?? raw?.data ?? []);
+  const page = await load();
+  const records = Array.isArray(page?.data) ? page.data : page?.data?.records ?? [];
+  const data = normalize(records);
   if (!data || !Object.keys(data).length) throw new Error(`catalog_empty:${key}`);
   cacheSet(key, data);
   return { data, stale: false, ageMs: 0, source: "upstream" };
@@ -67,7 +70,7 @@ function aggParsePositions(records) {
 async function aggPositions() {
   const hit = cacheGet("positions:v1", "C");
   if (hit.hit) return { data: hit.body ?? {}, stale: !!hit.stale, ageMs: hit.ageMs ?? 0, source: "cache" };
-  const raw = await arenaGet("/api/heroes/positions?size=200&index=1", { retries: 1, timeoutMs: 7000 });
+  const raw = await getPositions({ retries: 1, timeoutMs: 7000 });
   const data = aggParsePositions(raw?.data?.records ?? []);
   if (!Object.keys(data).length) throw new Error("positions_empty");
   cacheSet("positions:v1", data);
@@ -112,6 +115,30 @@ function aggFlattenBuilds(records) {
   return out;
 }
 
+/**
+ * Resultado cru de builds por herói. As três saídas (cache, deadline, falha)
+ * têm o MESMO contrato: `records` sempre existe e `error`/`detail`/`stale` são
+ * opcionais. Sem esse typedef o TS infere uma união em que `f.error` não
+ * existe em todo ramo — e a agregação precisa ler os três campos.
+ *
+ * @typedef {Object} RawBuildsResult
+ * @property {number} id
+ * @property {any[]} records
+ * @property {boolean} cached
+ * @property {boolean} [stale]
+ * @property {number} ageMs
+ * @property {string} [error]
+ * @property {string} [detail]
+ */
+
+/**
+ * @param {number} id
+ * @param {string} rank
+ * @param {string} lane
+ * @param {number} deadline
+ * @param {number} timeoutMs
+ * @returns {Promise<RawBuildsResult>}
+ */
 async function aggRawBuilds(id, rank, lane, deadline, timeoutMs) {
   const key = `builds:raw:v1:${id}:${rank}:${lane}`;
   const hit = cacheGet(key, "C");
@@ -122,9 +149,7 @@ async function aggRawBuilds(id, rank, lane, deadline, timeoutMs) {
     return { id, records: [], cached: false, error: "deadline_exceeded", ageMs: 0 };
   }
   try {
-    const raw = await arenaGet(`/api/academy/heroes/${id}/builds?lane=${lane}&rank=${rank}&size=6&index=1`, {
-      retries: 1, timeoutMs,
-    });
+    const raw = await getHeroBuilds({ id, lane, rank, retries: 1, timeoutMs });
     const records = raw?.data?.records ?? [];
     cacheSet(key, { records });
     return { id, records, cached: false, stale: false, ageMs: 0 };
@@ -161,9 +186,9 @@ async function computeBuildsAggregate({ rank, lane, window, top, population }) {
   // Catálogos em paralelo (3 requests frios). Falha de catálogo degrada o recorte,
   // não derruba a página: nome/arquétipo viram null/unclassified, e o aviso viaja.
   const [eq, em, sp] = await Promise.all([
-    aggCatalog("equipment:expanded:v1", "/api/academy/equipment/expanded?size=200&index=1", normalizeEquipmentCatalog).catch(() => null),
-    aggCatalog("emblems:v1", "/api/academy/emblems?size=200&index=1", normalizeEmblemCatalog).catch(() => null),
-    aggCatalog("spells:v1", "/api/academy/spells?size=200&index=1", normalizeSpellCatalog).catch(() => null),
+    aggCatalog("equipment:expanded:v1", () => getExpandedEquipment({ retries: 1, timeoutMs: 7000 }), normalizeEquipmentCatalog).catch(() => null),
+    aggCatalog("emblems:v1", () => getEmblems({ retries: 1, timeoutMs: 7000 }), normalizeEmblemCatalog).catch(() => null),
+    aggCatalog("spells:v1", () => getSpells({ retries: 1, timeoutMs: 7000 }), normalizeSpellCatalog).catch(() => null),
   ]);
   for (const [name, c] of [["equipment", eq], ["emblems", em], ["spells", sp]]) {
     if (!c) continue;
@@ -200,7 +225,7 @@ async function computeBuildsAggregate({ rank, lane, window, top, population }) {
   }
 
   const contexts = roster.map((h, i) => {
-    const f = fetched[i] ?? { records: [], cached: false, ageMs: 0 };
+    const f = fetched[i] ?? /** @type {RawBuildsResult} */ ({ records: [], cached: false, ageMs: 0 });
     const rawBuilds = aggFlattenBuilds(f.records);
     const status = f.error ? "error" : rawBuilds.length ? "ok" : "empty";
     return {

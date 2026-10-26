@@ -339,11 +339,21 @@ export type BuildsAggregateResponse = {
 
 // ── hooks ───────────────────────────────────────────────────────────────────
 
+/** Resposta de `/v1/heroes/:id/builds` — o eco de `id/rank/lane` valida cache. */
+export type HeroBuildsResponse = {
+  id: number;
+  rank: string;
+  lane: string;
+  data: Build[];
+  audit_status?: string;
+  references?: { mostUsed: { win: number } | null; heroMean: number | null };
+};
+
 export const useBuilds = (id: string | null | undefined, rank: string, lane: string) =>
   useQuery({
     queryKey: ["builds", id, rank, lane],
     enabled: !!id && (LANES as readonly string[]).includes(lane),
-    queryFn: () => getJSON<{ data: Build[]; lane: string; audit_status?: string; references?: { mostUsed: { win: number } | null; heroMean: number | null } }>(`/v1/heroes/${id}/builds?rank=${rank}&lane=${lane}`),
+    queryFn: () => getJSON<HeroBuildsResponse>(`/v1/heroes/${id}/builds?rank=${rank}&lane=${lane}`),
   });
 
 /**

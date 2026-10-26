@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
+import { filtersQuery } from "./filters";
 
 /**
  * Mapa de rotas da aplicação.
@@ -21,6 +22,7 @@ const Matchups = lazy(() => import("../features/matchups/Matchups"));
 const Draft = lazy(() => import("../features/draft/Draft"));
 const Blind = lazy(() => import("../features/blind/Blind"));
 const Builds = lazy(() => import("../features/builds/Builds"));
+const Preparar = lazy(() => import("../features/loadout/Preparar"));
 const Exposure = lazy(() => import("../features/exposure/Exposure"));
 const HeroDetail = lazy(() => import("../features/hero-detail/HeroDetail"));
 
@@ -38,11 +40,11 @@ function RouteFallback() {
   );
 }
 
-export function AppRoutes({ rank, window }: { rank: string; window: string }) {
+export function AppRoutes({ rank, window, lanes }: { rank: string; window: string; lanes: string[] }) {
   return (
     <Suspense fallback={<RouteFallback />}>
       <Routes>
-        <Route path="/" element={<Navigate to={`/dashboard?rank=${rank}&window=${window}`} replace />} />
+        <Route path="/" element={<Navigate to={`/dashboard?${filtersQuery({ rank, window, hero: "", lanes })}`} replace />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/hero" element={<HeroList />} />
         <Route path="/forca" element={<Strength />} />
@@ -53,6 +55,7 @@ export function AppRoutes({ rank, window }: { rank: string; window: string }) {
         <Route path="/draft" element={<Draft />} />
         <Route path="/blind" element={<Blind />} />
         <Route path="/builds" element={<Builds />} />
+        <Route path="/preparar" element={<Preparar />} />
         <Route path="/exposicao" element={<Exposure />} />
         <Route path="/hero/:id" element={<HeroDetail />} />
         {/* Aliases permanentes da ficha (links antigos seguem válidos) */}

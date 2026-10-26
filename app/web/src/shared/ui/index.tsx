@@ -9,9 +9,6 @@
  * - `patterns/` — composições do produto (HeroPicker, HeroDossier, charts…).
  *   Podem consumir `shared/api`. Importados por caminho, **não** por este
  *   barrel: quem usa `HeroPicker` deve saber que está puxando dados.
- *
- * `IddZone`/`IddTraceBadge` moram em `shared/idd` (dependem do contexto IDD) e
- * são reexportados aqui só para a UI continuar com uma fachada única.
  */
 
 export { Avatar } from "./primitives/Avatar";
@@ -20,8 +17,7 @@ export { ClassSeal } from "./primitives/ClassSeal";
 export { CtxSeal } from "./primitives/CtxSeal";
 export { CtxBar } from "./primitives/CtxBar";
 export { StatusSeal } from "./primitives/StatusSeal";
-export { DomainStateBadge, type TrustLevel } from "./primitives/DomainStateBadge";
-export { TrustSeal } from "./primitives/TrustSeal";
+export { DomainStateBadge } from "./primitives/DomainStateBadge";
 export { EvidenceQualityBadge } from "./primitives/EvidenceQualityBadge";
 export { Delta } from "./primitives/Delta";
 export { ThetaBar } from "./primitives/ThetaBar";
@@ -34,6 +30,3 @@ export { GhostNote } from "./primitives/GhostNote";
 export { AnchorNumber } from "./primitives/AnchorNumber";
 export { StateStrip, type StateStripTone } from "./primitives/StateStrip";
 export { HeroBanner, type HeroBannerTone } from "./primitives/HeroBanner";
-
-export { IddZone } from "../idd/IddZone";
-export { IddTraceBadge } from "../idd/IddTraceBadge";

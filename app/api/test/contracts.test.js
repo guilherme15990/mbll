@@ -15,7 +15,7 @@ import { installUpstreamMock, HEROES } from "./support/upstream.mjs";
 const mock = installUpstreamMock();
 const { router } = await import("../src/routes.js");
 const { recordSnapshot } = await import("../src/infra/snapshotHistory.js");
-const { resetArenaCircuit } = await import("../src/infra/arena.js");
+const { resetArenaCircuit } = await import("../src/providers/arena/index.js");
 
 before(() => { mock.reset(); });
 // O breaker é estado de módulo (5 falhas ⇒ 60 s aberto). Um teste que simula

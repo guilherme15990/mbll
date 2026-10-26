@@ -2,7 +2,6 @@ import { Link, useSearchParams } from "react-router-dom";
 import { num, pct, useHero } from "../../api";
 import { Avatar } from "../primitives/Avatar";
 import { ClassSeal } from "../primitives/ClassSeal";
-import { IddZone } from "../../idd/IddZone";
 import { TierBadge } from "../primitives/TierBadge";
 import { classOf } from "@radar/proprietary-engine";
 import { Activity, ArrowUpRight, FlaskConical, Gem, Hammer, LayoutGrid, LineChart, Radar, Swords, X } from "lucide-react";
@@ -41,7 +40,7 @@ export function HeroDossier({ heroId, activeContextId, rank, window }: HeroDossi
   return (
     <div className="card p-3.5 bg-gradient-to-r from-panel via-panel2/80 to-panel border-gold/30 shadow-lg">
       <div className="flex items-center gap-3.5 flex-wrap">
-        <IddZone zone="identity" capId="CAP-SHR-01" className="flex items-center gap-3 p-1">
+        <div className="flex items-center gap-3 p-1">
           <Avatar src={h?.head ?? null} name={h?.name ?? `Herói #${heroId}`} size={46} />
           <div>
             <div className="flex items-center gap-2">
@@ -61,7 +60,7 @@ export function HeroDossier({ heroId, activeContextId, rank, window }: HeroDossi
               )}
             </div>
           </div>
-        </IddZone>
+        </div>
 
         <div className="flex items-center gap-1.5 ml-auto flex-wrap">
           <span className="text-[11px] text-mist/80 mr-1 hidden sm:inline">Explorar herói em:</span>

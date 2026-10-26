@@ -4,9 +4,9 @@ import { ArrowUpDown, Search, Sparkles } from "lucide-react";
 import { cx, num, pct, useHeroes, type Hero } from "../../shared/api";
 import {
   Avatar, ClassSeal, CtxBar, Empty, ErrBox, FreshLine,
-  IddZone, IddTraceBadge, Loading, SectionTitle, ThetaBar, TierBadge
+  Loading, SectionTitle, ThetaBar, TierBadge
 } from "../../shared/ui";
-import { PrimaryAction } from "../../shared/idd/cards/PrimaryAction";
+import { PrimaryAction } from "../../shared/ui/patterns/PrimaryAction";
 import { classOf, heroRankPosition, medianWrAdj, sortHeroesByMetric } from "@radar/proprietary-engine";
 import type { HeroPanelProps } from "../../shared/ui/patterns/heroPanel";
 
@@ -79,8 +79,6 @@ export default function ForcaPanel({ rank, window, hero, dossier, picker, ficha 
       {picker}
 
       <PrimaryAction
-        contextId="SHR"
-        capId="CAP-SHR-01"
         label="Comparar neste contexto"
         to={`/confianca?hero=${hero}&rank=${rank}&window=${window}`}
         disabledReason={!hero ? "selecione um herói na tabela" : null}
@@ -270,16 +268,15 @@ export default function ForcaPanel({ rank, window, hero, dossier, picker, ficha 
                     isSelected ? "border-gold bg-gold/5 shadow-glow" : "bg-panel"
                   )}
                 >
-                  <IddZone zone="identity" capId="CAP-SHR-01" className="flex items-center gap-2.5 p-1">
+                  <div className="flex items-center gap-2.5 p-1">
                     <Avatar src={h.head} name={h.name} size={46} />
                     <div>
                       <span className="font-bold text-sm text-foam">{h.name}</span>
-                      <IddTraceBadge capId="CAP-SHR-01" step="Localizar" />
                     </div>
-                  </IddZone>
+                  </div>
 
                   <div className="min-w-0 flex-1 space-y-1.5">
-                    <IddZone zone="state" className="flex items-center gap-2 flex-wrap p-1">
+                    <div className="flex items-center gap-2 flex-wrap p-1">
                       <TierBadge tier={h.tier} />
                       <ClassSeal cls={classOf(h)} />
                       {isSelected && (
@@ -292,9 +289,9 @@ export default function ForcaPanel({ rank, window, hero, dossier, picker, ficha 
                           Amostra Escassa (Encolhido)
                         </span>
                       )}
-                    </IddZone>
+                    </div>
 
-                    <IddZone zone="data" capId="CAP-SHR-02" className="flex items-center gap-4 text-xs text-mist flex-wrap p-1">
+                    <div className="flex items-center gap-4 text-xs text-mist flex-wrap p-1">
                       {/* Força Ajustada θ̂ vs Observado */}
                       <span className="flex items-center gap-1.5">
                         θ̂ <b className="num text-gold font-bold text-sm">{num(h.wrAdj, 3)}</b>
@@ -321,14 +318,11 @@ export default function ForcaPanel({ rank, window, hero, dossier, picker, ficha 
                       <span>
                         ban <b className="num text-cyan-200">{pct(h.ban)}</b>
                       </span>
-                    </IddZone>
+                    </div>
                   </div>
 
-                  {/* Quick DDD Drilldown Links (Zona de Ações Secundárias / Drilldown) */}
-                  <IddZone
-                    zone="secondary"
-                    className="flex items-center gap-1.5 flex-wrap ml-auto p-1"
-                  >
+                  {/* Quick DDD Drilldown Links (Ações Secundárias / Drilldown) */}
+                  <div className="flex items-center gap-1.5 flex-wrap ml-auto p-1">
                     <div
                       className="flex items-center gap-1.5"
                       onClick={(e) => e.stopPropagation()}
@@ -355,7 +349,7 @@ export default function ForcaPanel({ rank, window, hero, dossier, picker, ficha 
                         Draft →
                       </Link>
                     </div>
-                  </IddZone>
+                  </div>
                 </article>
               );
             })}

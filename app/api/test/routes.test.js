@@ -3,7 +3,7 @@ import "./support/env.mjs";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { score, scoreLot, lastVerifiedPosterior } from "../src/routes.js";
-import { classOf, confidenceToTrust } from "@radar/proprietary-engine";
+import { classOf } from "@radar/proprietary-engine";
 
 describe("contratos internos Fase 1 (zero-dep)", () => {
   const rows = [
@@ -20,7 +20,6 @@ describe("contratos internos Fase 1 (zero-dep)", () => {
       for (const k of ["wrAdj", "z", "q", "tier", "strong", "weak", "isGem", "posterior_mean", "degenerate", "smallSample"]) assert.ok(k in h, `falta ${k} em ${h.id}`);
       for (const k of ["d", "class", "confidence", "prior"]) assert.ok(!(k in h), `fora do contrato em ${h.id}: ${k}`);
       assert.ok(["S", "A", "B", "C", "D", "?"].includes(h.tier));
-      assert.ok(["Situacional", "Inconclusivo"].includes(confidenceToTrust(h).level));
       assert.ok(typeof classOf(h) === "string");
     }
   });

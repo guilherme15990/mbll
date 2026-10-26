@@ -2,7 +2,8 @@
 // Ids = lista do rank pedido (janela 7; lane é estática por herói, o rank só diz
 // quem listar). Desconhecido = herói SEM lane (aparece sem filtro). Falha do
 // upstream = lista vazia/mapa sem lanes — degradação honesta, nunca 502.
-import { arenaGet, mapConc } from "../infra/arena.js";
+import { getHeroLane, mapConc } from "../providers/arena/index.js";
+import { getLogger, LOG_EVENTS } from "../providers/logging/index.js";
 import { cacheGet, cacheSet } from "../infra/cacheStore.js";
 import { fetchRankAll, lanesFromRoadsort } from "./rankLot.js";
 import { catalogMap } from "./catalogs.js";
@@ -35,10 +36,16 @@ async function heroLanesBodyImpl(rank) {
   }
   const pairs = await mapConc(ids, async (id) => {
     try {
-      const raw = await arenaGet(`/api/academy/heroes/${id}/lane`);
+      const raw = await getHeroLane(id);
       const roadsort = raw?.data?.records?.[0]?.data?.hero?.data?.roadsort ?? [];
       const parsed = lanesFromRoadsort(roadsort);
-      for (const u of parsed.unknown) console.warn(`[lanes] título não-mapeado ${JSON.stringify(u)} no herói ${id} — herói sem lane`);
+      for (const u of parsed.unknown) {
+        getLogger().warn(LOG_EVENTS.LANE_UNMAPPED, {
+          heroId: id,
+          title: u,
+          outcome: "hero_without_lane",
+        });
+      }
       return [id, parsed.lanes];
     } catch {
       return [id, []]; // herói sem lane nesta coleta; aparece sem filtro, nunca sob lane errada

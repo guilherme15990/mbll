@@ -10,7 +10,8 @@ import { router as defaultRouter } from "./router.js";
 import { send, sendBuffer, sendEmpty } from "./respond.js";
 import { serveStatic } from "./static.js";
 import { HTTP, errorBody, toErrorResponse } from "./errors.js";
-import { createLogger } from "./log.js";
+import { createLogger, configureLogging, LOG_EVENTS } from "../providers/logging/index.js";
+import { withRequestContext } from "../providers/logging/context.js";
 import { createRateLimiter } from "../application/rateLimit.js";
 import { config } from "../infra/config.js";
 import { closeDb } from "../infra/db.js";
@@ -35,8 +36,9 @@ function clientKey(req, trustProxy) {
 }
 
 /**
- * Opções injetáveis do servidor. `logger` aceita o logger de `http/log.js`
- * (`{ info, warn, error }`) ou um espião de teste.
+ * Opções injetáveis do servidor. `logger` aceita o logger de
+ * `providers/logging` (`{ info, warn, error }`) ou um espião de teste — o
+ * contrato mínimo é `{ info, error }`, completado por `normalizeLogger`.
  *
  * @typedef {Object} ApiServerOptions
  * @property {(path: string, sp: URLSearchParams) => Promise<any>} [router]
@@ -44,7 +46,14 @@ function clientKey(req, trustProxy) {
  * @property {string} [logLevel]
  * @property {boolean} [trustProxy]
  * @property {{ enabled: boolean, rps?: number, burst?: number }} [rateLimit]
- * @property {{ info: Function, error: Function, debug?: Function, level?: string }} [logger]
+ * @property {{
+ *   level?: string,
+ *   child?: Function,
+ *   info: Function,
+ *   error: Function,
+ *   warn?: Function,
+ *   debug?: Function,
+ * }} [logger]
  */
 
 /**
@@ -59,6 +68,9 @@ export function createApiServer({
   logger,
 } = {}) {
   const log = logger ?? createLogger(logLevel);
+  // Logger único do processo: application/providers chamam `getLogger()` e
+  // herdam nível + contexto de request (ADR-045).
+  configureLogging(log);
   const limiter = rateLimit?.enabled
     ? createRateLimiter({ rps: rateLimit.rps, burst: rateLimit.burst })
     : null;
@@ -73,7 +85,7 @@ export function createApiServer({
     res.setHeader("referrer-policy", "no-referrer");
     res.on("finish", () => {
       const ms = Number(process.hrtime.bigint() - started) / 1e6;
-      log.info("request", {
+      log.info(LOG_EVENTS.REQUEST, {
         requestId, method: req.method, path: url.pathname,
         status: res.statusCode, ms: Math.round(ms),
       });
@@ -99,12 +111,15 @@ export function createApiServer({
         }
       }
       try {
-        const out = await router(m[1], url.searchParams);
+        const out = await withRequestContext(
+          { requestId, method: req.method, path: url.pathname, route: m[1] },
+          () => router(m[1], url.searchParams),
+        );
         return send(res, out.status, out.body);
       } catch (e) {
         const { status, body } = toErrorResponse(e);
         if (status >= HTTP.INTERNAL) {
-          log.error("unhandled_error", {
+          log.error(LOG_EVENTS.UNHANDLED_ERROR, {
             requestId, method: req.method, path: url.pathname,
             err: String(e?.message ?? e), stack: e?.stack,
           });
@@ -144,11 +159,12 @@ export function stopServer(server, { timeoutMs = config.http.shutdownTimeoutMs }
  */
 export function startServer({ port = config.port, ...opts } = {}) {
   const log = opts.logger ?? createLogger(opts.logLevel ?? config.http.logLevel);
+  configureLogging(log);
   const server = createApiServer({ ...opts, logger: log });
 
   server.on("error", (e) => {
     const err = /** @type {NodeJS.ErrnoException} */ (e);
-    log.error("listen_failed", { err: String(err?.message ?? err), code: err?.code ?? null });
+    log.error(LOG_EVENTS.LISTEN_FAILED, { err: String(err?.message ?? err), code: err?.code ?? null });
     process.exitCode = 1;
   });
 
@@ -156,18 +172,18 @@ export function startServer({ port = config.port, ...opts } = {}) {
   server.listen(port, () => {
     const addr = server.address();
     const effective = addr && typeof addr === "object" ? addr.port : port;
-    log.info("server_listening", { port: effective, zeroDep: true });
+    log.info(LOG_EVENTS.SERVER_LISTENING, { port: effective, zeroDep: true });
   });
 
   let stopping = false;
   const shutdown = async (signal) => {
     if (stopping) return;
     stopping = true;
-    log.info("shutdown", { signal, timeoutMs: config.http.shutdownTimeoutMs });
+    log.info(LOG_EVENTS.SHUTDOWN, { signal, timeoutMs: config.http.shutdownTimeoutMs });
     const { forced } = await stopServer(server);
     // F3: fecha o SQLite depois de parar de aceitar requests (WAL checkpoint no close).
     const closed = closeDb();
-    log.info("shutdown_done", { signal, forced, dbClosed: closed });
+    log.info(LOG_EVENTS.SHUTDOWN_DONE, { signal, forced, dbClosed: closed });
     process.exit(forced ? 1 : 0);
   };
   process.once("SIGINT", () => { void shutdown("SIGINT"); });

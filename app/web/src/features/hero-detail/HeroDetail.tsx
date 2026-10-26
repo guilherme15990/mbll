@@ -9,7 +9,7 @@ import { PickVerdictText } from "../../shared/ui/patterns/PickVerdict";
 import BuildLoadout from "../../shared/ui/patterns/BuildLoadout";
 import { getBuildTags, getDraftPatterns } from "@radar/proprietary-engine";
 import { classifyBlindPick, classifyFirstPick } from "@radar/proprietary-engine";
-import { NeedsLane, NeedsRank } from "../../shared/idd/cards/NeedsRankLane";
+import { NeedsLane, NeedsRank } from "../../shared/ui/patterns/NeedsRankLane";
 import {
   Avatar, Empty, ErrBox, TierBadge,
 } from "../../shared/ui";
@@ -28,7 +28,7 @@ type HeroContextId = "SHR" | "CNF" | "RNK" | "TMP" | "M6" | "DRF" | "BPS" | "BDL
 
 /**
  * Ordem de decisão: home → confrontos → draft (picks + pressão) → builds → fundamento.
- * IDD: 1 ícone fixo por Contexto de Interface, repetido em toda a ficha.
+ * Cada aba tem um Contexto de Interface fixo, repetido em toda a ficha.
  */
 const HERO_TABS: { slug: string; label: string; contextId: HeroContextId; icon: ReactNode }[] = [
   { slug: "home", label: "Visão geral", contextId: "M6", icon: <LayoutDashboard size={13} aria-hidden="true" /> },
@@ -450,7 +450,7 @@ export default function HeroDetail() {
               </div>
               {rank === "all" ? (
                 <div className="mt-1.5" onClick={(e) => e.preventDefault()}>
-                  <NeedsRank capId="CAP-BPS-01" onPick={(r) => { sp.set("rank", r); setSp(sp); }} />
+                  <NeedsRank onPick={(r) => { sp.set("rank", r); setSp(sp); }} />
                 </div>
               ) : bQuery.isLoading ? (
                 <p className="text-[11px] text-mist mt-1.5" role="status">avaliando blind e first pick…</p>
@@ -488,7 +488,7 @@ export default function HeroDetail() {
               <div className="rounded-2xl border border-line bg-panel p-3.5 space-y-2">
                 <p className="text-xs font-bold uppercase tracking-wider text-foam">Builds</p>
                 <p className="text-[13px] text-foam font-sans">Escolha a lane — sem lane, sem lift.</p>
-                <NeedsLane capId="CAP-BDL-01" onPick={(l) => { const n = new URLSearchParams(sp); n.set("lane", l); setSp(n); }} />
+                <NeedsLane onPick={(l) => { const n = new URLSearchParams(sp); n.set("lane", l); setSp(n); }} />
               </div>
             ) : (
               homeLanes.map((l) => (

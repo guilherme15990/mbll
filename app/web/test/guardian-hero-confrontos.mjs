@@ -31,7 +31,7 @@ check("prévia montada na visão geral", /<ConfrontosPreview\b/.test(hero));
 check("HeroDetails sem mQuery paralela", !/mQuery/.test(hero));
 check("prévia usa useMatchups 1x", (preview.match(/useMatchups\(/g) ?? []).length === 1);
 check("rank=all não dispara matchup", /needsRank\s*\?\s*null\s*:\s*heroId/.test(preview));
-check("gate de elo com CAP-M6-01", /preview-needs-rank/.test(preview) && /CAP-M6-01/.test(preview));
+check("gate de elo na prévia", /preview-needs-rank/.test(preview));
 check("mesma key do hook (api única)", /\["matchups",\s*id,\s*rank,\s*days\]/.test(api));
 
 // 2 — honestidade e copy sem antropomorfismo/causalidade.

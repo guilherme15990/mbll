@@ -11,6 +11,7 @@ import {
   EMPTY_PICK, evidenceLabel, scoreCombination, validatePick, valueText,
   type CombinerContribution, type CombinerPick,
 } from "../../shared/domain/combiner";
+import { decodeLoadout } from "../../shared/domain/loadout";
 import { CtxBar, Empty, ErrBox, FreshLine, Loading, SectionTitle } from "../../shared/ui";
 import { signed } from "../../shared/format";
 
@@ -164,8 +165,20 @@ export default function BuildsCombinerPanel({ rank, window }: { rank: string; wi
   const [search, setSearch] = useState("");
   const [showAll, setShowAll] = useState(false);
 
-  // Componentes mudam com o recorte: começa limpo em cada lane/top.
-  useEffect(() => { setPick(EMPTY_PICK); }, [lane, top]);
+  // Carga vinda de `/preparar` (ADR-044): `?l=` hidrata a composição.
+  // Sem código, o recorte manda — componentes mudam com lane/top e começa limpo.
+  const loadoutCode = sp.get("l");
+  useEffect(() => {
+    if (loadoutCode) {
+      const decoded = decodeLoadout(loadoutCode);
+      if (decoded.ok) {
+        setPick(decoded.loadout.pick);
+        setHeroId(String(decoded.loadout.heroId));
+        return;
+      }
+    }
+    setPick(EMPTY_PICK);
+  }, [lane, top, loadoutCode]);
 
   const score = useMemo(() => scoreCombination(pick, combiner), [pick, combiner]);
   const pickCheck = useMemo(() => validatePick(pick, combiner), [pick, combiner]);

@@ -2,12 +2,12 @@ import { useSearchParams } from "react-router-dom";
 import { FlaskConical, Shield, ShieldAlert } from "lucide-react";
 import { num, pct, useBlind, useHero, useHeroes } from "../../shared/api";
 import {
-  Avatar, CtxBar, Empty, ErrBox, IddZone, Loading,
+  Avatar, CtxBar, Empty, ErrBox, Loading,
   SectionTitle, StatusSeal, TierBadge
 } from "../../shared/ui";
-import { PrimaryAction } from "../../shared/idd/cards/PrimaryAction";
+import { PrimaryAction } from "../../shared/ui/patterns/PrimaryAction";
 import { classOf, getSafetyClassification, selectLevelPopularityCandidates } from "@radar/proprietary-engine";
-import { NeedsRank } from "../../shared/idd/cards/NeedsRankLane";
+import { NeedsRank } from "../../shared/ui/patterns/NeedsRankLane";
 import type { HeroPanelProps } from "../../shared/ui/patterns/heroPanel";
 
 type BlindView = {
@@ -66,23 +66,20 @@ export default function BlindPanel({ rank, window, hero, dossier, picker }: Hero
       {picker}
 
       <PrimaryAction
-        contextId="BPS"
-        capId="CAP-BPS-01"
         label="Declarar candidato + checklist"
         to={`/blind?hero=${hero}&rank=${rank}&window=${window}`}
         disabledReason={!hero ? "selecione um herói" : rank === "all" ? "selecione o rank" : null}
       />
 
       {rank === "all" && hero ? (
-        <IddZone zone="state" capId="CAP-BPS-01">
+        <div>
           <NeedsRank
-            capId="CAP-BPS-01"
             onPick={(r) => {
               sp.set("rank", r);
               setSp(sp);
             }}
           />
-        </IddZone>
+        </div>
       ) : !hero ? (
         <div className="space-y-4">
           <div className="card p-6 border-line bg-panel2/30 space-y-3 text-center">

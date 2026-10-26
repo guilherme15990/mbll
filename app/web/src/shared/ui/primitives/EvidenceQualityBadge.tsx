@@ -8,8 +8,8 @@ export function EvidenceQualityBadge({
   reasons?: string[];
 }) {
   const q = (quality || "").toLowerCase();
-  // V2 §1/§8.2: "robusto" legado mapeia p/ "Consistente" descritivo — selo de confiança
-  // público ("Robusto") exige denominador validado e mora no TrustSeal, nunca aqui.
+  // V2 §1/§8.2: "robusto" legado mapeia p/ "Consistente" descritivo — este selo
+  // descreve a qualidade da evidência e nunca concede nível de confiança público.
   const label =
     q === "robusto" || q === "solid" || q === "consistente"
       ? "Consistente"

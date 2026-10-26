@@ -1,13 +1,13 @@
 import { useEffect, useRef } from "react";
 import { Link, NavLink, useSearchParams } from "react-router-dom";
 import {
-  Activity, ArrowUpRight, Compass, FlaskConical, Gem, Hammer, HeartPulse,
+  Activity, ArrowUpRight, FlaskConical, Gem, Hammer, HeartPulse,
   LayoutDashboard, LayoutGrid, LineChart as LineIcon, Radar, Swords, Users, X,
 } from "lucide-react";
 import { cx, num, pct, useHero, useHeroes, useMeta } from "../shared/api";
 import HeroPicker from "../shared/ui/patterns/HeroPicker";
 import { Avatar, FreshLine, TierBadge } from "../shared/ui";
-import { SigmaBanCard } from "../shared/idd/cards/SigmaBanCard";
+import { SigmaBanCard } from "../shared/ui/patterns/SigmaBanCard";
 
 const navTabClass = ({ isActive }: { isActive: boolean }) =>
   cx(
@@ -17,7 +17,7 @@ const navTabClass = ({ isActive }: { isActive: boolean }) =>
       : "text-mist hover:text-foam hover:bg-panel2/60 border border-transparent"
   );
 
-/** 9 Bounded Contexts: Builds fica na Visão geral; os outros 8 nos 3 Streams do DDD / IDD */
+/** 9 Bounded Contexts: Builds fica na Visão geral; os outros 8 nos 3 Streams do DDD */
 const STREAMS = [
   {
     name: "Inferência & Força",
@@ -104,14 +104,13 @@ function LotSeal({ rank, window }: { rank: string; window: string }) {
         sigmaPickSum={sigmaPickSum}
         sigmaAlert={pickCheck ? !pickCheck.ok : false}
         pickFonte="appearance==pick"
-        capId="CAP-EXP-01"
       />
       <FreshLine stale={heroesQuery.data?.stale} ageMs={ageMs} />
     </div>
   );
 }
 
-function SidebarBody({ getNavUrl, onNavigate, onOpenIdd }: { getNavUrl: (baseTo: string) => string; onNavigate: () => void; onOpenIdd: () => void }) {
+function SidebarBody({ getNavUrl, onNavigate }: { getNavUrl: (baseTo: string) => string; onNavigate: () => void }) {
   const [sp, setSp] = useSearchParams();
   const rank = sp.get("rank") ?? "mythic";
   const window = sp.get("window") ?? "7";
@@ -236,7 +235,7 @@ function SidebarBody({ getNavUrl, onNavigate, onOpenIdd }: { getNavUrl: (baseTo:
         <section aria-labelledby="sb-s4">
           <h2 id="sb-s4" className="sr-only">Ver herói no dossiê</h2>
           <Link
-            to={`/hero/${hero}?rank=${rank}&window=${window}`}
+            to={getNavUrl(`/hero/${hero}`)}
             onClick={onNavigate}
             aria-label="Abrir dossiê do herói"
             className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold bg-gold/15 text-gold border border-gold/40 hover:bg-gold/25 transition-all"
@@ -266,15 +265,6 @@ function SidebarBody({ getNavUrl, onNavigate, onOpenIdd }: { getNavUrl: (baseTo:
             EXP
           </span>
         </NavLink>
-        <button
-          type="button"
-          onClick={onOpenIdd}
-          aria-label="Abrir Interface Domain Designer"
-          className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-amber-500/15 to-amber-600/10 hover:from-amber-500/25 hover:to-amber-600/20 border border-gold/50 text-gold-light hover:text-gold transition-all"
-        >
-          <Compass size={14} className="text-gold" />
-          <span>Interface Domain Designer (IDD)</span>
-        </button>
       </section>
     </div>
   );
@@ -284,12 +274,10 @@ export function Sidebar({
   open,
   onClose,
   getNavUrl,
-  onOpenIdd,
 }: {
   open: boolean;
   onClose: () => void;
   getNavUrl: (baseTo: string) => string;
-  onOpenIdd: () => void;
 }) {
   const drawerRef = useRef<HTMLDivElement>(null);
 
@@ -341,7 +329,7 @@ export function Sidebar({
       {/* Desktop: sidebar fixa */}
       <aside className="hidden lg:block w-[248px] xl:w-[272px] shrink-0 sticky top-24 self-start my-6 max-h-[calc(100vh-7rem)] overflow-y-auto rounded-2xl border border-line/60 bg-surface/60">
         <nav aria-label="Contextos do Radar">
-          <SidebarBody getNavUrl={getNavUrl} onNavigate={() => undefined} onOpenIdd={onOpenIdd} />
+          <SidebarBody getNavUrl={getNavUrl} onNavigate={() => undefined} />
         </nav>
       </aside>
 
@@ -378,7 +366,7 @@ export function Sidebar({
               </button>
             </div>
             <nav aria-label="Contextos do Radar">
-              <SidebarBody getNavUrl={getNavUrl} onNavigate={onClose} onOpenIdd={() => { onClose(); onOpenIdd(); }} />
+              <SidebarBody getNavUrl={getNavUrl} onNavigate={onClose} />
             </nav>
           </div>
         </>

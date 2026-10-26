@@ -1,7 +1,7 @@
 // Coleta e normalização do lote de heróis por rank/janela.
 // Porta fina para a Arena API (arena.js) + SnapshotHistory (cache.js); o resto
 // do sistema consome `fetchRankAll` e nunca fala com o upstream diretamente.
-import { arenaGet, rankPath, mapConc } from "../infra/arena.js";
+import { getRankPage, mapConc } from "../providers/arena/index.js";
 import { cacheGet, cacheSet } from "../infra/cacheStore.js";
 import { recordSnapshot, listSnapshots } from "../infra/snapshotHistory.js";
 import { createSingleFlight } from "./singleFlight.js";
@@ -67,13 +67,13 @@ async function fetchRankAllImpl({ days, rank, retries = 3, timeoutMs = 12000 }) 
     const prior = lastVerifiedPosterior({ fonte: "heroes", rank, janela: days });
     return { rows: hit.body, ageMs: hit.ageMs, stale: false, fromCache: true, pages: 0, truncated: false, totalFonte: hit.body.length, prior, gameVersion: vg };
   }
-  const first = await arenaGet(rankPath({ days, rank, size: 50, index: 1 }), { retries, timeoutMs });
+  const first = await getRankPage({ days, rank, size: 50, index: 1, retries, timeoutMs });
   const total = Number(first?.data?.total ?? 0) || 0;
   // SEC M-02/EC-001: total vem da fonte; teto de 6 páginas (~300 registros, cobre os ~133 heróis)
   const pages = Math.min(6, Math.max(1, Math.ceil(total / 50)));
   const truncated = total > pages * 50;
   const rest = await mapConc(Array.from({ length: pages - 1 }, (_, k) => k + 2),
-    (idx) => arenaGet(rankPath({ days, rank, size: 50, index: idx }), { retries, timeoutMs }));
+    (idx) => getRankPage({ days, rank, size: 50, index: idx, retries, timeoutMs }));
   const recs = [first, ...rest].flatMap((p) => p?.data?.records ?? []);
   const rows = recs.map(normalize).filter(Boolean);
   // ADR-021-09 / DDD-V4-05: hook append-only — todo lote válido gravado no histórico (INSERT, nunca REPLACE).

@@ -1,0 +1,127 @@
+---
+
+## Análise competitiva
+
+Antes de escrever o que construir, vale entender o que o mercado já resolveu e o que não resolveu.
+
+**MLBBHub** (mlbbhub.com) é o concorrente mais próximo em ambição. Tem tier list com shrinkage bayesiano próprio, draft simulator com modo MPL, build simulator com 6 slots e detecção de conflito de passivas únicas, e estatísticas de matchup com dados diretos das APIs da Moonton (GMS e MAPI). A diferença crítica: o score deles é uma combinação manual de win rate + pick rate + ban rate, sem o modelo hierárquico M1 com posterior normal-normal que o Radar usa. Eles "empurram para 50%" com shrinkage de +400 partidas imaginárias — funciona, mas é ad hoc. Também não têm o conceito de "força relativa por rank" (rank-diff) nem a distorção pick/ban separada.
+
+**mlbb.io** tem algo que nenhum dos outros dois tem: **ordem de compra de itens** — exatamente o gap que você identificou. Eles mostram a sequência média de slot de compra agregada de builds enviadas pela comunidade, com marcação do "power spike" (primeiro item core após boots) e trocas situacionais com condição textual. A limitação deles é que os dados são editoriais/comunidade, sem vínculo com match outcome, e o próprio site afirma isso explicitamente: "Build submissions carry no match outcome, so this page cannot compare a build's win rate to the hero's baseline." O Radar tem exatamente o que falta neles: o lift associado ao resultado.
+
+**CounterWatch** (para Overwatch/Marvel Rivals) usa shrinkage bayesiano de forma idêntica ao M1 do Radar, mas em outro jogo. Interessante porque eles documentam publicamente o método — o que sugere que explicar o modelo para o jogador gera confiança, não confusão.
+
+**O que ninguém faz ainda:** nenhum dos concorrentes combina ordem de compra estatística com lift de resultado. Todos mostram "o que a galera compra" ou "o que ganha mais", mas nenhum mostra "nessa lane, nesse rank, comprar X antes de Y está associado a N% de lift sobre a referência." Esse é o espaço original do Radar.
+
+---
+
+## PRD — Melhorias do Sistema Radar MLBB
+
+**Versão:** 1.0 · **Data:** 24/10/2026 · **Status:** Rascunho para revisão
+
+---
+
+### 1. Contexto e posicionamento
+
+O Radar é a única ferramenta MLBB que aplica inferência bayesiana hierárquica (M1) sobre dados reais da Rone Arena para produzir um score de força ajustado por exposição e rank. Esse diferencial técnico existe mas não está legível para os três perfis de jogador que o sistema atende.
+
+A análise competitiva mostra que MLBBHub domina a camada de acesso rápido (tier list, counters, draft) mas não tem profundidade estatística. mlbb.io resolveu o problema da ordem de compra via curadoria comunitária mas sem vínculo com resultado. O Radar tem os dados para fazer melhor — mas ainda não fez.
+
+O objetivo deste PRD é fechar três brechas de produto, em ordem de prioridade pela dor do jogador:
+
+1. O jogador não sabe qual build escolher nem em que ordem comprar os itens.
+2. O jogador vê feitiço e build sem saber se é adequado para seu rank.
+3. O sistema tem profundidade estatística inacessível — não existe uma resposta rápida para o jogador casual.
+
+---
+
+### 2. Perfis de jogador e contexto de uso
+
+**P1 — Casual / Blind Pick.** Abre o app com 30 segundos de decisão antes de confirmar o herói. Não lê gráficos, não compara ranks. Precisa de: "esse herói está bom hoje?" + feitiço + primeiro item. O resto é ruído.
+
+**P2 — Rank baixo / Draft.** Está no draft com o celular na outra mão enquanto o timer corre. Sabe qual herói quer jogar mas não sabe se o feitiço que usa (Flicker, Aegis, Execute) é o mais associado a vitórias no rank dele. Precisa de: build filtrada pelo rank selecionado, feitiço consolidado, ordem de compra clara.
+
+**P3 — Preparação prévia.** Tem 5–20 minutos antes de rankar. Usa as features de profundidade — temporal, rank-diff, matchups, distorção. Já existe no sistema; só precisa de melhor navegação entre as telas.
+
+---
+
+### 3. Funcionalidades propostas
+
+#### F1 — Resposta rápida por herói (P1 prioritário)
+
+**O que é:** Uma linha de decisão que aparece no topo da ficha do herói e no dashboard, antes de qualquer gráfico. Mostra: status da semana em um ícone (subindo / estável / caindo, derivado do temporalRoute), feitiço mais associado a vitórias no rank selecionado, e o primeiro item de núcleo.
+
+**O que não é:** Não substitui nenhuma tela existente. É um componente novo `<HeroQuickAnswer>` que se encaixa acima do conteúdo atual.
+
+**Dados disponíveis:** `temporalRoute` já retorna o delta com veredito. `heroBuildsRoute` já retorna feitiço e itens por rank e lane. A questão é surfacear isso em uma linha sem exigir que o usuário escolha lane primeiro — o sistema pode usar a lane primária do herói (já existe em `heroLanes`).
+
+**Restrição de honestidade:** Quando o veredito temporal é `inconclusive` por série curta, o ícone de status fica neutro — sem tendência inventada. O sistema já tem esse controle; precisa ser respeitado na UI.
+
+---
+
+#### F2 — Build filtrada por rank com feitiço explícito (P2 prioritário)
+
+**O que é:** A tela de builds `BuildsPanel` e a `BuildsSection` da ficha já recebem `rank` como prop. O problema é que o feitiço mais usado no rank selecionado não está sendo exibido com destaque e o usuário não tem sinal visual de que os dados estão filtrados pelo rank dele.
+
+**O que muda:** Adicionar um badge de rank visível no topo da BuildsSection, mostrar o feitiço mais frequente naquele rank como destaque (não enterrado na lista de itens), e quando o feitiço diferir entre ranks, mostrar a comparação direta em uma linha: "Mythic: Flicker (68%) · Glory: Aegis (54%)". Isso vem diretamente do `rankDiffRoute` cruzado com os dados de build.
+
+**Dado que falta hoje:** A API de builds retorna o feitiço como campo da build, mas não agrega a frequência de feitiços separada dos itens. Um endpoint derivado ou uma agregação no cliente seria suficiente.
+
+---
+
+#### F3 — Ordem de compra derivada do lift (F3 — diferencial de mercado)
+
+**O que é:** A funcionalidade que nenhum concorrente tem com dado de resultado. mlbb.io mostra ordem de compra por slot médio de comunidade, sem vínculo com win rate. O Radar tem builds observadas com `delta_wr_pp_vs_most_used` por build completa (6 itens). A proposta é usar o lift por variante de build para inferir qual sequência de compra está associada a melhor resultado, e exibir isso com a mesma linguagem visual da LiftBar já existente.
+
+**Implementação mínima viável:** Exibir a sequência dos itens da build de maior lift como a ordem recomendada, com o rótulo "ordem de compra sugerida pelo desempenho observado" e o mesmo aviso de causalidade já presente no sistema (seleção de build, não causalidade). Marcar o primeiro item não-boot como "power spike" — mesma linguagem do mlbb.io, mas vinda de dado de resultado, não de curadoria.
+
+**O que não fazer agora:** Não criar uma reordenação drag-and-drop neste ciclo. O valor está em mostrar a sequência recomendada, não em deixar o usuário reorganizar. O editor interativo entra em F4.
+
+**Restrição técnica:** A Rone Arena não fornece timestamp de compra por partida. A ordem de compra do Radar é inferida pelo lift da build completa, não observada diretamente. Isso precisa estar documentado na UI com a mesma transparência que o sistema usa para outras métricas.
+
+---
+
+#### F4 — Build editor interativo (P3, iteração futura)
+
+**O que é:** O `BuildsCombinerPanel` e o `BuildsPowerPanel` já têm a matemática de composição e o `scoreCombination` no cliente. O que falta é transformar o fluxo de consulta em fluxo de edição: o sistema sugere a build de maior lift, o usuário pode trocar um item e ver o novo delta em tempo real, e ao final pode salvar ou compartilhar a build resultante.
+
+**Por que é F4 e não F1:** Depende de F3 estar funcional. O editor sem a ordenação e o lift base não tem contexto suficiente.
+
+**Decisão de arquitetura pendente:** O estado da build editada vive no cliente (URL params + localStorage) ou precisa de persistência no servidor? Para a versão MVP, URL params são suficientes — permite compartilhamento sem login.
+
+---
+
+### 4. O que não construir agora
+
+**Pick composicional (dado time parcial):** Exige cruzamento de matchups de cinco heróis simultâneos. Os dados existem em pares via `matchupsRoute`, mas o produto composicional de cinco pares tem problemas de cobertura severos para ranks baixos. Melhor deixar para quando a base de dados de matchups tiver volume suficiente.
+
+**Personalização por conta individual:** Depende de dados por conta da Rone Arena, que atualmente não estão expostos no sistema. É a funcionalidade de maior potencial a longo prazo, mas sem os dados ela é impossível de implementar corretamente.
+
+**Resumo pós-partida:** Requer integração com histórico de partida individual. Mesmo caso acima.
+
+---
+
+### 5. O que incorporar dos concorrentes
+
+Do mlbb.io: o conceito de "power spike" como rótulo do primeiro item core — é intuitivo e pode ser adotado diretamente, com a diferença de que o Radar ancora o rótulo em dado de resultado, não em curadoria.
+
+Do MLBBHub: a prática de documentar o método de scoring publicamente em linguagem acessível. O Radar tem notas técnicas excelentes nos `CtxBar` existentes, mas nenhuma página de "como isso funciona" que um jogador casual conseguiria ler. Isso não é uma feature de produto, é documentação — mas o MLBBHub demonstra que ela gera confiança e diferencia da competição.
+
+Do CounterWatch: mostrar explicitamente o tamanho da amostra por hero e por build. Já existe em alguns pontos do Radar mas não é consistente. Um `n=` discreto ao lado de qualquer stat resolve a dor do "isso é confiável?".
+
+---
+
+### 6. Critérios de sucesso por funcionalidade
+
+F1 é bem-sucedida se o tempo médio para um usuário chegar à informação de feitiço cair abaixo de 10 segundos a partir da abertura da ficha do herói — hoje requer selecionar lane e rolar até a seção de builds.
+
+F2 é bem-sucedida se o usuário com rank `glory` parar de ver builds do mythic por padrão. A divergência de feitiço entre ranks é o sinal mais claro de que o filtro está funcionando.
+
+F3 é bem-sucedida se a ordem de compra aparecer na ficha sem exigir nenhuma interação além da seleção de lane. O usuário não deve precisar entender o que é lift para usar a funcionalidade.
+
+---
+
+### 7. Dependências e riscos
+
+O principal risco técnico é que a Rone Arena não expõe timestamp de compra por item por partida. A ordem de compra do Radar vai ser sempre inferida, não observada. Isso é um risco de credibilidade se comunicado errado, e uma vantagem de produto se comunicado com transparência — é honesto dizer "a sequência com maior lift observado" ao invés de inventar uma ordem sem dados.
+
+O segundo risco é a cobertura de builds por lane para heróis menos populares. Em ranks baixos, heróis com pick rate abaixo de 0.5% têm amostras insuficientes para qualquer lift significativo. O sistema já tem o tratamento de `smallSample → null` — precisa estar visível na UI como "dados insuficientes para este rank" ao invés de simplesmente sumir o dado.

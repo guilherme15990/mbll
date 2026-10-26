@@ -1,5 +1,5 @@
 // Ficha do herói e módulos derivados por herói (sem nova coleta quando possível).
-import { arenaGet } from "../infra/arena.js";
+import { getTrends } from "../providers/arena/index.js";
 import { cacheGet, cacheSet } from "../infra/cacheStore.js";
 import { listSnapshots } from "../infra/snapshotHistory.js";
 import {
@@ -20,8 +20,8 @@ export async function heroRoute(sp, id) {
   if (!hero) return { status: 404, body: { error: "hero_not_found", message: "Hero not found in this rank/window" } };
   let trends = [];
   try {
-    const t = await arenaGet(`/api/heroes/${id}/trends?rank=${rank}&past-days=30&size=30&index=1`);
-    trends = t?.data?.records ?? t?.data ?? [];
+    const t = await getTrends({ id, rank, days: 30 });
+    trends = t?.data?.records ?? [];
   } catch { trends = []; }
   return { status: 200, body: { data: hero, trends, rank, window, meta: lotH.meta } };
 }
@@ -112,7 +112,7 @@ export async function trendsRoute(sp, id) {
   const key = `trends:${id}:${rank}:${days}`;
   const hit = cacheGet(key, "B");
   if (hit.hit && !hit.stale) return { status: 200, body: { ...hit.body, stale: false } };
-  const raw = await arenaGet(`/api/heroes/${id}/trends?rank=${rank}&past-days=${days}&size=${days}&index=1`).catch(() => null);
+  const raw = await getTrends({ id, rank, days }).catch(() => null);
   const series = raw?.data?.records?.[0]?.data?.win_rate ?? [];
   if (!series.length) return { status: 502, body: { error: "upstream_unavailable", message: "Upstream unavailable, try again" } };
   const data = series.map((p) => ({ date: p.date, win: p.win_rate, pick: p.app_rate, ban: p.ban_rate })).filter((p) => p.date && [p.win, p.pick, p.ban].every((v) => Number.isFinite(v) && v >= 0 && v <= 1)); // INV-001 em trends

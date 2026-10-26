@@ -40,9 +40,9 @@ app/web/src
     api/         transporte + dados: http, errors, queries/<domínio>
                  (filters, heroes, builds, matchups, insights) e o barrel
     domain/      lógica pura, zero React: combiner, buildLabel, itemsets, present
-    idd/         contexto IDD: index, IddModal, IddZone e cards/
     ui/          index (fachada) · primitives/ (1 componente por arquivo)
-                 · patterns/ (HeroPicker, HeroDossier, PickVerdict, charts…)
+                 · patterns/ (HeroPicker, HeroDossier, PrimaryAction,
+                 SigmaBanCard, NeedsRankLane, PickVerdict, charts…)
 
 packages/proprietary-engine
   src/index.js   barrel público (fronteira única)

@@ -1,7 +1,7 @@
 import { useSearchParams } from "react-router-dom";
 import { Clock, Info, Swords, Users } from "lucide-react";
 import { cx, num, pct, useMatchups, type Pair } from "../../shared/api";
-import { PrimaryAction } from "../../shared/idd/cards/PrimaryAction";
+import { PrimaryAction } from "../../shared/ui/patterns/PrimaryAction";
 import {
   Avatar, CtxBar, ErrBox, EvidenceQualityBadge,
   Loading, SectionTitle
@@ -147,8 +147,6 @@ export default function ConfrontosPanel({ rank, window, hero, dossier, picker }:
       {picker}
 
       <PrimaryAction
-        contextId="M6"
-        capId="CAP-M6-01"
         label="Levar par p/ o draft"
         to={`/draft?hero=${hero}&rank=${rank}&window=${window}`}
         disabledReason={!hero ? "selecione um par" : null}

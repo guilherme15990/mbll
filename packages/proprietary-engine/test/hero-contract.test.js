@@ -9,7 +9,7 @@ import { trendOf } from "../src/hero/hero-trend.js";
 import { dominantProfileOf } from "../src/hero/hero-profile.js";
 import { sortHeroesByMetric, heroRankPosition, heroRankPositions, medianWrAdj } from "../src/hero/forca-sorting.js";
 import { medianOf, medianPickOf } from "../src/hero/hero-lists.js";
-import { classOf, trustOf, confidenceToTrust } from "../src/hero/trust.js";
+import { classOf } from "../src/hero/trust.js";
 
 // PRNG determinístico (mulberry32) + normal por Box–Muller.
 function rng(seed) {
@@ -126,7 +126,6 @@ test("lote pequeno: guardas ligadas, tier '?'", () => {
   for (const h of heroes) {
     assert.equal(h.tier, "?");
     assert.ok(!h.strong && !h.weak && !h.isGem);
-    assert.equal(confidenceToTrust(h).level, "Inconclusivo");
   }
 });
 
@@ -158,16 +157,12 @@ test("meta traz o que saiu do herói", () => {
   assert.ok(meta.prior);
 });
 
-test("trust v3: derivações e nulos (Situacional|Inconclusivo, sem Robusto)", () => {
+test("classOf v3: rótulos descritivos e nulos", () => {
   const rows = scoreHeroes(makeLot(12, 132));
   for (const h of rows) {
     assert.ok(typeof classOf(h) === "string");
-    assert.ok(["Situacional", "Inconclusivo"].includes(trustOf(h).level));
-    assert.ok(["Situacional", "Inconclusivo"].includes(confidenceToTrust(h).level));
   }
-  assert.equal(trustOf(null).level, "Inconclusivo");
   assert.equal(classOf({ smallSample: false, strong: true, isGem: true }), "Joia");
-  assert.equal(trustOf({ B: 0.9, uncertainty_status: "estavel" }).level, "Situacional");
 });
 
 test("ordenação e posição: independem da ordem, 'd' é alias de wrAdj, bulk = individual", () => {

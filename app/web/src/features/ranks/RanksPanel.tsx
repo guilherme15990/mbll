@@ -1,7 +1,7 @@
 import { useSearchParams } from "react-router-dom";
 import { ShieldAlert } from "lucide-react";
 import { RANKS, num, useRankDiff, useViews } from "../../shared/api";
-import { PrimaryAction } from "../../shared/idd/cards/PrimaryAction";
+import { PrimaryAction } from "../../shared/ui/patterns/PrimaryAction";
 import {
   Avatar, CtxBar, Empty, ErrBox, Loading,
   SectionTitle, StatusSeal
@@ -79,8 +79,6 @@ export default function RanksPanel({ rank, window, hero, dossier, picker, ficha 
       {picker}
 
       <PrimaryAction
-        contextId="RNK"
-        capId="CAP-RNK-01"
         label="Fixar par a×b"
         to={`/tempo?hero=${hero}&rank=${rank}&window=${window}`}
         disabledReason={!hero ? "selecione um herói" : rankA === rankB ? "escolha dois elos distintos" : null}

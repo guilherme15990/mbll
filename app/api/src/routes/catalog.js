@@ -1,5 +1,5 @@
 // Catálogos expostos e mapa de lanes (todos cacheados na camada C).
-import { RANKS } from "../infra/arena.js";
+import { RANKS } from "../providers/arena/index.js";
 import { isRank } from "../application/validation.js";
 import { heroCatalog, equipmentCatalog } from "../application/catalogs.js";
 import { heroLanesBody } from "../application/heroLanes.js";

@@ -1,25 +1,19 @@
 import type { ReactNode } from "react";
 import { cx } from "../../domain/present";
 
-/** Nível de confiança exibido no selo (leitura de apresentação, sem métrica nova). */
-export type TrustLevel = "Robusto" | "Situacional" | "Inconclusivo";
-
 export function DomainStateBadge({
   status,
   label,
   icon,
 }: {
-  status: "solid" | "warning" | "inconclusive" | "neutral" | "gem" | "rank_state" | "temporal" | "safety" | "build" | "draft" | "robusto" | "situacional" | "inconclusivo";
+  status: "solid" | "warning" | "inconclusive" | "neutral" | "gem" | "rank_state" | "temporal" | "safety" | "build" | "draft";
   label: string;
   icon?: ReactNode;
 }) {
   const styles: Record<string, string> = {
     solid: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30",
-    robusto: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30",
     warning: "bg-amber-500/10 text-amber-300 border-amber-500/30",
-    situacional: "bg-amber-500/10 text-amber-300 border-amber-500/30",
     inconclusive: "bg-slate-500/10 text-slate-300 border-slate-500/30",
-    inconclusivo: "bg-slate-500/10 text-slate-300 border-slate-500/30",
     neutral: "bg-panel2 text-mist border-line",
     gem: "bg-cyan-500/10 text-cyan-300 border-cyan-500/30 shadow-[0_0_12px_rgba(34,211,238,0.15)]",
     rank_state: "bg-indigo-500/10 text-indigo-300 border-indigo-500/30",

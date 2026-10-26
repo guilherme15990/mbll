@@ -3,11 +3,11 @@ import { CheckCircle2, HeartPulse, Info, Server, ShieldAlert, ShieldCheck, Spark
 import { ago, useHeroes, useMeta, useViews } from "../../shared/api";
 import { useFilters } from "../../app/filters";
 import {
-  Avatar, CtxBar, ErrBox, IddZone, Loading,
+  Avatar, CtxBar, ErrBox, Loading,
   SectionTitle, StatusSeal, TierBadge
 } from "../../shared/ui";
-import { PrimaryAction } from "../../shared/idd/cards/PrimaryAction";
-import { SigmaBanCard } from "../../shared/idd/cards/SigmaBanCard";
+import { PrimaryAction } from "../../shared/ui/patterns/PrimaryAction";
+import { SigmaBanCard } from "../../shared/ui/patterns/SigmaBanCard";
 
 /** CTX-EXP · Exposição e Validação do Denominador — Quanto observamos de cada herói? */
 export default function Exposure() {
@@ -37,8 +37,6 @@ export default function Exposure() {
       />
 
       <PrimaryAction
-        contextId="EXP"
-        capId="CAP-EXP-01"
         label="Exportar relatório do lote"
         to={`/exposicao?rank=${rank}&window=${window}`}
         disabledReason={heroesQuery.isError || !pickCheck ? "sem snapshot neste rank/janela" : null}
@@ -49,7 +47,6 @@ export default function Exposure() {
         sigmaPickSum={typeof pickCheck?.sum === "number" ? pickCheck.sum : null}
         sigmaAlert={Boolean(pickCheck) && !pickCheck.ok}
         pickFonte="appearance==pick"
-        capId="CAP-EXP-01"
       />
 
       {/* Core Integrity Gauges */}

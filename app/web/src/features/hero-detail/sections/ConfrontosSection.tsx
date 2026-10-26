@@ -3,7 +3,7 @@ import { Clock } from "lucide-react";
 import { cx, pct, useMatchups, type Pair } from "../../../shared/api";
 import { Empty, ErrBox, Loading } from "../../../shared/ui";
 import { DurationChart } from "../../../shared/ui/patterns/charts";
-import { NeedsRank } from "../../../shared/idd/cards/NeedsRankLane";
+import { NeedsRank } from "../../../shared/ui/patterns/NeedsRankLane";
 import {
   hasFiniteDelta, sortPairsByDeltaAsc, sortPairsByDeltaDesc,
 } from "@radar/proprietary-engine";
@@ -141,7 +141,6 @@ export default function ConfrontosSection({
           />
         </header>
         <NeedsRank
-          capId="CAP-M6-01"
           hint="Escolha um elo para liberar counters e sinergias."
           onPick={(r) => {
             sp.set("rank", r);

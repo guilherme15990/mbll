@@ -1,7 +1,7 @@
 // SnapshotHistory append-only (ADR-021-09, C-103/C-105).
 // Lista sem payload; diff resumido entre coletas, também sem despejar payload.
 import { listSnapshots, getSnapshot } from "../infra/snapshotHistory.js";
-import { RANKS } from "../infra/arena.js";
+import { RANKS } from "../providers/arena/index.js";
 import { isRank, WINDOWS } from "../application/validation.js";
 
 // GET /snapshots?fonte=&rank=&janela= — lista snapshots SEM payload (hash + verificações).

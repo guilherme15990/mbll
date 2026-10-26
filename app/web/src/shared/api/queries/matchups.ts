@@ -14,9 +14,17 @@ export type Pair = {
   profile: "snowball" | "scaling" | "uniforme";
 };
 
-export const useMatchups = (id: string | null | undefined, rank: string, days: string) =>
+export const useMatchups = (
+  id: string | null | undefined,
+  rank: string,
+  days: string,
+  // Opcionais: chamadas em grade (1 por card) usam staleTime longo e sem retry.
+  opts: { staleTime?: number; retry?: number } = {},
+) =>
   useQuery({
     queryKey: ["matchups", id, rank, days],
     enabled: !!id,
+    ...(opts.staleTime != null ? { staleTime: opts.staleTime } : {}),
+    ...(opts.retry != null ? { retry: opts.retry } : {}),
     queryFn: () => getJSON<{ id: number; rank: string; days: number; hero: { name: string; head: string | null }; countersUp: Pair[]; countersDown: Pair[]; synergiesUp: Pair[]; synergiesDown: Pair[]; semanticsNote: string }>(`/v1/heroes/${id}/matchups?rank=${rank}&days=${days}`),
   });

@@ -9,8 +9,6 @@
 // helpers internos que nenhum app consome permanecem sem declaração de propósito
 // (o runtime é a verdade; declarar assinatura não usada só cria drift).
 
-export type TrustLevel = "Robusto" | "Situacional" | "Inconclusivo";
-
 // ---- itemsets ----
 export declare const ITEMSET_SCORE_VERSION: "itemset-score-v1";
 export declare const ITEMSET_M_MIN: number;
@@ -177,10 +175,6 @@ export interface TrustInput {
   uncertainty_status?: string | null;
   [k: string]: unknown;
 }
-export interface TrustSeal { level: TrustLevel; motive: string }
-export declare function confidenceToTrust(h: TrustInput | undefined): TrustSeal;
-export declare function trustOf(h: TrustInput): TrustSeal;
-export declare function verdictSentence(h: TrustInput | undefined): string;
 export declare function verdictShort(h: TrustInput | undefined): string;
 
 // ---- hero-trend ----

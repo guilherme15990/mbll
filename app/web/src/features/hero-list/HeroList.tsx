@@ -1,10 +1,10 @@
 import { Link, useSearchParams } from "react-router-dom";
 import { num, useHeroLanes, useHeroes } from "../../shared/api";
-import { useFilters } from "../../app/filters";
+import { useFilters, withLanes } from "../../app/filters";
 import HeroPicker from "../../shared/ui/patterns/HeroPicker";
-import { PrimaryAction } from "../../shared/idd/cards/PrimaryAction";
+import { PrimaryAction } from "../../shared/ui/patterns/PrimaryAction";
 import {
-  Avatar, CtxBar, Empty, ErrBox, IddZone,
+  Avatar, CtxBar, Empty, ErrBox,
   Loading, SectionTitle, TierBadge,
 } from "../../shared/ui";
 
@@ -14,7 +14,7 @@ import {
  * A tabela analítica segue em /forca (nada duplicado aqui, nada removido de lá).
  */
 export default function HeroList() {
-  const { rank, window, hero } = useFilters();
+  const { rank, window, hero, lanes } = useFilters();
   const [sp, setSp] = useSearchParams();
   const heroesQuery = useHeroes(rank, window);
   const lanesQuery = useHeroLanes(rank);
@@ -30,8 +30,16 @@ export default function HeroList() {
   if (heroesQuery.isError) return <ErrBox onRetry={() => heroesQuery.refetch()} />;
 
   const heroes = [...(heroesQuery.data?.data ?? [])].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  // Filtro global de rota (?lanes=, selecionado no header): join client com o
+  // mapa /heroes/lanes. Mapa ainda não carregado/vazio = sem filtro (nunca
+  // esconder tudo por falha de fonte).
+  const lanesReady = lanesQuery.isSuccess && Object.keys(lanesMap).length > 0;
+  const filtering = lanes.length > 0 && lanesReady;
+  const shown = filtering
+    ? heroes.filter((h) => (lanesMap[h.id] ?? []).some((l) => lanes.includes(l)))
+    : heroes;
   const fichaTo = hero
-    ? `/hero/${hero}?rank=${rank}&window=${window}`
+    ? withLanes(`/hero/${hero}?rank=${rank}&window=${window}`, lanes)
     : "/hero";
 
   return (
@@ -51,28 +59,40 @@ export default function HeroList() {
       />
 
       <PrimaryAction
-        contextId="SHR"
-        capId="CAP-SHR-01"
         label="Abrir a Ficha do Herói"
         to={fichaTo}
         disabledReason={!hero ? "selecione um herói abaixo para abrir a ficha" : null}
       />
 
-      <IddZone zone="secondary" capId="CAP-SHR-01">
+      <div>
         <HeroPicker hero={hero || null} onPick={pickHero} />
-      </IddZone>
+      </div>
 
-      {!heroes.length ? (
+      {lanes.length > 0 && !lanesReady ? (
+        <p className="text-[11px] text-mist" role="note">
+          {lanesQuery.isLoading
+            ? `carregando mapa de rotas… (${lanes.join(" + ")})`
+            : `mapa de rotas indisponível — lista sem filtro de rota (${lanes.join(" + ")})`}
+        </p>
+      ) : filtering ? (
+        <p className="text-[11px] text-mist" role="note">
+          filtro global de rota {lanes.join(" + ")} (topo) · {shown.length} de {heroes.length} heróis
+        </p>
+      ) : null}
+
+      {!shown.length ? (
         <Empty
           title="Nenhum herói neste recorte"
-          hint="Ajuste o elo ou a janela no topo."
+          hint={filtering
+            ? `Nenhum herói com rota ${lanes.join(" + ")} neste recorte. Ajuste o elo, a janela ou a rota no topo.`
+            : "Ajuste o elo ou a janela no topo."}
         />
       ) : (
         <ul className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3" aria-label="Cartões de heróis">
-          {heroes.map((h) => (
+          {shown.map((h) => (
             <li key={h.id}>
               <Link
-                to={`/hero/${h.id}?rank=${rank}&window=${window}`}
+                to={withLanes(`/hero/${h.id}?rank=${rank}&window=${window}`, lanes)}
                 className="flex items-center gap-2.5 p-2.5 rounded-2xl bg-panel border border-line hover:border-gold/40 transition-colors"
                 aria-label={`Abrir ficha de ${h.name}`}
               >

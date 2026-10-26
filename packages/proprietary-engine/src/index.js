@@ -40,7 +40,7 @@ export {
 } from "./utils/thresholds.js";
 
 // ── hero (classes; shims funcionais preservados em cada módulo) ──
-export { HeroTrustPolicy, classOf, confidenceToTrust, trustOf, verdictSentence, verdictShort } from "./hero/trust.js";
+export { HeroTrustPolicy, classOf, verdictShort } from "./hero/trust.js";
 export { TREND_N, TREND_DELTA, TREND_VERSION, TREND_PRACTICAL_DELTA_PP, TREND_DELTA_WIN, TREND_DELTA_PICK, TREND_DELTA_BAN, HeroTrendAnalyzer, trendOf, trendSeriesDated, trendOfDated } from "./hero/hero-trend.js";
 export { HeroProfile, dominantProfileOf } from "./hero/hero-profile.js";
 export {

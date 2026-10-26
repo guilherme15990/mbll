@@ -5,11 +5,11 @@ import { BUILD_TAG_CLASS } from "../../shared/domain/buildLabel";
 import { getBuildTags } from "@radar/proprietary-engine";
 import BuildLoadout from "../../shared/ui/patterns/BuildLoadout";
 import {
-  Avatar, CtxBar, Empty, ErrBox, IddZone, Loading,
+  Avatar, CtxBar, Empty, ErrBox, Loading,
   SectionTitle, TierBadge
 } from "../../shared/ui";
-import { PrimaryAction } from "../../shared/idd/cards/PrimaryAction";
-import { NeedsLane } from "../../shared/idd/cards/NeedsRankLane";
+import { PrimaryAction } from "../../shared/ui/patterns/PrimaryAction";
+import { NeedsLane } from "../../shared/ui/patterns/NeedsRankLane";
 import type { HeroPanelProps } from "../../shared/ui/patterns/heroPanel";
 
 /** CTX-BDL · painel reutilizado pela rota plana /builds e pela aba builds de /heroi. Lane via URL (?lane=, sem default). Mesma key ["builds",id,rank,lane]. */
@@ -61,8 +61,6 @@ export default function BuildsPanel({ rank, window, hero, dossier, picker }: Her
       {picker}
 
       <PrimaryAction
-        contextId="BDL"
-        capId="CAP-BDL-01"
         label="Fixar build de referência"
         to={`/builds?view=hero&hero=${hero}&rank=${rank}&window=${window}${lane ? `&lane=${lane}` : ""}`}
         disabledReason={!hero ? "selecione um herói" : !validLane ? "escolha a lane" : null}
@@ -129,15 +127,14 @@ export default function BuildsPanel({ rank, window, hero, dossier, picker }: Her
           </div>
         </div>
       ) : !validLane ? (
-        <IddZone zone="state" capId="CAP-BDL-01">
+        <div>
           <NeedsLane
-            capId="CAP-BDL-01"
             onPick={(l) => {
               sp.set("lane", l);
               setSp(sp);
             }}
           />
-        </IddZone>
+        </div>
       ) : buildsQuery.isLoading ? (
         <Loading rows={4} />
       ) : buildsQuery.isError || !buildsQuery.data?.data?.length ? (

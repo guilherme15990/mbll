@@ -1,19 +1,14 @@
-// Log estruturado mínimo (uma linha JSON por evento), zero-dep.
-// Níveis: silent < error < info < debug. `sink` injetável para teste.
-const PRIORITY = { silent: 0, error: 1, info: 2, debug: 3 };
+// Compatibilidade: a camada de logging mudou de casa na ADR-045.
+//
+// A implementação vive em `providers/logging` (logger + contexto de request).
+// Este arquivo mantém o import histórico de `http/server.js` e de qualquer
+// consumidor que ainda aponte para `http/log.js`. Não adicione lógica aqui.
+export {
+  createLogger,
+  configureLogging,
+  getLogger,
+  serializeError,
+  LOG_EVENTS,
+} from "../providers/logging/index.js";
 
-export function createLogger(level = "info", sink = console) {
-  const min = PRIORITY[level] ?? PRIORITY.info;
-  const write = (lvl, msg, fields = {}) => {
-    if (PRIORITY[lvl] > min) return;
-    const line = JSON.stringify({ ts: new Date().toISOString(), level: lvl, msg, ...fields });
-    if (lvl === "error" && typeof sink.error === "function") sink.error(line);
-    else sink.log(line);
-  };
-  return {
-    level,
-    error: (msg, fields) => write("error", msg, fields),
-    info: (msg, fields) => write("info", msg, fields),
-    debug: (msg, fields) => write("debug", msg, fields),
-  };
-}
+export { withRequestContext, currentRequestContext } from "../providers/logging/context.js";

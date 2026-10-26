@@ -1,7 +1,7 @@
 // Validadores de query compartilhados pelas rotas.
 // Antes cada handler repetia `RANKS.includes(rank) || WINDOWS.has(window)`;
 // a regra agora tem um dono só — o fio (códigos de erro) continua o mesmo.
-import { RANKS } from "../infra/arena.js";
+import { RANKS } from "../providers/arena/index.js";
 
 export const WINDOWS = new Set([1, 3, 7, 15, 30]);
 

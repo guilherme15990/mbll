@@ -16,7 +16,7 @@ const HERE = dirname(fileURLToPath(import.meta.url)); // app/api/src/infra
 const REPO_ROOT = resolve(HERE, "..", "..", "..", "..");
 const DEFAULT_WEB_DIST = join(REPO_ROOT, "app", "web", "dist");
 const DEFAULT_DATA_DIR = join(REPO_ROOT, "data");
-const LOG_LEVELS = ["silent", "error", "info", "debug"];
+const LOG_LEVELS = ["silent", "error", "warn", "info", "debug"];
 
 function fail(name, value, expected) {
   throw new Error(`config inválida: ${name}=${JSON.stringify(value)} (esperado: ${expected})`);

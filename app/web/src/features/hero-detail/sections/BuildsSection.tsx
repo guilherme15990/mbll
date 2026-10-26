@@ -3,7 +3,8 @@ import { Link, useSearchParams } from "react-router-dom";
 import { LANES, cx, num, pct, useBuilds, useHeroLanes, type Build } from "../../../shared/api";
 import { BUILD_TAG_CLASS } from "../../../shared/domain/buildLabel";
 import { getBuildTags, orderBuildsByLift, selectBuildsAboveMostUsed } from "@radar/proprietary-engine";
-import { NeedsLane } from "../../../shared/idd/cards/NeedsRankLane";
+import { NeedsLane } from "../../../shared/ui/patterns/NeedsRankLane";
+import { forkObservedBuild, loadoutHref } from "../../../shared/domain/loadout";
 import BuildLoadout from "../../../shared/ui/patterns/BuildLoadout";
 import { Empty, ErrBox, Loading } from "../../../shared/ui";
 import { signed } from "../../../shared/format";
@@ -41,6 +42,40 @@ function Kpi({ label, value, hint }: { label: string; value: React.ReactNode; hi
       <p className="num text-base font-bold text-foam leading-tight">{value}</p>
       {hint && <p className="text-[10px] text-mist/70">{hint}</p>}
     </div>
+  );
+}
+
+/**
+ * Fork de build observada (ADR-044).
+ *
+ * É navegação, não comando: a composição vira URL e nada é gravado. Por isso
+ * o invariante "leitura instrumentada, nunca comando de domínio" continua de pé.
+ */
+function ForkLink({
+  build,
+  heroId,
+  lane,
+  rank,
+  window,
+}: {
+  build: Build;
+  heroId: string;
+  lane: string;
+  rank: string;
+  window: string;
+}) {
+  const fork = forkObservedBuild({ heroId, lane, rank, window, build });
+  if (!fork.ok) {
+    return <span className="text-[11px] text-mist/70">{fork.error}</span>;
+  }
+  return (
+    <Link
+      to={loadoutHref(fork.loadout)}
+      className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl border border-gold/40 bg-gold/10 text-xs font-bold text-gold-light hover:text-gold hover:border-gold/60 transition-colors min-h-[40px]"
+      aria-label={`Preparar a partir desta build — ${fork.loadout.pick.itemIds.length} itens, contexto de ${lane} e ${rank}`}
+    >
+      Preparar a partir desta build →
+    </Link>
   );
 }
 
@@ -104,7 +139,6 @@ export default function BuildsSection({
           </p>
         ) : null}
         <NeedsLane
-          capId="CAP-BDL-01"
           onPick={(l) => {
             sp.set("lane", l);
             setSp(sp);
@@ -282,6 +316,16 @@ export default function BuildsSection({
                   </div>
 
                   <BuildLoadout build={b} />
+
+                  <div className="flex items-center justify-end gap-2 flex-wrap pt-1 border-t border-line/60">
+                    <ForkLink
+                      build={b}
+                      heroId={heroId}
+                      lane={lane ?? ""}
+                      rank={rank}
+                      window={window}
+                    />
+                  </div>
                 </div>
               </article>
             );

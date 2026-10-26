@@ -1,10 +1,10 @@
 import { useSearchParams } from "react-router-dom";
 import { AlertTriangle, Sparkles } from "lucide-react";
 import { num, pct, useConfidence, useGems, useHero } from "../../shared/api";
-import { PrimaryAction } from "../../shared/idd/cards/PrimaryAction";
+import { PrimaryAction } from "../../shared/ui/patterns/PrimaryAction";
 import {
   Avatar, ClassSeal, CtxBar, Empty, ErrBox,
-  GhostNote, IddZone, Loading, SectionTitle, StatusSeal, TierBadge
+  GhostNote, Loading, SectionTitle, StatusSeal, TierBadge
 } from "../../shared/ui";
 import type { HeroPanelProps } from "../../shared/ui/patterns/heroPanel";
 import { interpretProbBand } from "@radar/proprietary-engine";
@@ -59,8 +59,6 @@ export default function ConfiancaPanel({ rank, window, hero, dossier, picker, fi
       {picker}
 
       <PrimaryAction
-        contextId="CNF"
-        capId="CAP-CNF-01"
         label="Copiar veredito c/ carimbos"
         to={`/confianca?hero=${hero}&rank=${rank}&window=${window}`}
         disabledReason={!hero ? "selecione o herói" : null}
@@ -80,7 +78,7 @@ export default function ConfiancaPanel({ rank, window, hero, dossier, picker, fi
       ) : (
         <div className="space-y-4">
           {/* Trio Cards Grid */}
-          <IddZone zone="data" capId="CAP-CNF-01" className="grid gap-3 md:grid-cols-3 p-1">
+          <div className="grid gap-3 md:grid-cols-3 p-1">
             {/* 1. Posterior Mean */}
             <div className="card p-4 bg-gradient-to-b from-panel via-panel2/40 to-panel border-line space-y-1.5">
               <div className="flex items-center justify-between">
@@ -138,10 +136,10 @@ export default function ConfiancaPanel({ rank, window, hero, dossier, picker, fi
                 <b>Regra intransigente:</b> isto NUNCA é chance de vitória do jogador em partida.
               </p>
             </div>
-          </IddZone>
+          </div>
 
           {/* Premissa de exposição (v3: grade c podada — premissa única declarada) */}
-          <IddZone zone="risk" capId="CAP-CNF-02" className="card p-4 border-line bg-panel2/40 space-y-3">
+          <div className="card p-4 border-line bg-panel2/40 space-y-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <Sparkles size={16} className="text-gold" />
@@ -159,7 +157,7 @@ export default function ConfiancaPanel({ rank, window, hero, dossier, picker, fi
             <p className="text-xs text-mist leading-relaxed">
               Posterior, intervalo e probabilidade são condicionais à premissa c = {trio.c_reference ?? 100000} (proxy, sem validação de exposição). Sem contagens reais, não há selo confirmatório — só Situacional ou Inconclusivo.
             </p>
-          </IddZone>
+          </div>
 
           {/* PRD Interpretive Framework */}
           <div className="card p-4 border-line bg-panel2/20 space-y-2">

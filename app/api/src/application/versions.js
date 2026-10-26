@@ -1,15 +1,16 @@
 // Versão do jogo / patches (cache de 1 h, alimentado pela Arena API).
 // Extraído do routes.js sem mudança de comportamento: `versions()` continua
 // devolvendo a lista crua e `patchFlag()` o carimbo postPatch/latest do /heroes.
-import { arenaGet } from "../infra/arena.js";
+import { getVersion } from "../providers/arena/index.js";
 
 let patchCache = { at: 0, versions: [] };
 
 export async function versions() {
   if (Date.now() - patchCache.at < 3600e3 && patchCache.versions.length) return patchCache.versions;
   try {
-    const v = await arenaGet(`/api/academy/meta/version?size=5&index=1`);
-    patchCache = { at: Date.now(), versions: v?.data?.records ?? v?.data ?? [] };
+    const page = await getVersion();
+    const list = Array.isArray(page?.data) ? page.data : page?.data?.records ?? [];
+    patchCache = { at: Date.now(), versions: list };
   } catch { /* mantém */ }
   return patchCache.versions;
 }
