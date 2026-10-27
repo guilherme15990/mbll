@@ -22,6 +22,7 @@ const Matchups = lazy(() => import("../features/matchups/Matchups"));
 const Draft = lazy(() => import("../features/draft/Draft"));
 const Blind = lazy(() => import("../features/blind/Blind"));
 const Builds = lazy(() => import("../features/builds/Builds"));
+const BuildManager = lazy(() => import("../features/build-manager/BuildManager"));
 const Preparar = lazy(() => import("../features/loadout/Preparar"));
 const Exposure = lazy(() => import("../features/exposure/Exposure"));
 const HeroDetail = lazy(() => import("../features/hero-detail/HeroDetail"));
@@ -55,6 +56,8 @@ export function AppRoutes({ rank, window, lanes }: { rank: string; window: strin
         <Route path="/draft" element={<Draft />} />
         <Route path="/blind" element={<Blind />} />
         <Route path="/builds" element={<Builds />} />
+        <Route path="/build" element={<BuildManager />} />
+        <Route path="/build/:id" element={<BuildManager />} />
         <Route path="/preparar" element={<Preparar />} />
         <Route path="/exposicao" element={<Exposure />} />
         <Route path="/hero/:id" element={<HeroDetail />} />

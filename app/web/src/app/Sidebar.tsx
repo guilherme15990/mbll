@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { Link, NavLink, useSearchParams } from "react-router-dom";
 import {
   Activity, ArrowUpRight, FlaskConical, Gem, Hammer, HeartPulse,
-  LayoutDashboard, LayoutGrid, LineChart as LineIcon, Radar, Swords, Users, X,
+  LayoutDashboard, LayoutGrid, LineChart as LineIcon, Radar, Swords, Users, Wrench, X,
 } from "lucide-react";
 import { cx, num, pct, useHero, useHeroes, useMeta } from "../shared/api";
 import HeroPicker from "../shared/ui/patterns/HeroPicker";
@@ -17,7 +17,7 @@ const navTabClass = ({ isActive }: { isActive: boolean }) =>
       : "text-mist hover:text-foam hover:bg-panel2/60 border border-transparent"
   );
 
-/** 9 Bounded Contexts: Builds fica na Visão geral; os outros 8 nos 3 Streams do DDD */
+/** 9 Bounded Contexts + Build Management: Builds e Gerir build ficam na Visão geral. */
 const STREAMS = [
   {
     name: "Inferência & Força",
@@ -173,6 +173,21 @@ function SidebarBody({ getNavUrl, onNavigate }: { getNavUrl: (baseTo: string) =>
                 <span>Builds</span>
                 <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-abyss/80 border border-line/60 text-mist group-hover:text-foam ml-auto">
                   BDL
+                </span>
+              </NavLink>
+            </li>
+            <li>
+              <NavLink
+                to={getNavUrl("/build")}
+                onClick={onNavigate}
+                className={navTabClass}
+                title="Gerenciar build · núcleo, builds e slots do herói"
+                aria-label="Gerenciar build, núcleo, builds e slots do herói"
+              >
+                <span className="text-current opacity-80 group-hover:opacity-100"><Wrench size={13} /></span>
+                <span>Gerenciar build</span>
+                <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-abyss/80 border border-line/60 text-mist group-hover:text-foam ml-auto">
+                  BMS
                 </span>
               </NavLink>
             </li>

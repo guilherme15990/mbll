@@ -31,6 +31,8 @@ const must = [
   "src/features/draft/Draft.tsx",
   "src/features/blind/Blind.tsx",
   "src/features/builds/Builds.tsx",
+  "src/features/build-manager/BuildManager.tsx",
+  "src/shared/domain/buildManager.ts",
   "src/features/exposure/Exposure.tsx",
   "package.json",
   "vite.config.ts",

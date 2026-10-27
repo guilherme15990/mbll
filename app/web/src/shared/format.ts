@@ -34,6 +34,24 @@ export function pp(v: number | null | undefined, digits = 1): string {
   return signed(v, digits, " pp");
 }
 
+/**
+ * Lift vem da fonte em fração 0–1 (`build-lift.js`: `unit: "fraction_0_1"`).
+ * A leitura de produto é em pontos percentuais: 0.034 vira "+3.4 pp".
+ * Não use `signed(lift, …)` direto — isso exibe 100× menor.
+ */
+export function liftPp(v: number | null | undefined, digits = 1): string {
+  return v == null || !Number.isFinite(v) ? DASH : pp(v * 100, digits);
+}
+
+export type LiftTone = "unknown" | "neutral" | "positive" | "negative";
+
+/** Três estados de leitura do lift, com o corte prático em 2 pp por padrão. */
+export function liftTone(v: number | null | undefined, practicalPp = 2): LiftTone {
+  if (v == null || !Number.isFinite(v)) return "unknown";
+  if (Math.abs(v * 100) < practicalPp) return "neutral";
+  return v > 0 ? "positive" : "negative";
+}
+
 /** Idade relativa curta: "agora", "há 5 min", "há 3.2 h". */
 export function ago(ms?: number): string {
   if (ms == null) return "agora";
