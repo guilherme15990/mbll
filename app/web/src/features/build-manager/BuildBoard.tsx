@@ -1,8 +1,8 @@
-import { Plus } from "lucide-react";
-import { cx } from "../../shared/api";
+import { X } from "lucide-react";
 import type { CombinerPick } from "../../shared/domain/combiner";
 import { TOTAL_ITEM_SLOTS } from "../../shared/domain/combiner";
 import type { SlotRef } from "../../shared/domain/buildManager";
+import SlotShell from "./SlotShell";
 
 export type BoardItemMeta = { id: number; name: string | null; icon: string | null; core?: boolean };
 export type BoardEmblemMeta = { id: number; name: string | null; icon: string | null };
@@ -16,84 +16,15 @@ type Props = {
   talents: readonly BoardTalentMeta[];
   spells: readonly BoardSpellMeta[];
   onOpen: (slot: SlotRef) => void;
+  onRemove?: (slot: SlotRef) => void;
 };
-
-function SlotShell({
-  label,
-  hint,
-  icon,
-  name,
-  empty,
-  badge,
-  onClick,
-  ariaLabel,
-  tone = "item",
-}: {
-  label: string;
-  hint?: string;
-  icon?: string | null;
-  name?: string | null;
-  empty: boolean;
-  badge?: string | null;
-  onClick: () => void;
-  ariaLabel: string;
-  tone?: "item" | "emblem" | "talent" | "spell";
-}) {
-  const toneClass =
-    tone === "emblem"
-      ? "border-amber-300/25 bg-amber-300/5"
-      : tone === "talent"
-        ? "border-emerald-400/25 bg-emerald-400/5"
-        : tone === "spell"
-          ? "border-sky-400/25 bg-sky-400/5"
-          : "border-line bg-abyss/40";
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={ariaLabel}
-      className={cx(
-        "group relative flex min-h-[78px] flex-col items-center justify-center gap-1 rounded-2xl border px-1.5 py-2 text-center transition-colors",
-        "hover:border-gold/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/40",
-        empty ? "border-dashed border-line/80 bg-panel2/20" : toneClass,
-      )}
-    >
-      {badge ? (
-        <span className="absolute left-1.5 top-1.5 rounded border border-line bg-panel/90 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-mist">
-          {badge}
-        </span>
-      ) : null}
-      {!empty && icon ? (
-        <img
-          src={icon}
-          alt=""
-          className="h-9 w-9 rounded-lg border border-line bg-panel2 object-cover"
-          loading="lazy"
-        />
-      ) : !empty && name ? (
-        <span className="grid h-9 w-9 place-items-center rounded-lg border border-line bg-panel2 text-[10px] font-bold text-mist">
-          {name.slice(0, 2).toUpperCase()}
-        </span>
-      ) : (
-        <span className="grid h-9 w-9 place-items-center rounded-lg border border-dashed border-line/70 bg-panel2/20 text-mist/60">
-          <Plus size={15} aria-hidden="true" />
-        </span>
-      )}
-      <span className={cx("w-full truncate text-[10px]", empty ? "text-mist/70" : "text-foam")}>
-        {empty ? label : (name ?? label)}
-      </span>
-      {hint ? <span className="w-full truncate text-[9px] text-mist/70">{hint}</span> : null}
-    </button>
-  );
-}
 
 /**
  * Quadro de composição: 6 itens + emblema + 3 talentos por tier + feitiço.
  * O quadro é só a superfície de leitura/entrada; a regra de encaixe vive no
  * domínio (`applyCandidate`).
  */
-export default function BuildBoard({ pick, items, emblems, talents, spells, onOpen }: Props) {
+export default function BuildBoard({ pick, items, emblems, talents, spells, onOpen, onRemove }: Props) {
   const itemById = new Map(items.map((item) => [item.id, item]));
   const emblemById = new Map(emblems.map((emblem) => [emblem.id, emblem]));
   const talentById = new Map(talents.map((talent) => [talent.id, talent]));
@@ -115,21 +46,32 @@ export default function BuildBoard({ pick, items, emblems, talents, spells, onOp
             const id = pick.itemIds[index];
             const item = id == null ? null : itemById.get(id) ?? null;
             return (
-              <SlotShell
-                key={`item-${index}`}
-                label={`Item ${index + 1}`}
-                hint={item?.core ? "core" : undefined}
-                icon={item?.icon}
-                name={item?.name ?? (id == null ? null : `Item #${id}`)}
-                empty={id == null}
-                badge={item?.core ? "core" : null}
-                onClick={() => onOpen({ kind: "item", index })}
-                ariaLabel={
-                  id == null
-                    ? `Slot de item ${index + 1} vazio — escolher item`
-                    : `Item ${index + 1}: ${item?.name ?? `#${id}`} — trocar`
-                }
-              />
+              <div key={`item-${index}`} className="relative h-full">
+                <SlotShell
+                  label={`Item ${index + 1}`}
+                  hint={item?.core ? "core" : undefined}
+                  icon={item?.icon}
+                  name={item?.name ?? (id == null ? null : `Item #${id}`)}
+                  empty={id == null}
+                  badge={item?.core ? "core" : null}
+                  onClick={() => onOpen({ kind: "item", index })}
+                  ariaLabel={
+                    id == null
+                      ? `Slot de item ${index + 1} vazio — escolher item`
+                      : `Item ${index + 1}: ${item?.name ?? `#${id}`} — trocar`
+                  }
+                />
+                {id != null && onRemove ? (
+                  <button
+                    type="button"
+                    onClick={() => onRemove({ kind: "item", index })}
+                    aria-label={`Remover item ${index + 1} do quadro`}
+                    className="absolute -right-1.5 -top-1.5 z-10 grid h-5 w-5 place-items-center rounded-full border border-line bg-panel text-mist transition-colors hover:border-rose-300/50 hover:text-rose-200"
+                  >
+                    <X size={11} />
+                  </button>
+                ) : null}
+              </div>
             );
           })}
         </div>

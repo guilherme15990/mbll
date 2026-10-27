@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
-  AlertTriangle, ArrowRight, Check, Crosshair, Info, Sparkles, Swords,
+  AlertTriangle, ArrowRight, Crosshair, Info, RotateCcw, Sparkles, Swords,
 } from "lucide-react";
 import { orderBuildsByLift } from "@radar/proprietary-engine";
 import {
@@ -10,7 +10,7 @@ import {
 } from "../../shared/api";
 import {
   APPLY_ERROR_TEXT, applyCandidate, candidateBlockReason, completionSuggestions, coreItems,
-  maxIndexPick, observedRuneCombos, pickFromObservedBuild, removeSlot, sameAsObserved,
+  observedRuneCombos, pickFromObservedBuild, removeSlot, sameAsObserved,
   type ApplyError, type CompletionSuggestion, type CoreItem, type ObservedRuneCombo,
   type PickCandidate, type SlotRef,
 } from "../../shared/domain/buildManager";
@@ -24,6 +24,9 @@ import {
   Avatar, CtxBar, Empty, ErrBox, FreshLine, GhostNote, Loading, SectionTitle, TierBadge,
 } from "../../shared/ui";
 import HeroPicker from "../../shared/ui/patterns/HeroPicker";
+import ItemComposer, {
+  type ComposerItem, type ComposerSpell,
+} from "../../shared/ui/patterns/ItemComposer";
 import { NeedsLane } from "../../shared/ui/patterns/NeedsRankLane";
 import { liftPp, liftTone } from "../../shared/format";
 import BuildBoard from "./BuildBoard";
@@ -39,9 +42,10 @@ import SlotPicker, {
  *
  * A tela é uma superfície de DECISÃO:
  * 1. núcleo observado (descritivo, não ordem de compra);
- * 2. quadro editável de 6 itens + emblema + 3 talentos + feitiço, com índice
- *    relativo ao vivo e combinações exatas observadas;
- * 3. candidatos de item com lastro no recorte, abaixo do quadro e no modal.
+ * 2. quadro editável de 6 itens + emblema + 3 talentos + feitiço, com o
+ *    índice relativo acima das combinações exatas observadas;
+ * 3. biblioteca de equipamentos (candidatos com lastro) abaixo do quadro;
+ * 4. catálogo de equipamentos em modal: recomendados → categorias → feitiços.
  *
  * Honestidade estrutural:
  * - build observada, núcleo e combinações vêm de `useBuilds`;
@@ -439,6 +443,7 @@ export default function BuildManager() {
 
   const [showAllBases, setShowAllBases] = useState(false);
   const [pickerTarget, setPickerTarget] = useState<SlotRef | null>(null);
+  const [itemTarget, setItemTarget] = useState<number | null>(null);
   const [pickerError, setPickerError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -532,9 +537,49 @@ export default function BuildManager() {
   };
 
   const openPicker = (target: SlotRef) => {
-    setPickerTarget(target);
+    if (target.kind === "item") {
+      setItemTarget(target.index);
+      setPickerTarget(null);
+    } else {
+      setPickerTarget(target);
+      setItemTarget(null);
+    }
     setPickerError(null);
     setActionError(null);
+  };
+
+  const applyItemAt = (id: number, index: number) => {
+    const outcome = applyCandidate(pick, { kind: "item", index }, { kind: "item", id }, applyCtx);
+    if (!outcome.ok) {
+      setPickerError(APPLY_ERROR_TEXT[outcome.reason]);
+      return;
+    }
+    commitPick(outcome.pick);
+    setItemTarget(null);
+  };
+
+  const removeItemAt = (index: number) => {
+    commitPick(removeSlot(pick, { kind: "item", index }, combiner?.talents));
+    setItemTarget(null);
+  };
+
+  const itemBlockReason = (item: ComposerItem, index: number): string | null => {
+    const reason = candidateBlockReason(pick, { kind: "item", index }, { kind: "item", id: item.id }, applyCtx);
+    return reason ? APPLY_ERROR_TEXT[reason] : null;
+  };
+
+  const spellBlockReason = (spell: ComposerSpell): string | null => {
+    const reason = candidateBlockReason(pick, { kind: "spell" }, { kind: "spell", name: spell.name }, applyCtx);
+    return reason ? APPLY_ERROR_TEXT[reason] : null;
+  };
+
+  const applySpell = (name: string | null) => {
+    const outcome = applyCandidate(pick, { kind: "spell" }, { kind: "spell", name }, applyCtx);
+    if (!outcome.ok) {
+      setPickerError(APPLY_ERROR_TEXT[outcome.reason]);
+      return;
+    }
+    commitPick(outcome.pick);
   };
 
   const applyToSlot = (candidate: PickCandidate) => {
@@ -566,11 +611,6 @@ export default function BuildManager() {
       return;
     }
     commitPick(outcome.pick);
-  };
-
-  const optimize = () => {
-    if (!combiner) return;
-    commitPick(maxIndexPick(combiner, pick));
   };
 
   const applyRuneCombo = (combo: ObservedRuneCombo) => {
@@ -746,9 +786,19 @@ export default function BuildManager() {
                               <p className="text-xs font-bold text-foam">Base observada</p>
                               <p className="text-[10px] text-mist">A build do sistema entra preenchida; o quadro é seu para alterar.</p>
                             </div>
-                            <span className="rounded-full border border-line bg-abyss/50 px-2 py-0.5 text-[10px] text-mist">
-                              {rows.length} no recorte
-                            </span>
+                            {!sameAsBase ? (
+                              <button
+                                type="button"
+                                onClick={resetBase}
+                                className="inline-flex min-h-[32px] items-center gap-1.5 rounded-xl border border-line bg-panel2 px-2.5 text-[10px] font-semibold text-mist hover:border-gold/40 hover:text-foam"
+                              >
+                                <RotateCcw size={12} /> Voltar à base
+                              </button>
+                            ) : (
+                              <span className="rounded-full border border-line bg-abyss/50 px-2 py-0.5 text-[10px] text-mist">
+                                {rows.length} no recorte
+                              </span>
+                            )}
                           </div>
 
                           <div className="flex gap-2 overflow-x-auto pb-1" role="group" aria-label="Escolher build observada como base">
@@ -800,34 +850,8 @@ export default function BuildManager() {
                             talents={pickerTalents}
                             spells={pickerSpells}
                             onOpen={openPicker}
+                            onRemove={(slot) => commitPick(removeSlot(pick, slot, combiner?.talents))}
                           />
-
-                          <div className="flex items-center gap-2 flex-wrap border-t border-line/60 pt-2">
-                            <span className={cx(
-                              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold",
-                              sameAsBase
-                                ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
-                                : "border-amber-300/30 bg-amber-300/10 text-amber-200",
-                            )}>
-                              {sameAsBase ? <Check size={11} /> : <Info size={11} />}
-                              {sameAsBase ? "idêntica à base observada" : "composição editada · custom"}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => openPicker({ kind: "emblem" })}
-                              className="min-h-[38px] rounded-xl border border-line bg-panel2 px-2.5 text-[10px] font-semibold text-mist hover:border-gold/40 hover:text-foam"
-                            >
-                              Trocar emblema
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => openPicker({ kind: "item", index: Math.min(pick.itemIds.length, TOTAL_ITEM_SLOTS - 1) })}
-                              className="min-h-[38px] rounded-xl border border-line bg-panel2 px-2.5 text-[10px] font-semibold text-mist hover:border-gold/40 hover:text-foam"
-                            >
-                              Escolher item
-                            </button>
-                            <span className="text-[10px] text-mist/70">clique no slot para trocar; o modal busca no recorte.</span>
-                          </div>
                         </div>
 
                         <div className="space-y-2.5">
@@ -836,24 +860,19 @@ export default function BuildManager() {
                             baseScore={baseScore}
                             sameAsBase={sameAsBase}
                             base={selected?.build ?? null}
-                            canOptimize={!!combiner}
-                            onOptimize={optimize}
-                            onReset={resetBase}
                           />
                           <RuneCombos
                             combos={combos}
                             pick={pick}
                             onApply={applyRuneCombo}
-                            onOpenEmblem={() => openPicker({ kind: "emblem" })}
-                            onOpenTalent={(tier) => openPicker({ kind: "talent", tier })}
                           />
                         </div>
                       </div>
 
                       <SectionTitle
-                        kicker="3 · Itens"
+                        kicker="3 · Biblioteca de equipamentos"
                         title="Complete a composição"
-                        subtitle="Sugestões abaixo do quadro, com o mesmo lastro do recorte. Clique para preencher o primeiro slot livre ou abra o catálogo para escolher outro item."
+                        subtitle="Abaixo do quadro e dos talentos: sugestões com o mesmo lastro do recorte. Clique para preencher o primeiro slot livre ou abra o catálogo para escolher outro item."
                         right={<span className={cx(
                           "text-[11px] font-bold px-2 py-0.5 rounded-full border",
                           full ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200" : "border-line bg-abyss/50 text-mist",
@@ -894,10 +913,6 @@ export default function BuildManager() {
                             <p>
                               <b className="text-foam/90">Combinações prontas:</b> só o conjunto exato de emblema + talentos + feitiço que apareceu junto
                               em uma build. Uma build não vira “padrão recorrente”; ela é mostrada como 1 build.
-                            </p>
-                            <p>
-                              <b className="text-foam/90">Montar maior índice:</b> o sistema escolhe os componentes de maior valor no recorte.
-                              Isso é composição montada por peso, não build observada, e não é recomendação.
                             </p>
                             <p>
                               <b className="text-foam/90">Editar:</b> a composição deixa de ser a build observada e vira <code>custom</code>.
@@ -971,6 +986,25 @@ export default function BuildManager() {
           )}
         </>
       )}
+
+      <ItemComposer
+        variant="modal"
+        open={itemTarget != null}
+        onClose={() => { setItemTarget(null); setPickerError(null); }}
+        title={itemTarget != null ? `Montar equipamento · slot ${itemTarget + 1}` : "Montar equipamento"}
+        targetIndex={itemTarget ?? 0}
+        items={pickerItems}
+        recommended={suggestions}
+        value={pick.itemIds}
+        onPick={applyItemAt}
+        onRemove={removeItemAt}
+        max={TOTAL_ITEM_SLOTS}
+        blockReason={itemBlockReason}
+        spells={pickerSpells}
+        spell={pick.spellName}
+        onPickSpell={applySpell}
+        spellBlockReason={spellBlockReason}
+      />
 
       <SlotPicker
         open={pickerTarget}

@@ -1,4 +1,4 @@
-import { ArrowRight, Check, Sparkles, Swords } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 import { cx, pct } from "../../shared/api";
 import type { CombinerPick } from "../../shared/domain/combiner";
 import type { ObservedRuneCombo } from "../../shared/domain/buildManager";
@@ -7,8 +7,6 @@ type Props = {
   combos: readonly ObservedRuneCombo[];
   pick: CombinerPick;
   onApply: (combo: ObservedRuneCombo) => void;
-  onOpenEmblem: () => void;
-  onOpenTalent: (tier: number) => void;
 };
 
 function sameIds(left: readonly number[], right: readonly number[]): boolean {
@@ -49,7 +47,7 @@ function Mini({ icon, label, tier }: { icon: string | null; label: string; tier?
  * Combinações EXATAS de emblema + talentos + feitiço observadas nas builds.
  * Uma combinação com 1 build não é chamada de recorrente; é só isso: 1 build.
  */
-export default function RuneCombos({ combos, pick, onApply, onOpenEmblem, onOpenTalent }: Props) {
+export default function RuneCombos({ combos, pick, onApply }: Props) {
   return (
     <div className="card space-y-2.5 border-line bg-panel p-3.5">
       <div className="flex items-start justify-between gap-2">
@@ -60,27 +58,6 @@ export default function RuneCombos({ combos, pick, onApply, onOpenEmblem, onOpen
             Só o conjunto exato que apareceu junto nas builds. Emblema é descritivo; talento tem peso.
           </p>
         </div>
-        <Sparkles size={15} className="mt-0.5 shrink-0 text-gold" />
-      </div>
-
-      <div className="flex flex-wrap gap-1.5">
-        <button
-          type="button"
-          onClick={onOpenEmblem}
-          className="inline-flex min-h-[36px] items-center gap-1.5 rounded-xl border border-line bg-abyss/50 px-2.5 text-[10px] font-semibold text-mist hover:border-gold/40 hover:text-foam"
-        >
-          Testar outro emblema
-        </button>
-        {[1, 2, 3].map((tier) => (
-          <button
-            key={tier}
-            type="button"
-            onClick={() => onOpenTalent(tier)}
-            className="inline-flex min-h-[36px] items-center gap-1.5 rounded-xl border border-line bg-abyss/50 px-2.5 text-[10px] font-semibold text-mist hover:border-gold/40 hover:text-foam"
-          >
-            Talento T{tier}
-          </button>
-        ))}
       </div>
 
       {combos.length === 0 ? (
@@ -143,12 +120,6 @@ export default function RuneCombos({ combos, pick, onApply, onOpenEmblem, onOpen
           })}
         </div>
       )}
-
-      <p className="flex items-start gap-1.5 text-[10px] text-mist/70">
-        <Swords size={12} className="mt-0.5 shrink-0" />
-        O jogador avançado pode trocar cada peça nos slots. A combinação deixa de ser observada quando qualquer peça
-        muda; a tela passa a mostrar só o índice relativo, sem herdar win/pick/lift.
-      </p>
     </div>
   );
 }

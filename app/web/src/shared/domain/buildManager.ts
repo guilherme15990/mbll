@@ -299,7 +299,7 @@ export function candidateBlockReason(
 
   if (candidate.kind === "item") {
     if (!validId(candidate.id)) return "unknown_component";
-    if (target.kind !== "item" || !Number.isInteger(target.index) || target.index < 0 || target.index >= maxItems) {
+    if (target.kind !== "item" || !Number.isInteger(target.index) || target.index < 0 || target.index > maxItems) {
       return "not_applicable";
     }
     const replacing = target.index < pick.itemIds.length ? target.index : -1;

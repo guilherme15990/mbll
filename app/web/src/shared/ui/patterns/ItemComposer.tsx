@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, Check, LayoutGrid, Minus, Plus, Search, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, LayoutGrid, Minus, Plus, Search, Sparkles, X } from "lucide-react";
 import type { AggregateValueSource } from "../../api";
 import { cx } from "../../domain/present";
 import { pct, pp, signed } from "../../format";
@@ -8,9 +8,11 @@ import { pct, pp, signed } from "../../format";
  * Compositor de itens e feitiços reutilizável.
  *
  * Duas superfícies no mesmo componente:
- * 1. os slots (6 itens por padrão + feitiço), que abrem o catálogo no alvo clicado;
- * 2. a navbar lateral por arquétipo + a categoria “Feitiços”, que abre o
- *    catálogo já filtrado.
+ * 1. `inline`: os slots (6 itens por padrão + feitiço), que abrem o catálogo no
+ *    alvo clicado, mais a navbar lateral por arquétipo;
+ * 2. `modal`: o próprio componente é o modal controlado — usado quando a tela
+ *    já tem os slots e só precisa do catálogo (recomendados → categorias →
+ *    feitiços).
  *
  * O componente é dono só da interação (slot ativo, categoria, busca). A regra
  * de encaixe (duplicata, teto, uma bota) fica com o chamador via `blockReason`
@@ -68,13 +70,28 @@ export type ItemComposerProps = {
   spellBlockReason?: (spell: ComposerSpell) => string | null;
   /** Número único de poder: seta + desvio vs média. Sem a prop, não aparece. */
   power?: ComposerPower | null;
+  /**
+   * `inline` (padrão): slots + navbar + catálogo em modal interno.
+   * `modal`: o componente é o próprio modal controlado (`open`/`onClose`),
+   * usado quando a tela já tem os slots e só precisa do catálogo.
+   */
+  variant?: "inline" | "modal";
+  open?: boolean;
+  onClose?: () => void;
+  /** Slot que recebe a escolha no variant `modal`. */
+  targetIndex?: number;
+  /** Candidatos com lastro, mostrados como primeira categoria do modal. */
+  recommended?: readonly ComposerItem[];
+  title?: string;
   label?: string;
   className?: string;
 };
 
 const CATEGORY_ALL = "all";
 const CATEGORY_SPELL = "__spell__";
+const CATEGORY_RECOMMENDED = "__recommended__";
 const EMPTY_SPELLS: readonly ComposerSpell[] = [];
+const EMPTY_ITEMS: readonly ComposerItem[] = [];
 
 const CATEGORY_ORDER = [
   "physical_attack",
@@ -163,14 +180,25 @@ export default function ItemComposer({
   onPickSpell,
   spellBlockReason,
   power,
+  variant = "inline",
+  open: openProp = false,
+  onClose,
+  targetIndex = 0,
+  recommended,
+  title,
   label = "Itens",
   className,
 }: ItemComposerProps) {
-  const [open, setOpen] = useState(false);
-  const [target, setTarget] = useState(0);
+  const isModal = variant === "modal";
+  const [catalogOpen, setCatalogOpen] = useState(false);
+  const [inlineTarget, setInlineTarget] = useState(0);
   const [category, setCategory] = useState<string>(CATEGORY_ALL);
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
+
+  const open = isModal ? openProp : catalogOpen;
+  const target = isModal ? Math.max(0, targetIndex) : inlineTarget;
+  const recommendedList = recommended ?? EMPTY_ITEMS;
 
   const spellList = spells ?? EMPTY_SPELLS;
   const canPickSpell = !!onPickSpell;
@@ -178,6 +206,7 @@ export default function ItemComposer({
   const selectedSpellKey = spellKey(spell);
   const selectedSpell = spellList.find((row) => spellKey(row.name) === selectedSpellKey) ?? null;
   const isSpellCategory = category === CATEGORY_SPELL;
+  const isRecommendedCategory = category === CATEGORY_RECOMMENDED;
 
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
 
@@ -196,6 +225,11 @@ export default function ItemComposer({
     }));
   }, [items]);
 
+  const close = () => {
+    if (isModal) onClose?.();
+    else setCatalogOpen(false);
+  };
+
   useEffect(() => {
     if (!open) return;
     const id = window.setTimeout(() => searchRef.current?.focus(), 30);
@@ -205,20 +239,27 @@ export default function ItemComposer({
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") close();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
+  }, [open, isModal, onClose]);
+
+  // No modal controlado, abre em "Recomendados" (se houver) e sem busca.
+  useEffect(() => {
+    if (!isModal || !openProp) return;
+    setQuery("");
+    setCategory(recommendedList.length > 0 ? CATEGORY_RECOMMENDED : CATEGORY_ALL);
+  }, [isModal, openProp, targetIndex, recommendedList.length]);
 
   const filledCount = value.filter((id) => itemById.has(id) || Number.isInteger(id)).length;
   const firstFree = value.length >= max ? 0 : value.length;
 
   const openAt = (index: number, categoryKey: string) => {
-    setTarget(index);
+    setInlineTarget(index);
     setCategory(categoryKey);
     setQuery("");
-    setOpen(true);
+    setCatalogOpen(true);
   };
 
   const openSlot = (index: number) => {
@@ -229,24 +270,28 @@ export default function ItemComposer({
 
   const apply = (id: number) => {
     onPick(id, target);
-    setOpen(false);
+    close();
   };
 
   const openSpellCatalog = () => {
     setCategory(CATEGORY_SPELL);
     setQuery("");
-    setOpen(true);
+    if (!isModal) setCatalogOpen(true);
   };
 
   const applySpell = (name: string | null) => {
     onPickSpell?.(name);
-    setOpen(false);
+    close();
   };
 
   const q = query.trim().toLowerCase();
   const visible = useMemo(() => {
-    return items
-      .filter((item) => (category === CATEGORY_ALL || categoryOf(item) === category))
+    const source = category === CATEGORY_RECOMMENDED ? recommendedList : items;
+    return source
+      .filter(
+        (item) =>
+          category === CATEGORY_ALL || category === CATEGORY_RECOMMENDED || categoryOf(item) === category,
+      )
       .filter((item) => !q || itemName(item).toLowerCase().includes(q))
       .sort(
         (a, b) =>
@@ -254,7 +299,7 @@ export default function ItemComposer({
           (b.adoption ?? -Infinity) - (a.adoption ?? -Infinity) ||
           itemName(a).localeCompare(itemName(b)),
       );
-  }, [items, category, q]);
+  }, [items, recommendedList, category, q]);
 
   const visibleSpells = useMemo(() => {
     return spellList
@@ -271,12 +316,16 @@ export default function ItemComposer({
   const targetLabel = targetMeta ? itemName(targetMeta) : `slot ${target + 1}`;
   const activeCategory = isSpellCategory
     ? "Feitiços"
-    : category === CATEGORY_ALL
-      ? "Todos os itens"
-      : categoryName(category, items);
+    : isRecommendedCategory
+      ? "Recomendados do recorte"
+      : category === CATEGORY_ALL
+        ? "Todos os itens"
+        : categoryName(category, items);
   const modalHint = isSpellCategory
     ? "A escolha entra no feitiço da composição."
-    : `A escolha entra no ${targetLabel}.`;
+    : isRecommendedCategory
+      ? "Candidatos com lastro no recorte; a decisão é sua — isto não é recomendação."
+      : `A escolha entra no ${targetLabel}.`;
 
   const powerDelta = power?.delta ?? null;
   const powerTone = powerDelta == null ? "unknown" : powerDelta >= 0.05 ? "up" : powerDelta <= -0.05 ? "down" : "flat";
@@ -290,6 +339,8 @@ export default function ItemComposer({
 
   return (
     <div className={cx("space-y-2", className)} data-testid="item-composer">
+      {!isModal ? (
+        <>
       <div className="flex items-center justify-between gap-2">
         <span className="lbl text-[10px]">{label}</span>
         <span className="text-[10px] text-mist">
@@ -410,6 +461,18 @@ export default function ItemComposer({
           aria-label="Categorias do catálogo de itens e feitiços"
           className="flex w-[96px] shrink-0 flex-col gap-1 sm:w-[112px]"
         >
+          {recommendedList.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => openAt(firstFree, CATEGORY_RECOMMENDED)}
+              className="flex min-h-[32px] items-center gap-1.5 rounded-lg border border-emerald-400/35 bg-emerald-400/10 px-2 text-left text-[10px] font-bold text-emerald-100 transition-colors hover:border-emerald-400/55"
+            >
+              <Sparkles size={11} className="shrink-0" />
+              <span className="min-w-0 flex-1 truncate">Recomendados</span>
+              <span className="num text-[9px] text-emerald-100/70">{recommendedList.length}</span>
+            </button>
+          ) : null}
+
           <button
             type="button"
             onClick={() => openAt(firstFree, CATEGORY_ALL)}
@@ -470,10 +533,12 @@ export default function ItemComposer({
           </span>
         </div>
       ) : null}
+        </>
+      ) : null}
 
       {open ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-abyss/70 p-2 sm:items-center sm:p-4" role="presentation">
-          <button type="button" aria-label="Fechar catálogo" className="absolute inset-0 cursor-default" onClick={() => setOpen(false)} />
+          <button type="button" aria-label="Fechar catálogo" className="absolute inset-0 cursor-default" onClick={close} />
 
           <div
             role="dialog"
@@ -483,15 +548,24 @@ export default function ItemComposer({
           >
             <div className="flex items-center gap-2 border-b border-line px-3 py-2.5">
               <div className="min-w-0 flex-1">
-                <p className="lbl text-[10px]">Catálogo de itens e feitiços</p>
+                <p className="lbl text-[10px]">{title ?? (isModal ? "Montar equipamento" : "Catálogo de itens e feitiços")}</p>
                 <h2 id="item-composer-title" className="truncate text-sm font-bold text-foam">
                   {activeCategory}
                 </h2>
                 <p className="truncate text-[10px] text-mist">{modalHint}</p>
               </div>
+              {isModal && onRemove && target < value.length ? (
+                <button
+                  type="button"
+                  onClick={() => { onRemove(target); close(); }}
+                  className="inline-flex min-h-[38px] items-center gap-1.5 rounded-xl border border-line bg-abyss/60 px-2.5 text-[11px] font-semibold text-mist hover:border-rose-300/50 hover:text-rose-200"
+                >
+                  <Minus size={13} /> Remover
+                </button>
+              ) : null}
               <button
                 type="button"
-                onClick={() => setOpen(false)}
+                onClick={close}
                 aria-label="Fechar"
                 className="grid min-h-[38px] min-w-[38px] place-items-center rounded-xl border border-line bg-abyss/60 text-mist hover:text-foam"
               >
@@ -504,6 +578,23 @@ export default function ItemComposer({
                 aria-label="Filtrar por categoria"
                 className="flex gap-1 overflow-x-auto border-b border-line p-2 sm:flex-col sm:overflow-y-auto sm:border-b-0 sm:border-r"
               >
+                {recommendedList.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setCategory(CATEGORY_RECOMMENDED)}
+                    aria-pressed={category === CATEGORY_RECOMMENDED}
+                    className={cx(
+                      "flex min-h-[34px] shrink-0 items-center gap-1.5 rounded-lg border px-2 text-left text-[10px] font-bold transition-colors sm:shrink",
+                      category === CATEGORY_RECOMMENDED
+                        ? "border-emerald-400/55 bg-emerald-400/10 text-emerald-100"
+                        : "border-emerald-400/30 bg-emerald-400/5 text-emerald-100/90 hover:border-emerald-400/55",
+                    )}
+                  >
+                    <Sparkles size={11} />
+                    <span className="flex-1 whitespace-nowrap sm:whitespace-normal">Recomendados</span>
+                    <span className="num text-[9px] opacity-70">{recommendedList.length}</span>
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => setCategory(CATEGORY_ALL)}
@@ -727,9 +818,11 @@ export default function ItemComposer({
                 </div>
 
                 <p className="border-t border-line px-3 py-2 text-[10px] text-mist/75">
-                  {isSpellCategory
-                    ? "Feitiços ficam na categoria própria; o peso é relativo ao recorte. Sem contraste não vira zero — vira “sem contraste”."
-                    : "Categoria vem do arquétipo do item. Peso é relativo ao recorte; sem contraste não vira zero — vira “sem contraste”."}
+                  {isRecommendedCategory
+                    ? "Candidatos com lastro no recorte. Ordem é peso → adoção → builds; a decisão é sua — sugestão não é recomendação."
+                    : isSpellCategory
+                      ? "Feitiços ficam na categoria própria; o peso é relativo ao recorte. Sem contraste não vira zero — vira “sem contraste”."
+                      : "Categoria vem do arquétipo do item. Peso é relativo ao recorte; sem contraste não vira zero — vira “sem contraste”."}
                 </p>
               </div>
             </div>

@@ -53,13 +53,13 @@ check(
 );
 
 // 3. Lógica pura separada da UI.
-check("importa as funções puras", /coreItems/.test(screen) && /completionSuggestions/.test(screen) && /addCompletionItem/.test(screen) && /pickFromObservedBuild/.test(screen));
+check("importa as funções puras", /coreItems/.test(screen) && /completionSuggestions/.test(screen) && /applyCandidate/.test(screen) && /pickFromObservedBuild/.test(screen));
 check("domínio não importa React", !/from\s+["']react/.test(domain) && !/\buse(State|Effect|Memo)\b/.test(domain));
 check("domínio não faz rede", !/\bfetch\s*\(/.test(domain) && !/getJSON/.test(domain));
 check("domínio só tem import type", !/^\s*import\s+(?!type\b)[^;]*from/m.test(domain));
 check(
-  "domínio exporta as quatro funções",
-  ["coreItems", "pickFromObservedBuild", "completionSuggestions", "addCompletionItem"].every((fn) =>
+  "domínio exporta as funções puras da tela",
+  ["coreItems", "pickFromObservedBuild", "completionSuggestions", "applyCandidate", "removeSlot", "observedRuneCombos", "maxIndexPick"].every((fn) =>
     new RegExp(`export function ${fn}\\b`).test(domain),
   ),
 );
@@ -69,11 +69,15 @@ check("lê ?build=", /sp\.get\("build"\)/.test(screen));
 check("grava ?build=", /next\.set\("build"/.test(screen));
 check("limpa ?build= ao trocar recorte", (screen.match(/next\.delete\("build"\)/g) ?? []).length >= 2);
 check("herói vem de /build/:id ou ?hero=", /params\.id \?\? sp\.get\("hero"\)/.test(screen));
-check("troca de herói/lane limpa itens adicionados", /setAdded\(\[\]\)/.test(screen));
+check("troca de herói/lane limpa composição editada", (screen.match(/next\.delete\("l"\)/g) ?? []).length >= 2);
 
 // 5. Honestidade estrutural da composição.
-check("proveniência custom com item adicionado", /provenance:\s*added\.length\s*\?\s*"custom"\s*:\s*"observed"/.test(screen));
-check("observedItems conta só a build de origem", /observedItems:\s*selected\.pick\.itemIds\.length/.test(screen));
+check("proveniência custom quando diverge da base", /provenance:\s*same\s*\?\s*"observed"\s*:\s*"custom"/.test(screen));
+check(
+  "observedItems conta só a origem",
+  /observedItems:\s*same\s*\?/.test(screen) &&
+    /nextPick\.itemIds\.filter\(\(id\) => selected\.pick\.itemIds\.includes\(id\)\)/.test(screen),
+);
 check("usa o índice do Combinador", /scoreCombination\s*\(/.test(screen));
 check("usa o teto de slots do Combinador", /TOTAL_ITEM_SLOTS/.test(screen));
 check("uma bota no máximo", /archetype === "movement"/.test(domain));
