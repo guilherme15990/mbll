@@ -15,6 +15,8 @@
 //  5. Web — `features/a` não importa `features/b`; `app|shared|lib` não importam
 //     `features`; só `App.tsx` carrega features; `src/pages` e `src/components`
 //     não existem; `lib → shared` só via `shared/format`.
+//  6. Contrato — `@radar/contracts` é a única casa dos DTOs do fio: só tipos, sem
+//     import, e nenhum app/pacote redeclara um nome que ele exporta.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -306,6 +308,134 @@ check(
   "api: infra/arena.js removido (ADR-045)",
   fs.existsSync(path.join(API_SRC, "infra", "arena.js")) ? ["app/api/src/infra/arena.js existe"] : [],
 );
+
+// ── 6. contrato único (@radar/contracts) ────────────────────────────────────
+// O agregado de builds já teve três descrições: o `index.d.ts` do motor com
+// `Record<string, any>`, a montagem em JS na API e 29 tipos escritos à mão na
+// web. Divergir era possível sem o `tsc` reclamar. Agora `@radar/contracts` é a
+// fonte: o motor declara `buildAggregate(): AggregateBody`, a API anota a borda
+// e a web reexporta. Este gate impede a terceira cópia de voltar.
+const CONTRACTS = path.join(PACKAGES, "contracts");
+const CONTRACTS_ENTRY = path.join(CONTRACTS, "src/index.ts");
+const contractText = fs.existsSync(CONTRACTS_ENTRY) ? fs.readFileSync(CONTRACTS_ENTRY, "utf8") : "";
+const contractNames = new Set();
+for (const m of contractText.matchAll(/export\s+(?:type|interface)\s+([A-Za-z0-9_$]+)/g)) contractNames.add(m[1]);
+
+check(
+  "contracts: pacote existe com tipos",
+  contractText && contractNames.size > 0 ? [] : ["packages/contracts/src/index.ts ausente ou sem exports de tipo"],
+  `${contractNames.size} tipos`,
+);
+
+// Só tipo: nada de import (nem de app, nem do motor) e nenhum valor exportado.
+// Um contrato com runtime vira mais uma camada para manter em sincronia.
+const contractRuntime = [];
+for (const { spec } of importsOf(contractText)) contractRuntime.push(`import de "${spec}" (contrato é só tipo)`);
+for (const m of contractText.matchAll(/^(?:export\s+)?(?:const|let|var|function|class|enum)\s+([A-Za-z0-9_$]+)/gm)) {
+  contractRuntime.push(`valor ${m[1]} (contrato é só tipo)`);
+}
+check("contracts: só tipos, sem import nem runtime", contractRuntime);
+
+// Ninguém redeclara um nome do contrato. `export type { X } from "@radar/contracts"`
+// continua válido: o reexport não casa com este padrão.
+const contractDuplicates = [];
+for (const file of files) {
+  if (isInside(file, CONTRACTS)) continue;
+  const text = fs.readFileSync(file, "utf8");
+  for (const m of text.matchAll(/(?:export\s+)?(?:type|interface)\s+([A-Za-z0-9_$]+)\s*(?:=|extends\b|\{)/g)) {
+    if (contractNames.has(m[1])) contractDuplicates.push(`${rel(file)} redeclara ${m[1]}`);
+  }
+}
+check("contracts: nenhum DTO do fio redeclarado fora do pacote", contractDuplicates);
+
+// O consumidor da web importa daqui (não de uma cópia local).
+const webBuildsQueries = path.join(WEB_SRC, "shared/api/queries/builds.ts");
+const webBuildsText = fs.existsSync(webBuildsQueries) ? fs.readFileSync(webBuildsQueries, "utf8") : "";
+check(
+  "contracts: web importa o agregado de @radar/contracts",
+  /from\s+["']@radar\/contracts["']/.test(webBuildsText)
+    ? []
+    : ["shared/api/queries/builds.ts não importa @radar/contracts"],
+);
+
+// Workspace declarado nos três consumidores: sem isso o import funciona por
+// acaso (hoisting) e quebra num `npm ci` limpo.
+const contractDeps = [];
+for (const pkgPath of ["app/web/package.json", "app/api/package.json", "packages/proprietary-engine/package.json"]) {
+  const abs = path.join(ROOT, pkgPath);
+  if (!fs.existsSync(abs)) continue;
+  const pkg = JSON.parse(fs.readFileSync(abs, "utf8"));
+  if (!pkg.dependencies?.["@radar/contracts"]) contractDeps.push(`${pkgPath} sem dependência @radar/contracts`);
+}
+check("contracts: declarado em web, api e motor", contractDeps);
+
+// ── 7. tamanho de arquivo (ADR-041, critério de aceite nº 1) ─────────────────
+// "Nenhum arquivo acima de 300 linhas fora de packages/proprietary-engine".
+// A regra existia só no papel e por isso regrediu para 11 arquivos. A allowlist
+// é a dívida medida em 2026-10-27, com o tamanho de então: o arquivo pode
+// encolher, não crescer. Arquivo novo acima do limite falha.
+//
+// `packages/contracts` fica fora de propósito: é declaração de tipo do fio
+// (crescer = mais endpoints), sem lógica que alguém precise abrir para mudar
+// comportamento — que é o que o critério da ADR-041 quer proteger.
+const LOC_LIMIT = 300;
+const LOC_BASELINE = new Map([
+  ["app/web/src/features/build-manager/BuildManager.tsx", 1008],
+  ["app/web/src/shared/ui/patterns/ItemComposer.tsx", 834],
+  ["app/web/src/shared/domain/buildManager.ts", 566],
+  ["app/web/src/features/hero-detail/HeroDetail.tsx", 500],
+  ["app/web/src/features/build-manager/SlotPicker.tsx", 430],
+  ["app/web/src/shared/domain/loadout.ts", 476],
+  ["app/api/src/application/buildsAggregate.js", 394],
+  ["app/web/src/features/hero-detail/sections/BuildsSection.tsx", 349],
+  ["app/web/src/features/builds/BuildsPowerPanel.tsx", 338],
+  ["app/web/src/features/dashboard/Dashboard.tsx", 333],
+  ["app/web/src/features/hero-detail/sections/ConfrontosPreview.tsx", 312],
+  ["app/web/src/features/hero-detail/sections/ConfrontosSection.tsx", 302],
+]);
+
+const locOversize = [];
+const locGrew = [];
+const locPaid = [];
+const locFiles = [
+  ...walk(path.join(API, "src")),
+  ...walk(path.join(WEB, "src")),
+];
+for (const file of locFiles) {
+  const text = fs.readFileSync(file, "utf8");
+  const lines = text.split("\n").length - (text.endsWith("\n") ? 1 : 0);
+  if (lines <= LOC_LIMIT) continue;
+  const from = rel(file);
+  const ceiling = LOC_BASELINE.get(from);
+  if (ceiling == null) locOversize.push(`${from} (${lines} linhas)`);
+  else if (lines > ceiling) locGrew.push(`${from}: ${lines} (teto registrado ${ceiling})`);
+}
+for (const [from, ceiling] of LOC_BASELINE) {
+  if (!locFiles.some((f) => rel(f) === from)) locPaid.push(`${from} sumiu (remova da allowlist)`);
+}
+check("arquivos: nada acima de 300 linhas fora da allowlist", locOversize, `${locFiles.length} arquivos varridos, ${LOC_BASELINE.size} na dívida`);
+check("arquivos: allowlist só encolhe (teto registrado)", locGrew, LOC_BASELINE.size ? "dívida monotônica" : "");
+for (const note of locPaid) console.log(`NOTE ${note}`);
+
+// ── 8. gerenciador de pacotes único (ADR-034, dívida 4) ─────────────────────
+// O lockfile versionado é o package-lock.json (v3) e o CI instala com `npm ci`.
+// Um segundo manifesto convida a instalar com outra ferramenta e a divergir do
+// único lockfile que o CI honra.
+const FOREIGN_MANIFESTS = [
+  "pnpm-workspace.yaml", "pnpm-lock.yaml", "yarn.lock", ".yarnrc.yml",
+  "bun.lock", "bun.lockb",
+];
+const managerProblems = FOREIGN_MANIFESTS
+  .filter((f) => fs.existsSync(path.join(ROOT, f)))
+  .map((f) => `${f} existe (o repo instala com npm; lockfile único é package-lock.json)`);
+
+const rootPkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
+if (!String(rootPkg.packageManager ?? "").startsWith("npm@")) {
+  managerProblems.push(
+    `package.json: packageManager ausente ou não-npm (hoje: ${rootPkg.packageManager ?? "ausente"})`,
+  );
+}
+check("repo: gerenciador único (npm) com packageManager declarado", managerProblems);
 
 // ── resultado ───────────────────────────────────────────────────────────────
 console.log(bad ? `BOUNDARIES FAIL (${bad} regra(s))` : "BOUNDARIES OK");

@@ -158,6 +158,20 @@ export {
 
 // ── draft ──
 export { getDraftPatterns } from "./draft/draft-patterns.js";
+export {
+  DRAFT_SCORE_VERSION,
+  DS_K,
+  DS_PRIOR_VAR,
+  DS_PAIR_DAMPING,
+  DS_OFFLANE_PENALTY_PP,
+  DS_FALLBACK_PICK,
+  DS_UNIT_STATUS,
+  scoreDraftCandidates,
+} from "./draft/draft-score.js";
+export {
+  HERO_DRAFT_SCORE_VERSION,
+  scoreHeroDraftScore,
+} from "./draft/hero-draft-score.js";
 
 // ── builds ──
 export { buildLift, buildReferences } from "./builds/build-lift.js";

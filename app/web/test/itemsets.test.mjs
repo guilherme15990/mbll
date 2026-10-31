@@ -62,10 +62,8 @@ describe("itemset-score-v1 (fórmula versionada)", () => {
     );
     assert.deepEqual(getBuildTags({ pick: 0.01, lift_vs_most_used: null }), []);
     assert.deepEqual(getBuildTags({ pick: 0.01, lift_vs_most_used: 0.001 }), []);
-    assert.deepEqual(
-      getBuildTags({ pick: 0.01, lift_vs_most_used: -0.05 }).map((t) => t.key),
-      ["abaixo-da-ref"],
-    );
+    // Negativo não gera tag: a tag "abaixo-da-ref" foi removida.
+    assert.deepEqual(getBuildTags({ pick: 0.01, lift_vs_most_used: -0.05 }), []);
   });
 
   it("S(u,c) atômico: trinca em 2/3 builds = ok, win_desc = média no contexto comum", () => {

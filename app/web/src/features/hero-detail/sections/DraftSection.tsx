@@ -60,7 +60,8 @@ function SummaryCell({ label, value, hint, tone }: { label: string; value: strin
  * - First Pick (BPS): travar primeiro e ver o inimigo responder.
  * - Pressão de draft (DRF): pick/ban acompanham a força? Padrões operacionais §7.
  *
- * Dados: 2 buscas com as MESMAS keys das rotas planas (/blind e /draft).
+ * Dados: 2 buscas (blind e distorção). As rotas planas /blind e /draft saíram
+ * (ADR-049); esta aba é o único lugar que mostra as duas leituras.
  * Nenhum endpoint novo. Layout limpo: identidade → estado → decisão → pressão → risco.
  */
 export default function DraftSection({
@@ -249,16 +250,7 @@ export default function DraftSection({
         </p>
       </div>
 
-      <Link
-        to={`/draft?hero=${heroId}&rank=${rank}&window=${window}`}
-        className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gold text-abyss text-sm font-bold hover:bg-gold-light transition-colors min-h-[44px]"
-      >
-        Abrir draft na rota plana →
-      </Link>
       <nav aria-label="Rotas planas relacionadas" className="flex items-center gap-4 flex-wrap text-[11px] text-mist/80">
-        <Link to={`/blind?hero=${heroId}&rank=${rank}&window=${window}`} className="underline hover:text-gold min-h-[44px] inline-flex items-center">
-          abrir blind pick na rota plana →
-        </Link>
         <Link to={`/hero/${heroId}?tab=confrontos&rank=${rank}&window=${window}`} className="underline hover:text-gold min-h-[44px] inline-flex items-center">
           ver counters →
         </Link>

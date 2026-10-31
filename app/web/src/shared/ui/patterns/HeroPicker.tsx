@@ -10,10 +10,13 @@ export default function HeroPicker({
   hero,
   onPick,
   compact = false,
+  showPrdSuggestions = true,
 }: {
   hero: string | null;
   onPick: (id: string) => void;
   compact?: boolean;
+  /** Atalhos de demonstração dos PRDs. Páginas de produção passam `false`. */
+  showPrdSuggestions?: boolean;
 }) {
   const cat = useCatalog();
   const [query, setQuery] = useState("");
@@ -101,8 +104,8 @@ export default function HeroPicker({
         </div>
       )}
 
-      {/* Quick Casos de Estudo do PRD suggestions */}
-      {!currentHero && !query && (
+      {/* Quick Casos de Estudo do PRD suggestions (scaffolding: fora da Heróis). */}
+      {showPrdSuggestions && !currentHero && !query && (
         <div className="flex items-center gap-1.5 flex-wrap text-xs pt-1 border-t border-line/40">
           <span className="text-[11px] text-mist flex items-center gap-1 mr-1">
             <Sparkles size={12} className="text-gold" /> Casos de Estudo dos PRDs:

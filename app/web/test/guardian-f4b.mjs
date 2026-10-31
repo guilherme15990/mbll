@@ -38,11 +38,11 @@ check("sem src/components", !fs.existsSync(path.join(src, "components")));
 const features = fs.existsSync(path.join(src, "features"))
   ? fs.readdirSync(path.join(src, "features"), { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name)
   : [];
-check("features/ com >= 10 contextos", features.length >= 10, `${features.length} contextos`);
+check("features/ com >= 7 contextos", features.length >= 7, `${features.length} contextos`);
 
 const router = read(path.join(src, "app", "router.tsx"));
 const lazyRoutes = [...router.matchAll(/lazy\(\(\) => import\("([^"]+)"\)\)/g)].map((m) => m[1]);
-check("rotas lazy em features/", lazyRoutes.length >= 12 && lazyRoutes.every((s) => s.startsWith("../features/")), `${lazyRoutes.length} rotas`);
+check("rotas lazy em features/", lazyRoutes.length >= 7 && lazyRoutes.every((s) => s.startsWith("../features/")), `${lazyRoutes.length} rotas`);
 
 const files = walk(src).map((f) => ({ f, r: rel(f), t: read(f) }));
 

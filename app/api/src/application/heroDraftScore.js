@@ -1,0 +1,52 @@
+// Draft Score do herói (número único) — motor `hero-draft-score-v1`.
+//
+// Compõe o lote oficial (`fetchRankAll`: id + WR + exposição) e chama o motor
+// puro — min–max da WR no recorte (melhor WR lê 100, pior lê 0). NÃO usa o livro
+// de pares: sem fan-out de ~133×2 requests.
+//
+// Custo: uma coleta do lote (mesmo cache da tela `/heroes`); o resto é cálculo em
+// memória. Falha do lote devolve 502 — sem WR não há número.
+//
+// A chave de cache carrega a VERSÃO do motor (`draft-score:<v>:<rank>:<days>`):
+// bumpar a métrica invalida automaticamente as entradas antigas (sem isso, uma
+// fórmula nova serviria o corpo velho por até 24 h — bug observado ao pivotar a
+// escala de "100·WR ancorado em 50" para "min–max do lote"). A tabela `cache` é
+// reconstruível, então sobra só a entrada órfã da versão anterior até o TTL.
+import { scoreHeroDraftScore, HERO_DRAFT_SCORE_VERSION } from "@radar/proprietary-engine";
+import { cacheGet, cacheSet } from "../infra/cacheStore.js";
+import { fetchRankAll } from "./rankLot.js";
+import { createSingleFlight } from "./singleFlight.js";
+
+// F3: coleções concorrentes idênticas compartilham UMA execução.
+const flights = createSingleFlight();
+
+export function heroDraftScoreBody(rank, days) {
+  const key = `draft-score:${HERO_DRAFT_SCORE_VERSION}:${rank}:${days}`;
+  return flights.run(key, () => heroDraftScoreBodyImpl(key, rank, days));
+}
+
+async function heroDraftScoreBodyImpl(key, rank, days) {
+  const hit = cacheGet(key, "C");
+  if (hit.hit) return { status: 200, body: { ...hit.body, stale: hit.stale, ageMs: hit.ageMs } };
+
+  let fetched;
+  try {
+    fetched = await fetchRankAll({ days, rank });
+  } catch {
+    return { status: 502, body: { error: "upstream_unavailable", message: "Upstream unavailable, try again" } };
+  }
+
+  const rows = fetched.rows ?? [];
+  const result = scoreHeroDraftScore({ heroes: rows.map((h) => ({ id: h.id, name: h.name, head: h.head, win: h.win })) });
+
+  const body = {
+    ...result,
+    rank,
+    days,
+    collectedAgoMs: fetched.ageMs,
+    truncated: !!fetched.truncated,
+    stale: false,
+  };
+  cacheSet(key, body);
+  return { status: 200, body: { ...body, stale: false, ageMs: 0 } };
+}

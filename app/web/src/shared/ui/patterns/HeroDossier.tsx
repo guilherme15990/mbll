@@ -4,25 +4,25 @@ import { Avatar } from "../primitives/Avatar";
 import { ClassSeal } from "../primitives/ClassSeal";
 import { TierBadge } from "../primitives/TierBadge";
 import { classOf } from "@radar/proprietary-engine";
-import { Activity, ArrowUpRight, FlaskConical, Gem, Hammer, LayoutGrid, LineChart, Radar, Swords, X } from "lucide-react";
-
+import { Hammer, Radar, Swords, X } from "lucide-react";
 interface HeroDossierProps {
   heroId: string | null;
-  activeContextId: "SHR" | "CNF" | "RNK" | "TMP" | "M6" | "DRF" | "BPS" | "BDL" | "EXP";
+  activeContextId: "M6" | "BDL";
   rank: string;
   window: string;
 }
 
 const CONTEXT_LINKS = [
-  { id: "SHR", to: "/forca", label: "Força", icon: LayoutGrid },
-  { id: "CNF", to: "/confianca", label: "Confiança", icon: Gem },
-  { id: "RNK", to: "/ranks", label: "Ranks", icon: Activity },
-  { id: "TMP", to: "/tempo", label: "Tempo", icon: LineChart },
   { id: "M6", to: "/confrontos", label: "Confrontos", icon: Swords },
-  { id: "DRF", to: "/draft", label: "Draft", icon: Radar },
-  { id: "BPS", to: "/blind", label: "Blind Pick", icon: FlaskConical },
+  { id: "DRF", to: "/hero", label: "Draft", icon: Radar },
   { id: "BDL", to: "/builds", label: "Builds", icon: Hammer },
 ];
+
+/** Draft (DRF/BPS) vive só na ficha: a rota aponta para a aba, não para página plana. */
+function contextHref(c: { id: string; to: string }, heroId: string, rank: string, window: string) {
+  if (c.id === "DRF") return `/hero/${heroId}?tab=draft&rank=${rank}&window=${window}`;
+  return `${c.to}?hero=${heroId}&rank=${rank}&window=${window}${c.id === "BDL" ? "&view=hero" : ""}`;
+}
 
 export function HeroDossier({ heroId, activeContextId, rank, window }: HeroDossierProps) {
   const [sp, setSp] = useSearchParams();
@@ -70,7 +70,7 @@ export function HeroDossier({ heroId, activeContextId, rank, window }: HeroDossi
             return (
               <Link
                 key={c.id}
-                to={`${c.to}?hero=${heroId}&rank=${rank}&window=${window}${c.id === "BDL" ? "&view=hero" : ""}`}
+                to={contextHref(c, heroId, rank, window)}
                 className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs transition-all ${
                   isCurrent
                     ? "bg-gold text-abyss font-bold shadow-sm"

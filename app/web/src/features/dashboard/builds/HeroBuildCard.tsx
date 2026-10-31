@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { num, pct, type Hero } from "../../../shared/api";
 import { Avatar, TierBadge } from "../../../shared/ui";
-import { BuildRow } from "./BuildRow";
+import { ReadonlyBuildRow } from "./ReadonlyBuildRow";
 import { LINES_PER_HERO, type BuildCardState } from "./useLaneBuilds";
 
 function HeroIdentity({ hero, position }: { hero: Hero; position: number }) {
@@ -74,7 +74,7 @@ export function HeroBuildCard({ state, position, href }: {
           <ol className="space-y-2" aria-label={`Builds de ${hero.name} nesta rota`}>
             {state.builds.slice(0, LINES_PER_HERO).map((build, i) => (
               <li key={i}>
-                <BuildRow build={build} />
+                <ReadonlyBuildRow build={build} />
               </li>
             ))}
           </ol>

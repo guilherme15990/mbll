@@ -9,8 +9,11 @@
     "noEmit": true,
     "strict": false,
     "skipLibCheck": true,
-    "types": ["node"]
+    "types": ["node"],
+    "paths": {
+      "punycode": ["./types/punycode.d.ts"]
+    }
   },
-  "include": ["src/**/*.js"],
+  "include": ["src/**/*.js", "types/**/*.d.ts"],
   "exclude": ["node_modules", "src/data"]
 }

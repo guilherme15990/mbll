@@ -9,6 +9,13 @@
 // helpers internos que nenhum app consome permanecem sem declaração de propósito
 // (o runtime é a verdade; declarar assinatura não usada só cria drift).
 
+import type {
+  AggregateSupport,
+  BuildsAggregateResponse,
+  DiscoveryStatus,
+  PatternScope,
+} from "@radar/contracts";
+
 // ---- itemsets ----
 export declare const ITEMSET_SCORE_VERSION: "itemset-score-v1";
 export declare const ITEMSET_M_MIN: number;
@@ -51,8 +58,8 @@ export declare function scoreAtomicItemset(u: readonly number[], ctx: HeroItemse
 export declare function scoreRouteItemsets(ctxs: readonly HeroItemsetContext[]): RouteItemset[];
 
 // ---- build-tags ----
-export type BuildTagKey = "popular" | "emergente" | "situacional" | "abaixo-da-ref";
-export type BuildTagTone = "popular" | "edge" | "situ" | "down";
+export type BuildTagKey = "popular" | "emergente" | "situacional";
+export type BuildTagTone = "popular" | "edge" | "situ";
 export interface BuildTag { key: BuildTagKey; label: string; tone: BuildTagTone; title: string }
 export interface BuildTagsInput { pick: number | null; lift_vs_most_used?: number | null }
 export declare function getBuildTags(b: BuildTagsInput): BuildTag[];
@@ -270,6 +277,106 @@ export interface DistortionViewInput {
 export interface DraftPattern { caso: string; leitura: string; ativo: boolean; badgeColor: string; evidence_status: string }
 export declare function getDraftPatterns(d: DistortionViewInput | undefined): DraftPattern[];
 
+// ---- utils: logit ----
+/** Inversa do logit: x (log-odds) → p (0–1). Usada para levar θ̂ à escala de WR. */
+export declare function invLogit(x: number): number;
+
+// ---- draft-score ----
+export declare const DRAFT_SCORE_VERSION: "draft-score-v1";
+export declare const DS_K: number;
+export declare const DS_PRIOR_VAR: number;
+export declare const DS_PAIR_DAMPING: number;
+export declare const DS_OFFLANE_PENALTY_PP: number;
+export declare const DS_FALLBACK_PICK: number;
+export declare const DS_UNIT_STATUS: "pp_hypothesis_strong";
+export interface DraftScorePairObs { id: number; delta?: number | null; [k: string]: unknown }
+export interface DraftScoreBook {
+  countersUp?: readonly DraftScorePairObs[]; countersDown?: readonly DraftScorePairObs[];
+  synergiesUp?: readonly DraftScorePairObs[]; synergiesDown?: readonly DraftScorePairObs[];
+}
+export interface DraftScoreHero {
+  id: number; name?: string | null; head?: string | null;
+  /** WR global (fração 0–1). */
+  win?: number | null;
+  /** WR da lane do recorte (fração 0–1), preferido sobre `win`. */
+  laneWin?: number | null;
+  pick?: number | null; ban?: number | null;
+  lanes?: readonly string[] | null;
+  book?: DraftScoreBook | null;
+  [k: string]: unknown;
+}
+export interface DraftScoreTerm {
+  kind: "synergy" | "matchup";
+  other_id: number; other_name: string | null;
+  present: boolean; contested: boolean;
+  raw_pp: number | null; effect_pp: number; var_pp2: number;
+  exposure_proxy: number; unit_status: typeof DS_UNIT_STATUS;
+}
+export interface DraftScoreBreakdown {
+  base_pp: number; synergy_pp: number; matchup_pp: number; lane_penalty_pp: number;
+  coverage: { observed: number; total: number; ratio: number };
+  terms: readonly DraftScoreTerm[];
+}
+export interface DraftScoreRow {
+  id: number; name: string | null; head: string | null;
+  lane: string | null; lane_fit: boolean | null;
+  /** Delta esperado de WR em pp (unidade-hipótese, não validada). */
+  expected_pp: number; sigma_pp: number;
+  /** `expected_pp - k·sigma_pp - lane_penalty`. Base da ordenação. */
+  lower_bound: number;
+  mu: number; sigma: number;
+  breakdown: DraftScoreBreakdown;
+  reasons: readonly string[];
+  evidence_status: "provisional" | "inconclusive" | "sem-dado";
+  /** Posição relativa do limite inferior no lote (0–100). NUNCA probabilidade. */
+  score: number | null;
+  dominated: boolean; frontier: boolean;
+}
+export interface DraftScoreInput {
+  candidates: readonly DraftScoreHero[];
+  allies?: readonly (DraftScoreHero | number)[];
+  enemies?: readonly (DraftScoreHero | number)[];
+  bans?: readonly number[];
+  lane?: string | null;
+  params?: { k?: number; priorVar?: number; damping?: number; offLanePenaltyPp?: number };
+}
+export interface DraftScoreResult {
+  version: typeof DRAFT_SCORE_VERSION;
+  lane: string | null; k: number; priorVar: number; damping: number;
+  unit_status: typeof DS_UNIT_STATUS;
+  rows: DraftScoreRow[];
+  meta: {
+    n_candidates: number; n_allies: number; n_enemies: number;
+    observed_pairs_total: number; coverage_incomplete: boolean;
+    calibrated: false; note: string;
+  };
+}
+export declare function scoreDraftCandidates(input: DraftScoreInput): DraftScoreResult;
+
+// ---- hero-draft-score ----
+export declare const HERO_DRAFT_SCORE_VERSION: "hero-draft-score-v1";
+export interface HeroDraftScoreHero {
+  id: number | string; name?: string | null; head?: string | null;
+  /** WR do recorte em fração 0–1. */
+  win?: number | null;
+  [k: string]: unknown;
+}
+export interface HeroDraftScoreEntry {
+  id: number; name: string | null; head: string | null;
+  /** Min–max da WR no recorte (0–100): melhor WR = 100, pior WR = 0; `null` sem WR. */
+  draft_score: number | null;
+}
+export interface HeroDraftScoreResult {
+  version: typeof HERO_DRAFT_SCORE_VERSION;
+  rows: HeroDraftScoreEntry[];
+  meta: {
+    n_heroes: number; with_data: number;
+    wr_min: number | null; wr_max: number | null;
+    calibrated: false; note: string;
+  };
+}
+export declare function scoreHeroDraftScore(input?: { heroes?: readonly HeroDraftScoreHero[] }): HeroDraftScoreResult;
+
 // ---- hero-lists ----
 export interface HeroMetric { id: number; wrAdj: number; pick: number; ban: number; [k: string]: unknown }
 export declare function compareById(a: { id?: unknown }, b: { id?: unknown }): number;
@@ -315,14 +422,11 @@ export declare const RUNES_MAX_ROWS: number;
 export declare const VARIANTS_MAX_CORES: number;
 export declare const PRACTICAL_DELTA_PP: number;
 export declare const ARCHETYPE_LABELS: Readonly<Record<string, string>>;
-export interface AggregateSupport {
-  status: "ok" | "insufficient";
-  k: number; m: number; h: number;
-  min: { contexts: number; builds: number; mode: "and" | "or" };
-  reason: string | null;
-}
-export type PatternScope = "cross_hero" | "two_heroes" | "single_hero";
-export type DiscoveryStatus = "consolidated" | "emerging" | "local" | "provisional";
+// Estes três eram declarados aqui E na web (cópia à mão do mesmo DTO). Agora
+// vêm de `@radar/contracts` e são reexportados: um lugar, dois consumidores.
+// `AggregateSupport.min.mode` fica `string` no contrato; o runtime continua
+// emitindo "and"/"or".
+export type { AggregateSupport, PatternScope, DiscoveryStatus };
 export interface AggregateDeltaFields {
   delta_wr_pp_median: number | null;
   delta_wr_pp_unweighted_median: number | null;
@@ -347,12 +451,14 @@ export declare function parseRawBuilds(
 export declare function detectPackages(
   contexts: readonly Record<string, unknown>[], equipment: Record<number, unknown>,
 ): Record<string, unknown>[];
-export interface AggregateBody {
-  /** Metadados da rodada (cache_hit, deadline_ms, prep_ms, ...) — escritos na borda. */
-  context: Record<string, any>;
-  sources: Record<string, any>;
-  [k: string]: any;
-}
+/**
+ * Corpo de `/v1/builds/aggregate`.
+ *
+ * Era `Record<string, any>` aqui e um tipo escrito à mão na web — duas
+ * descrições que podiam divergir sem o `tsc` acusar. Agora é o contrato de
+ * `@radar/contracts`: o motor, a borda da API e a web falam a mesma forma.
+ */
+export type AggregateBody = BuildsAggregateResponse;
 export declare function buildAggregate(input?: Record<string, any>): AggregateBody;
 
 // ---- builds-ordering ----

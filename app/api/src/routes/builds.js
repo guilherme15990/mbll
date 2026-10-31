@@ -4,12 +4,13 @@ import { cacheGet, cacheSet } from "../infra/cacheStore.js";
 import { requireLane, buildLift, buildReferences } from "@radar/proprietary-engine";
 import { isRank, isWindow, WINDOWS } from "../application/validation.js";
 import {
-  AGG_TOP_VALUES, aggCacheKey, withAggCacheMeta,
+  AGG_TOP_ALL, AGG_TOP_VALUES, aggCacheKey, withAggCacheMeta,
   aggBackgroundRevalidate, runBuildsAggregate,
 } from "../application/buildsAggregate.js";
 import { equipmentMap, emblemCatalog } from "../application/catalogs.js";
 
 // GET /builds/aggregate — visão de sistema (B0–B5), 1 lane por carga.
+// `top=all` = profundidade máxima (todos os heróis com dados na lane).
 // population=pro NÃO entra no MVP (fase 2); o recorte é ranked.
 export async function aggregateRoute(sp) {
   const chk = requireLane(sp.get("lane"));
@@ -19,11 +20,13 @@ export async function aggregateRoute(sp) {
   const lane = chk.lane;
   const rank = sp.get("rank") ?? "mythic";
   const window = Number(sp.get("window") ?? 7);
-  const top = sp.get("top") == null ? 10 : Number(sp.get("top"));
+  const topRaw = sp.get("top");
+  const top = topRaw == null ? 10 : topRaw === AGG_TOP_ALL ? AGG_TOP_ALL : Number(topRaw);
   const population = sp.get("population") ?? "ranked";
   if (!isRank(rank)) return { status: 400, body: { error: "rank_invalid", message: "Invalid rank", ranks: RANKS } };
   if (!isWindow(window)) return { status: 400, body: { error: "window_invalid", message: "Invalid window", windows: [...WINDOWS] } };
-  if (!Number.isInteger(top) || !AGG_TOP_VALUES.has(top)) return { status: 400, body: { error: "top_invalid", message: "Invalid top", allowed: [...AGG_TOP_VALUES], hint: "top=10 (deadline 8s) or top=20 (deadline 12s)" } };
+  const topOk = top === AGG_TOP_ALL || (Number.isInteger(top) && AGG_TOP_VALUES.has(top));
+  if (!topOk) return { status: 400, body: { error: "top_invalid", message: "Invalid top", allowed: [...AGG_TOP_VALUES, AGG_TOP_ALL], hint: "top=10, top=20 or top=all (todos os heróis com dados na lane)" } };
   if (population !== "ranked") {
     return { status: 400, body: {
       error: "population_not_supported",
@@ -54,7 +57,7 @@ export async function heroBuildsRoute(sp, id) {
   const chk = requireLane(laneRaw);
   if (chk.ok === false) return { status: 422, body: { error: "lane_required", message: "Lane query param is required", allowed: chk.allowed, hint: "use ?lane=exp|mid|roam|jungle|gold (no silent default)" } };
   const lane = chk.lane;
-  const key = `builds:v4:${id}:${rank}:${lane}`;
+  const key = `builds:v5:${id}:${rank}:${lane}`;
   const hit = cacheGet(key, "C");
   if (hit.hit && !hit.stale) return { status: 200, body: { ...hit.body, stale: false } };
   let raw = null;
@@ -94,6 +97,12 @@ export async function heroBuildsRoute(sp, id) {
     const emblemId = emblemRawId != null && Number.isFinite(Number(emblemRawId)) ? Number(emblemRawId) : null;
     const emblemName = emblemData?.emblemname ?? emblemData?.name ?? null;
     const emblemIcon = emblemData?.attriicon ?? emblemData?.emblemicon ?? null;
+    // Feitiço: a fonte entrega ora plano (data.skillname), ora aninhado (data.__data.skillname).
+    const spellData = b?.battleskill?.data && typeof b.battleskill.data === "object" ? b.battleskill.data : {};
+    const spellInner = spellData.__data && typeof spellData.__data === "object" ? spellData.__data : {};
+    const spellName = spellData.skillname ?? spellInner.skillname ?? null;
+    const spellIcon = spellData.skillicon ?? spellInner.skillicon ?? null;
+    const spell = spellName || spellIcon ? { name: spellName, icon: spellIcon } : null;
     return {
       win: b?.build_win_rate ?? null, pick: b?.build_pick_rate ?? null,
       lift_raw: liftMost.lift_raw, lift_vs_most_used: liftMost.lift_raw, lift_vs_mean: liftMean.lift_raw,
@@ -102,7 +111,7 @@ export async function heroBuildsRoute(sp, id) {
       references: { most_used_win: Number.isFinite(refMost) ? refMost : null, hero_mean_win: Number.isFinite(refMean) ? refMean : null },
       uncertainty_method: null, causal_status: "nao-avaliado",
       exposure_status: "unvalidated", classification_status: liftMost.classification_status,
-      spell: b?.battleskill?.data ? { name: b.battleskill.data.skillname ?? null, icon: b.battleskill.data.skillicon ?? null } : null,
+      spell,
       emblem: emblemId == null && !emblemName
         ? null
         : { id: emblemId, name: emblemName, icon: emblemIcon },

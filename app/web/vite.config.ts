@@ -2,7 +2,7 @@ import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 // O router do backend é zero-dep (só stdlib): roda DENTRO do Vite em dev.
 // Uma porta só (:5173) serve app + /v1/* + /health. Em prod, app/api faz o mesmo.
-import { router } from "../api/src/routes.js";
+import { router } from "../api/src/http/router.js";
 
 /** Monta /v1/* e /health no próprio dev server (sem segundo processo/proxy). */
 function radarApi(): Plugin {

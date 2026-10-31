@@ -135,7 +135,13 @@ export default function Preparar() {
 
   const heroHref = `/hero/${loadout.heroId}?rank=${loadout.rank}&window=${loadout.window}&lane=${loadout.lane}`;
   const flatHref = `/builds?view=hero&hero=${loadout.heroId}&rank=${loadout.rank}&window=${loadout.window}&lane=${loadout.lane}`;
-  const combinerHref = `/builds?view=combiner&hero=${loadout.heroId}&rank=${loadout.rank}&window=${loadout.window}&lane=${loadout.lane}&l=${code ?? ""}`;
+  const buildHref = `/build/${loadout.heroId}?${new URLSearchParams({
+    hero: String(loadout.heroId),
+    rank: loadout.rank,
+    window: loadout.window,
+    lane: loadout.lane,
+    ...(code ? { l: code } : {}),
+  }).toString()}`;
 
   return (
     <section className="space-y-4 animate-fadeIn motion-reduce:animate-none" data-testid="preparar">
@@ -162,8 +168,8 @@ export default function Preparar() {
       ) : null}
 
       <PrimaryAction
-        label="Abrir esta composição no combinador"
-        to={combinerHref}
+        label="Abrir esta composição no quadro de builds"
+        to={buildHref}
       />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">

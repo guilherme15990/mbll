@@ -1,31 +1,30 @@
 import { useSearchParams } from "react-router-dom";
-import { Package, Hammer, FlaskConical, Boxes } from "lucide-react";
+import { Package, Hammer, Boxes } from "lucide-react";
 import { useFilters } from "../../app/filters";
 import { cx } from "../../shared/api";
 import HeroPicker from "../../shared/ui/patterns/HeroPicker";
 import { HeroDossier } from "../../shared/ui/patterns/HeroDossier";
 import BuildsPanel from "./BuildsPanel";
 import BuildsAggregatePanel from "./BuildsAggregatePanel";
-import BuildsCombinerPanel from "./BuildsCombinerPanel";
 import BuildsPowerPanel from "./BuildsPowerPanel";
 
 /**
  * CTX-BDL · rota plana (dona do dado).
  * `view=system` (default): agregado B0–B5 por lane — itens/pacotes, conjuntos,
- * runa e emblemas. `view=combiner`: combinador com índice estimado (ADR-030).
+ * runa e emblemas.
  * `view=power`: builds observadas completas em 6 itens + poder estimado (ADR-030).
  * `view=hero`: painel por herói existente, preservado.
  * A aba "Combinações" foi removida: era o mesmo payload filtrado, duplicando
- * a lista por herói (ADR-028).
+ * a lista por herói (ADR-028). A aba "Combinador" foi removida junto com a
+ * tela; a edição da composição vive no quadro (`/build/:id`, ADR-051).
  */
 export default function Builds() {
   const { rank, window, hero } = useFilters();
   const [sp, setSp] = useSearchParams();
   const viewParam = sp.get("view");
-  const view =
-    viewParam === "hero" ? "hero" : viewParam === "combiner" ? "combiner" : viewParam === "power" ? "power" : "system";
+  const view = viewParam === "hero" ? "hero" : viewParam === "power" ? "power" : "system";
 
-  const setView = (nextView: "system" | "combiner" | "power" | "hero") => {
+  const setView = (nextView: "system" | "power" | "hero") => {
     const next = new URLSearchParams(sp);
     if (nextView === "system") next.delete("view");
     else next.set("view", nextView);
@@ -61,18 +60,6 @@ export default function Builds() {
         <button
           type="button"
           role="tab"
-          aria-selected={view === "combiner"}
-          onClick={() => setView("combiner")}
-          className={cx(
-            "px-3.5 py-2 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all min-h-[40px]",
-            view === "combiner" ? "bg-gold text-abyss shadow-sm" : "text-mist hover:text-foam",
-          )}
-        >
-          <FlaskConical size={14} /> Combinador
-        </button>
-        <button
-          type="button"
-          role="tab"
           aria-selected={view === "power"}
           onClick={() => setView("power")}
           className={cx(
@@ -97,7 +84,6 @@ export default function Builds() {
       </div>
 
       {view === "system" && <BuildsAggregatePanel rank={rank} window={window} />}
-      {view === "combiner" && <BuildsCombinerPanel rank={rank} window={window} />}
       {view === "power" && <BuildsPowerPanel rank={rank} window={window} />}
       {view === "hero" && (
         <BuildsPanel

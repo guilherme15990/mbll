@@ -133,7 +133,7 @@ describe("http: /health e /v1", () => {
       const res = await request(port, "/v1/modules");
       assert.equal(res.status, 200);
       assert.equal(res.headers["cache-control"], "no-store");
-      assert.equal(json(res).data.length, 9);
+      assert.equal(json(res).data.length, 6);
     });
   });
 

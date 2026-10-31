@@ -2,7 +2,8 @@
 import "./support/env.mjs";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { score, scoreLot, lastVerifiedPosterior } from "../src/routes.js";
+import { score, scoreLot } from "../src/application/scoring.js";
+import { lastVerifiedPosterior } from "../src/application/rankLot.js";
 import { classOf } from "@radar/proprietary-engine";
 
 describe("contratos internos Fase 1 (zero-dep)", () => {
@@ -66,7 +67,7 @@ describe("contratos internos Fase 1 (zero-dep)", () => {
     assert.deepEqual(score([{ id: 9, name: "NaN", win: NaN, pick: 0.1, ban: 0.1 }]), []);
   });
   it("query validation: rank/window inválidos rejeitados", async () => {
-    const { router } = await import("../src/routes.js");
+    const { router } = await import("../src/http/router.js");
     const bad = await router("/heroes", new URLSearchParams({ rank: "xyz", window: "7" }));
     assert.equal(bad.status, 400);
     const unk = await router("/nope", new URLSearchParams());
@@ -115,7 +116,7 @@ describe("SnapshotHistory append-only (ADR-021-09, DDD-V4-05)", () => {
   it("violado ENTRA marcado (L2) e some da T5", async () => {
     const { recordSnapshot } = await import("../src/infra/snapshotHistory.js");
     const { assessSeries } = await import("@radar/proprietary-engine");
-    const { router } = await import("../src/routes.js");
+    const { router } = await import("../src/http/router.js");
     const v = recordSnapshot({ fonte: FONTE, rank: "mythic", janela: 7, versao_jogo: "t1", rows: rowsA, status: "violado", motivo: "sigma_pick:0.9" });
     assert.equal(v.status, "violado");
     const listed = await router("/snapshots", new URLSearchParams({ fonte: FONTE }));
@@ -131,7 +132,7 @@ describe("SnapshotHistory append-only (ADR-021-09, DDD-V4-05)", () => {
   });
   it("diff detecta mudança p/ C-105 sem despejar payload", async () => {
     const { recordSnapshot } = await import("../src/infra/snapshotHistory.js");
-    const { router } = await import("../src/routes.js");
+    const { router } = await import("../src/http/router.js");
     const f = `${FONTE}_diff`;
     const b = recordSnapshot({ fonte: f, rank: "mythic", janela: 7, versao_jogo: "t1", rows: rowsA });
     const rowsB = [
@@ -155,7 +156,7 @@ describe("SnapshotHistory append-only (ADR-021-09, DDD-V4-05)", () => {
     assert.equal(missing.status, 404);
   });
   it("history valida envelopes na mão", async () => {
-    const { router } = await import("../src/routes.js");
+    const { router } = await import("../src/http/router.js");
     assert.equal((await router("/snapshots", new URLSearchParams({ rank: "xyz" }))).status, 400);
     assert.equal((await router("/snapshots", new URLSearchParams({ janela: "99" }))).status, 400);
     assert.equal((await router("/snapshots", new URLSearchParams({ fonte: "!!!" }))).status, 400);
@@ -183,7 +184,7 @@ describe("SnapshotHistory append-only (ADR-021-09, DDD-V4-05)", () => {
   });
 });
 
-describe("builds enriquecidos com equipment, emblema e talentos (builds:v4)", () => {
+describe("builds enriquecidos com equipment, emblema, talentos e feitiço (builds:v5)", () => {
   const EQUIP_PAGE1 = { data: { records: [
     { data: { equipid: 101, equipname: "Blade of Despair", equipicon: "https://x/101.png" } },
     { data: { equipid: 102, equipname: "Swift Boots", equipicon: "https://x/102.png" } },
@@ -253,7 +254,7 @@ describe("builds enriquecidos com equipment, emblema e talentos (builds:v4)", ()
   }
 
   it("GET /equipment retorna mapa equipid -> {name, icon} e para na página curta", async () => {
-    const { router } = await import("../src/routes.js");
+    const { router } = await import("../src/http/router.js");
     await evictCache(["equipment"]);
     let equipCalls = 0;
     const restore = mockFetch(async (url) => {
@@ -273,8 +274,8 @@ describe("builds enriquecidos com equipment, emblema e talentos (builds:v4)", ()
     } finally { restore(); }
   });
   it("builds resolve nome/ícone; id desconhecido mantém null", async () => {
-    const { router } = await import("../src/routes.js");
-    await evictCache(["equipment", "emblems:v1", "builds:v4:9101:mythic:mid"]);
+    const { router } = await import("../src/http/router.js");
+    await evictCache(["equipment", "emblems:v1", "builds:v5:9101:mythic:mid"]);
     const restore = mockFetch(async (url) => {
       url = String(url);
       if (url.includes("/api/academy/heroes/9101/builds")) return okJson(buildsPayload([101, 102, 999]));
@@ -295,11 +296,12 @@ describe("builds enriquecidos com equipment, emblema e talentos (builds:v4)", ()
         { id: 999, name: null, tier: null, desc: null, icon: null },
         { id: 9, name: "Lethal", tier: 3, desc: "extra damage", icon: "https://x/t9.png" },
       ]);
+      assert.deepEqual(r.body.data[0].spell, { name: "Flicker", icon: "https://x/flicker.png" });
     } finally { restore(); }
   });
   it("sem equipment (falha) mantém ids com null sem quebrar", async () => {
-    const { router } = await import("../src/routes.js");
-    await evictCache(["equipment", "builds:v4:9102:mythic:mid"]);
+    const { router } = await import("../src/http/router.js");
+    await evictCache(["equipment", "builds:v5:9102:mythic:mid"]);
     const restore = mockFetch(async (url) => {
       url = String(url);
       if (url.includes("/api/academy/heroes/9102/builds")) return okJson(buildsPayload([555, 556]));
@@ -315,9 +317,31 @@ describe("builds enriquecidos com equipment, emblema e talentos (builds:v4)", ()
       ]);
     } finally { restore(); }
   });
-  it("cache da rota builds usa key builds:v4 (não serve corpo velho)", async () => {
-    assert.equal(await cacheHas("builds:v4:9101:mythic:mid"), true);
-    assert.equal(await cacheHas("builds:v2:9101:mythic:mid"), false);
+  it("feitiço aninhado em battleskill.data.__data é lido", async () => {
+    const { router } = await import("../src/http/router.js");
+    await evictCache(["equipment", "emblems:v1", "builds:v5:9103:mythic:mid"]);
+    const nested = { data: { records: [
+      { data: { hero_name: "H", build: [
+        { build_win_rate: 0.5, build_pick_rate: 0.1, equipid: [101],
+          battleskill: { data: { __data: { skillname: "Retribution", skillicon: "https://x/retribution.png" } } } },
+      ] } },
+    ], total: 1 } };
+    const restore = mockFetch(async (url) => {
+      url = String(url);
+      if (url.includes("/api/academy/heroes/9103/builds")) return okJson(nested);
+      if (url.includes("/api/academy/equipment")) return equipPage(url);
+      if (url.includes("/api/academy/emblems")) return okJson(EMBLEM_PAGE);
+      throw new Error(`inesperado: ${url}`);
+    });
+    try {
+      const r = await router("/heroes/9103/builds", new URLSearchParams({ lane: "mid" }));
+      assert.equal(r.status, 200);
+      assert.deepEqual(r.body.data[0].spell, { name: "Retribution", icon: "https://x/retribution.png" });
+    } finally { restore(); }
+  });
+  it("cache da rota builds usa key builds:v5 (não serve corpo velho)", async () => {
+    assert.equal(await cacheHas("builds:v5:9101:mythic:mid"), true);
+    assert.equal(await cacheHas("builds:v4:9101:mythic:mid"), false);
   });
 });
 
@@ -354,7 +378,7 @@ describe("lanes por herói (road_sort_title -> LANES)", () => {
   ], total: 1 } });
 
   it("mapeia títulos reais da fonte (Jungle/Exp Lane/Mid Lane/Roam/Gold Lane)", async () => {
-    const { lanesFromRoadsort } = await import("../src/routes.js");
+    const { lanesFromRoadsort } = await import("../src/application/rankLot.js");
     assert.deepEqual(lanesFromRoadsort([{ data: { road_sort_title: "Jungle" } }]).lanes, ["jungle"]);
     assert.deepEqual(lanesFromRoadsort([{ data: { road_sort_title: "Exp Lane" } }]).lanes, ["exp"]);
     assert.deepEqual(lanesFromRoadsort([{ data: { road_sort_title: "Mid Lane" } }]).lanes, ["mid"]);
@@ -372,7 +396,7 @@ describe("lanes por herói (road_sort_title -> LANES)", () => {
     assert.deepEqual(multi.unknown, []);
   });
   it("título desconhecido -> herói SEM lane (registrado em unknown, nunca inventada)", async () => {
-    const { lanesFromRoadsort } = await import("../src/routes.js");
+    const { lanesFromRoadsort } = await import("../src/application/rankLot.js");
     const r = lanesFromRoadsort([
       { data: { road_sort_title: "Mid Lane" } },
       { data: { road_sort_title: "Super Lane" } },
@@ -382,7 +406,7 @@ describe("lanes por herói (road_sort_title -> LANES)", () => {
     assert.deepEqual(lanesFromRoadsort([{ data: { road_sort_title: "X" } }]).lanes, []);
   });
   it("GET /heroes/lanes agrega por herói via mapConc e responde {data,total,stale,ageMs}", async () => {
-    const { router } = await import("../src/routes.js");
+    const { router } = await import("../src/http/router.js");
     await evictKeys(["lanes:epic", "rank:epic:7"]);
     const rankPayload = { data: { total: 2, records: [
       { data: { main_heroid: 11, main_hero: { data: { name: "H11" } }, main_hero_win_rate: 0.55, main_hero_appearance_rate: 0.1, main_hero_ban_rate: 0.1 } },
@@ -408,7 +432,7 @@ describe("lanes por herói (road_sort_title -> LANES)", () => {
     } finally { restore(); }
   });
   it("falha do upstream -> mapa vazio 200 (lista segue sem filtro, nunca quebra)", async () => {
-    const { router } = await import("../src/routes.js");
+    const { router } = await import("../src/http/router.js");
     await evictKeys(["lanes:honor", "rank:honor:7", "catalog"]);
     const restore = mockFetch(async (url) => { throw new Error(`arena 500 em ${url}`); });
     try {
@@ -497,7 +521,7 @@ describe("walk-forward API ADR-023 (L2-WF-01/04/05)", () => {
   });
 
   it("GET /heroes carimba prior no payload (L2-WF-05, só o carimbo)", async () => {
-    const { router } = await import("../src/routes.js");
+    const { router } = await import("../src/http/router.js");
     function okJson(payload) {
       return { ok: true, status: 200, headers: { get: () => null }, json: async () => payload };
     }
@@ -525,7 +549,7 @@ describe("walk-forward API ADR-023 (L2-WF-01/04/05)", () => {
   });
 
   it("golden do fio: sort default 'd' = ordem θ̂ + casas decimais congeladas (critic-017)", async () => {
-    const { router } = await import("../src/routes.js");
+    const { router } = await import("../src/http/router.js");
     function okJson(payload) {
       return { ok: true, status: 200, headers: { get: () => null }, json: async () => payload };
     }
@@ -584,7 +608,7 @@ describe("walk-forward API ADR-023 (L2-WF-01/04/05)", () => {
   });
 
   it("paginate: sort=d é alias de wrAdj (mutação d→z falha aqui) — R1", async () => {
-    const { paginate } = await import("../src/routes.js");
+    const { paginate } = await import("../src/application/scoring.js");
     // Fixture discriminante: top θ̂ (id 1) ≠ top z (id 2). Sem DB, sem prior.
     const scored = [
       { id: 1, wrAdj: 0.62, z: 2.1 },

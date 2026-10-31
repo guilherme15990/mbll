@@ -10,9 +10,9 @@
  * call sites importam daqui.
  *
  * Por que os hooks não foram para pastas `api/` dentro de cada feature (como a
- * auditoria sugeriu): `app/Sidebar`, `shared/ui/patterns/HeroPicker` e `shared/ui/patterns/HeroDossier`
+ * auditoria sugeriu): `app/HeroFocus`, `shared/ui/patterns/HeroPicker` e `shared/ui/patterns/HeroDossier`
  * consomem `useHero`, `useHeroes`, `useCatalog` e `useMeta`, e as seções de
- * `features/hero-detail` consomem `useBuilds` de builds. Mover os hooks para
+ * `features/builds` consomem `useBuilds` de builds. Mover os hooks para
  * dentro das features violaria duas regras do `tools/check-boundaries.mjs`
  * ("app|shared não importam features" e "features não importam outras
  * features"). A camada de dados é transversal ao produto; o firewall continua
@@ -28,4 +28,5 @@ export * from "./queries/filters";
 export * from "./queries/heroes";
 export * from "./queries/builds";
 export * from "./queries/matchups";
+export * from "./queries/draftScore";
 export * from "./queries/insights";

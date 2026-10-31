@@ -13,7 +13,7 @@ import assert from "node:assert/strict";
 import { installUpstreamMock, HEROES } from "./support/upstream.mjs";
 
 const mock = installUpstreamMock();
-const { router } = await import("../src/routes.js");
+const { router } = await import("../src/http/router.js");
 const { recordSnapshot } = await import("../src/infra/snapshotHistory.js");
 const { resetArenaCircuit } = await import("../src/providers/arena/index.js");
 
@@ -220,6 +220,48 @@ describe("GET /heroes/:id/matchups — counters e sinergias", () => {
   });
 });
 
+// ── /heroes/draft-score ──────────────────────────────────────────────────────
+describe("GET /heroes/draft-score — Draft Score do herói (número único)", () => {
+  it("envelope, uma linha por herói, ordenação pela WR e min–max 0–100 (melhor=100, pior=0)", async () => {
+    const r = await call("/heroes/draft-score", { rank: "mythic", window: "7" });
+    assert.equal(r.status, 200);
+    envelope(r.body, [
+      "version", "rows", "meta", "rank", "days", "collectedAgoMs",
+      "truncated", "stale", "ageMs",
+    ], "/heroes/draft-score");
+    assert.equal(r.body.version, "hero-draft-score-v1");
+    assert.equal(r.body.meta.calibrated, false);
+    assert.equal(r.body.meta.n_heroes, HEROES.length);
+    assert.equal(r.body.meta.with_data, HEROES.length);
+    assert.equal(r.body.rank, "mythic");
+    assert.equal(r.body.days, 7);
+
+    assert.equal(r.body.rows.length, HEROES.length);
+    const top = [...r.body.rows].sort((a, b) => b.draft_score - a.draft_score)[0];
+    assert.equal(top.id, 1, "maior WR ⇒ 100 (Alpha)");
+    assert.equal(top.draft_score, 100, "melhor WR do lote ⇒ 100");
+    const bottom = [...r.body.rows].sort((a, b) => a.draft_score - b.draft_score)[0];
+    assert.equal(bottom.id, 12);
+    assert.equal(bottom.draft_score, 0, "pior WR do lote ⇒ 0");
+
+    for (const row of r.body.rows) {
+      for (const k of ["id", "name", "head", "draft_score"]) assert.ok(k in row, `falta ${k} em ${row.id}`);
+      assert.ok(row.draft_score === null || (row.draft_score >= 0 && row.draft_score <= 100), "draft_score é 0–100 (ou null)");
+    }
+    // Escala min–max do recorte: WR 50% cai no meio da faixa (0.44–0.56) ⇒ 50.
+    assert.equal(r.body.rows.find((x) => x.id === 7).draft_score, 50, "meio da faixa ⇒ 50");
+    // Âncoras da escala expostas no meta (fração 0–1).
+    assert.equal(r.body.meta.wr_min, 0.44);
+    assert.equal(r.body.meta.wr_max, 0.56);
+  });
+
+  it("validação de query: 400 fora de rank/janela conhecidos", async () => {
+    assert.equal((await call("/heroes/draft-score", { rank: "xyz" })).status, 400);
+    assert.equal((await call("/heroes/draft-score", { rank: "mythic", window: "5" })).status, 400);
+    assert.equal((await call("/heroes/draft-score", { rank: "mythic" })).status, 200, "window default = 7");
+  });
+});
+
 // ── /builds/aggregate ────────────────────────────────────────────────────────
 describe("GET /builds/aggregate — visão de sistema", () => {
   it("envelope B0–B5 completo, 200 (partial é corpo, não 206)", async () => {
@@ -250,6 +292,14 @@ describe("GET /builds/aggregate — visão de sistema", () => {
     assert.equal((await call("/builds/aggregate", { lane: "mid", population: "pro" })).status, 400);
     assert.equal((await call("/builds/aggregate", { lane: "mid", top: "50" })).status, 400);
   });
+
+  it("top=all cobre todos os heróis com dados na lane (sem top-N)", async () => {
+    const r = await call("/builds/aggregate", { lane: "mid", rank: "mythic", window: "7", top: "all" });
+    assert.equal(r.status, 200);
+    assert.equal(r.body.context.top, "all");
+    assert.equal(r.body.cells.length, HEROES.length);
+    assert.equal(r.body.coverage.heroes_with_builds, HEROES.length);
+  });
 });
 
 // ── /heroes/:id/builds ───────────────────────────────────────────────────────
@@ -279,34 +329,6 @@ describe("GET /heroes/:id/builds — lifts por build", () => {
 
 // ── módulos derivados (v2) ───────────────────────────────────────────────────
 describe("módulos derivados por herói", () => {
-  it("/confidence — trio CNF com exposição declarada", async () => {
-    const r = await call("/heroes/1/confidence", { rank: "mythic", window: "7" });
-    assert.equal(r.status, 200);
-    for (const k of ["id", "rank", "window", "observed_win", "shrinkage_B", "posterior_mean", "credible_interval_95", "posterior_prob_above_threshold", "c_reference", "uncertainty_status", "exposure", "note"]) {
-      assert.ok(k in r.body, `falta ${k}`);
-    }
-    assert.equal(r.body.exposure.unit, "slot_share");
-    assert.ok(r.body.posterior_prob_above_threshold >= 0 && r.body.posterior_prob_above_threshold <= 1);
-  });
-
-  it("/rank-diff — diferença entre dois elos, nunca causal", async () => {
-    const r = await call("/heroes/1/rank-diff", { a: "mythic", b: "glory", window: "7" });
-    assert.equal(r.status, 200);
-    for (const k of ["id", "a", "b", "window", "thetaA", "thetaB", "seA", "seB", "s_ref", "note"]) assert.ok(k in r.body, `falta ${k}`);
-    assert.equal((await call("/heroes/1/rank-diff", { a: "xyz", b: "glory" })).status, 400);
-  });
-
-  it("/temporal — delta + estado da série (T5)", async () => {
-    const r = await call("/heroes/1/temporal", { rank: "mythic", window: "7", base: "30" });
-    assert.equal(r.status, 200);
-    for (const k of ["id", "rank", "nowW", "baseW", "thetaNow", "thetaBase", "delta", "delta_logit", "interval_95", "temporal_status", "serie", "serie_contrato", "exposure_status"]) {
-      assert.ok(k in r.body, `falta ${k}`);
-    }
-    assert.equal(r.body.nowW, 7);
-    assert.equal(r.body.baseW, 30);
-    assert.ok(["initial", "inconclusive", "persistent"].includes(r.body.temporal_status));
-  });
-
   it("/distortion — pick e ban separados, nunca somados", async () => {
     const r = await call("/heroes/1/distortion", { rank: "mythic", window: "7" });
     assert.equal(r.status, 200);
@@ -397,12 +419,12 @@ describe("GET /snapshots — histórico append-only", () => {
 
 // ── /modules e /meta/status ──────────────────────────────────────────────────
 describe("metadados do sistema", () => {
-  it("/modules — 9 contextos com status e endpoint", async () => {
+  it("/modules — 6 contextos ativos com status e endpoint", async () => {
     const r = await call("/modules");
     assert.equal(r.status, 200);
     envelope(r.body, ["data", "c_reference", "impossibilities"], "/modules");
-    assert.equal(r.body.data.length, 9);
-    assert.deepEqual(r.body.data.map((m) => m.id), ["EXP", "SHR", "CNF", "RNK", "TMP", "M6", "DRF", "BPS", "BDL"]);
+    assert.equal(r.body.data.length, 6);
+    assert.deepEqual(r.body.data.map((m) => m.id), ["EXP", "SHR", "M6", "DRF", "BPS", "BDL"]);
     assert.equal(r.body.c_reference, 1e5);
   });
 

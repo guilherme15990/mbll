@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 // Guardião estático do Build Management (ADR-047).
 //
 // A tela é uma superfície de DECISÃO, não um motor novo. O invariante é:
-// 1. entra na sidebar e tem rota própria (com herói por param ou query);
+// 1. entra no menu horizontal e tem rota própria (com herói por param ou query);
 // 2. reusa os hooks oficiais — sem endpoint, query key ou fetch novos;
 // 3. núcleo/build/sugestão vêm de funções puras testáveis;
 // 4. seleção vive na URL e é limpa quando o recorte muda;
@@ -22,7 +22,7 @@ const check = (name, ok, detail = "") => {
 };
 
 const router = read("src/app/router.tsx");
-const sidebar = read("src/app/Sidebar.tsx");
+const nav = read("src/app/TopNav.tsx");
 const screenPath = "src/features/build-manager/BuildManager.tsx";
 const domainPath = "src/shared/domain/buildManager.ts";
 const screen = exists(screenPath) ? read(screenPath) : "";
@@ -34,8 +34,8 @@ check("chunk lazy da tela", /const BuildManager = lazy\(\(\) => import\("\.\.\/f
 check("rota /build", /<Route path="\/build" element=\{<BuildManager \/>\} \/>/.test(router));
 check("rota /build/:id", /<Route path="\/build\/:id" element=\{<BuildManager \/>\} \/>/.test(router));
 check(
-  "sidebar tem Gerenciar build preservando ?hero=",
-  /getNavUrl\("\/build"\)/.test(sidebar) && sidebar.includes("Gerenciar build") && sidebar.includes("BMS"),
+  "menu horizontal tem Gerenciar build preservando ?hero=",
+  /getNavUrl\("\/build"\)/.test(nav) && nav.includes("Gerenciar build") && nav.includes("BMS"),
 );
 
 // 2. Reuso dos contratos oficiais, sem backend novo.

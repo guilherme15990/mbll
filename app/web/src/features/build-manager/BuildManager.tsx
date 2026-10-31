@@ -486,18 +486,8 @@ export default function BuildManager() {
 
   const currentLoadout = selected ? buildLoadoutFor(pick) : null;
   const prepareHref = currentLoadout ? loadoutHref(currentLoadout) : "";
-  const combinerHref = currentLoadout
-    ? `/builds?${new URLSearchParams({
-        view: "combiner",
-        hero,
-        lane,
-        rank,
-        window,
-        l: encodeLoadout(currentLoadout),
-      }).toString()}`
-    : "";
   const heroHref = `/hero/${hero}?${new URLSearchParams({ tab: "builds", rank, window, lane }).toString()}`;
-  const draftHref = `/draft?${new URLSearchParams({ hero, rank, window, lane }).toString()}`;
+  const draftHref = `/hero/${hero}?${new URLSearchParams({ tab: "draft", rank, window, lane }).toString()}`;
   const matchupsHref = `/confrontos?${new URLSearchParams({ hero, rank, window, lane }).toString()}`;
 
   const pickHero = (id: string) => {
@@ -645,11 +635,11 @@ export default function BuildManager() {
           <SectionTitle
             kicker="Build Management"
             title="Escolha um herói para começar"
-            subtitle="A tela recebe o herói da sidebar ou da URL. Sem herói, nada de build é buscado."
+            subtitle="A tela recebe o herói do cabeçalho (Herói em foco) ou da URL. Sem herói, nada de build é buscado."
           />
           <Empty
             title="Nenhum herói em foco"
-            hint="Selecione um herói abaixo (ou use a busca da sidebar). Depois escolha a lane: o núcleo, as builds e as sugestões mudam com o recorte."
+            hint="Selecione um herói abaixo (ou use a busca do cabeçalho). Depois escolha a lane: o núcleo, as builds e as sugestões mudam com o recorte."
           />
           <HeroPicker hero={null} onPick={pickHero} />
         </>
@@ -929,12 +919,6 @@ export default function BuildManager() {
                           className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gold text-abyss text-sm font-bold hover:bg-gold-light transition-colors min-h-[44px]"
                         >
                           {sameAsBase ? "Levar esta build para a preparação" : "Levar composição editada para a preparação"} →
-                        </Link>
-                        <Link
-                          to={combinerHref || heroHref}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-line bg-panel2 text-xs font-semibold text-mist hover:text-foam transition-colors min-h-[44px]"
-                        >
-                          <Swords size={13} /> Abrir no combinador
                         </Link>
                         <Link
                           to={heroHref}

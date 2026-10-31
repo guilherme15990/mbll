@@ -21,10 +21,8 @@ describe("build-tags: paridade getBuildTags", () => {
     const t = getBuildTags({ pick: 0.03, lift_vs_most_used: 0.021 });
     assert.deepEqual(t.map((x) => x.key), ["situacional"]);
   });
-  it("abaixo-da-ref: lift<-0.02", () => {
-    const t = getBuildTags({ pick: 0.03, lift_vs_most_used: -0.021 });
-    assert.deepEqual(t.map((x) => x.key), ["abaixo-da-ref"]);
-    assert.equal(t[0].tone, "down");
+  it("negativo não gera tag (abaixo-da-ref foi removida)", () => {
+    assert.deepEqual(getBuildTags({ pick: 0.03, lift_vs_most_used: -0.021 }), []);
   });
   it("silêncio no inconclusivo (|lift|≤0.02 ou sem suporte)", () => {
     assert.deepEqual(getBuildTags({ pick: 0.03, lift_vs_most_used: 0.02 }), []);

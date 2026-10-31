@@ -1,39 +1,11 @@
 import { useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { LANES, cx, num, pct, useBuilds, useHeroLanes, type Build } from "../../../shared/api";
+import { LANES, cx, pct, useBuilds, useHeroLanes, type Build } from "../../../shared/api";
 import { BUILD_TAG_CLASS } from "../../../shared/domain/buildLabel";
 import { getBuildTags, orderBuildsByLift, selectBuildsAboveMostUsed } from "@radar/proprietary-engine";
 import { NeedsLane } from "../../../shared/ui/patterns/NeedsRankLane";
-import { forkObservedBuild, loadoutHref } from "../../../shared/domain/loadout";
 import BuildLoadout from "../../../shared/ui/patterns/BuildLoadout";
 import { Empty, ErrBox, Loading } from "../../../shared/ui";
-import { signed } from "../../../shared/format";
-
-function LiftBar({ lift }: { lift: number | null | undefined }) {
-  const has = lift != null && Number.isFinite(lift);
-  const v = has ? (lift as number) : 0;
-  const frac = Math.min(50, (Math.abs(v) / 0.1) * 50);
-  return (
-    <div
-      role="img"
-      aria-label={
-        has
-          ? `lift ${signed(v, 4)} em pontos percentuais vs mais-usada — escala fixa de menos 0,10 a mais 0,10`
-          : "lift sem referência — sem barra"
-      }
-      className="relative h-2 w-full rounded-full bg-abyss border border-line overflow-hidden"
-    >
-      <div className="absolute inset-y-0 left-1/2 w-px bg-mist/50" aria-hidden="true" />
-      {has && (
-        <div
-          aria-hidden="true"
-          className={`absolute inset-y-0 ${v >= 0 ? "left-1/2 bg-emerald-400/80" : "right-1/2 bg-rose-400/80"}`}
-          style={{ width: `${frac}%` }}
-        />
-      )}
-    </div>
-  );
-}
 
 function Kpi({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
   return (
@@ -42,40 +14,6 @@ function Kpi({ label, value, hint }: { label: string; value: React.ReactNode; hi
       <p className="num text-base font-bold text-foam leading-tight">{value}</p>
       {hint && <p className="text-[10px] text-mist/70">{hint}</p>}
     </div>
-  );
-}
-
-/**
- * Fork de build observada (ADR-044).
- *
- * É navegação, não comando: a composição vira URL e nada é gravado. Por isso
- * o invariante "leitura instrumentada, nunca comando de domínio" continua de pé.
- */
-function ForkLink({
-  build,
-  heroId,
-  lane,
-  rank,
-  window,
-}: {
-  build: Build;
-  heroId: string;
-  lane: string;
-  rank: string;
-  window: string;
-}) {
-  const fork = forkObservedBuild({ heroId, lane, rank, window, build });
-  if (!fork.ok) {
-    return <span className="text-[11px] text-mist/70">{fork.error}</span>;
-  }
-  return (
-    <Link
-      to={loadoutHref(fork.loadout)}
-      className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl border border-gold/40 bg-gold/10 text-xs font-bold text-gold-light hover:text-gold hover:border-gold/60 transition-colors min-h-[40px]"
-      aria-label={`Preparar a partir desta build — ${fork.loadout.pick.itemIds.length} itens, contexto de ${lane} e ${rank}`}
-    >
-      Preparar a partir desta build →
-    </Link>
   );
 }
 
@@ -111,16 +49,6 @@ export default function BuildsSection({
   const autoLane = !validLane && heroLanes.length > 0;
   const q = useBuilds(heroId || null, rank, lane ?? "");
 
-  const pickLane = (l: string) => {
-    sp.set("lane", l);
-    setSp(sp);
-    try {
-      localStorage.setItem("radar:lane", l);
-    } catch {
-      /* armazenamento privado */
-    }
-  };
-
   if (!heroId) return <Empty title="Sem herói" hint="Volte à visão geral e escolha um herói." />;
 
   if (!validLane) {
@@ -130,7 +58,7 @@ export default function BuildsSection({
           <p className="lbl">Builds · {rank.toUpperCase()}</p>
           <h2 className="text-lg font-extrabold tracking-tight text-foam">Selecione uma lane</h2>
           <p className="text-xs text-mist leading-relaxed">
-            A lane define a referência usada para comparar as builds. Sem lane, não há lift.
+            A lane define a referência usada para comparar as builds. Sem lane, não há comparação.
           </p>
         </div>
         {autoLane ? (
@@ -181,60 +109,27 @@ export default function BuildsSection({
   const withLift = selectBuildsAboveMostUsed(ordered);
   const refWin = refs?.mostUsed?.win;
   const meanWin = refs?.heroMean;
-  const bestLift = ordered[0]?.lift_vs_most_used;
+  const picks = rows
+    .map((r: Build) => r.pick)
+    .filter((p): p is number => p != null && Number.isFinite(p));
+  const maxPick = picks.length ? Math.max(...picks) : null;
   const laneLabel = lane?.toUpperCase() ?? "—";
 
   return (
     <section className="space-y-4 animate-fadeIn motion-reduce:animate-none" aria-label="Builds do herói">
-      <header className="flex items-end justify-between gap-4 flex-wrap">
-        <div className="space-y-1">
-          <p className="lbl">Builds · {laneLabel} · {rank.toUpperCase()} · janela {window}d</p>
-          <h2 className="text-xl font-extrabold tracking-tight text-foam">Builds na {laneLabel}</h2>
-          <p className="text-xs text-mist">
-            {ordered.length
-              ? `${ordered.length} builds catalogadas · ${withLift.length} acima da referência`
-              : "Nenhuma build catalogada nesta rota"}
-          </p>
-        </div>
-        <span className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-line bg-panel2 text-mist">
-          Lane {laneLabel} · {rank.toUpperCase()}
-        </span>
+      <header>
+        <h2 className="text-xl font-extrabold tracking-tight text-foam">Builds na {laneLabel}</h2>
       </header>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
         <Kpi
           label="Acima da referência"
           value={ordered.length ? `${withLift.length}/${ordered.length}` : "—"}
-          hint="builds com lift positivo"
+          hint="builds que vencem mais que o normal"
         />
         <Kpi label="Ref. mais usada" value={pct(refWin)} hint="win rate da referência" />
         <Kpi label="Média do herói" value={pct(meanWin)} hint="win rate na lane e elo" />
-        <Kpi
-          label="Maior lift"
-          value={bestLift != null && Number.isFinite(bestLift) ? signed(bestLift, 4) : "—"}
-          hint="vs build mais usada"
-        />
-      </div>
-
-      <div className="rounded-2xl border border-line bg-panel px-3 py-2.5 flex items-center gap-3 flex-wrap">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-mist">Lane</span>
-        <div className="flex items-center gap-1.5 flex-wrap" role="group" aria-label="Escolha a lane">
-          {LANES.map((l) => (
-            <button
-              key={l}
-              onClick={() => pickLane(l)}
-              aria-pressed={lane === l}
-              className={cx(
-                "px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase transition-colors min-h-[44px] md:min-h-[36px]",
-                lane === l
-                  ? "bg-gold text-abyss"
-                  : "text-mist hover:text-foam hover:bg-panel2",
-              )}
-            >
-              {l}
-            </button>
-          ))}
-        </div>
+        <Kpi label="Maior pick" value={pct(maxPick)} hint="pick mais alto observado" />
       </div>
 
       <div id="prova-builds" className="space-y-3 scroll-mt-4">
@@ -247,12 +142,13 @@ export default function BuildsSection({
           ordered.map((b: Build, i: number) => {
             const tags = getBuildTags(b);
             const lift = b.lift_vs_most_used;
-            const liftOk = lift != null && Number.isFinite(lift);
+            const liftOk = lift != null && Number.isFinite(lift) && lift !== 0;
+            const positive = liftOk && (lift as number) > 0;
             return (
               <article key={i} className="rounded-2xl border border-line bg-panel overflow-hidden">
                 <div className="p-4 space-y-4">
                   <div className="flex items-start justify-between gap-3 flex-wrap">
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 flex-wrap">
                       <span
                         className={cx(
                           "grid h-8 w-8 place-items-center rounded-lg border text-xs font-bold",
@@ -260,7 +156,7 @@ export default function BuildsSection({
                             ? "bg-gold/10 text-gold border-gold/30"
                             : "bg-panel2 text-mist border-line",
                         )}
-                        aria-label={`posição ${i + 1} por lift`}
+                        aria-label={`posição ${i + 1}`}
                       >
                         {i + 1}
                       </span>
@@ -272,13 +168,6 @@ export default function BuildsSection({
                         <p className="text-[11px] text-mist">Pick</p>
                         <p className="num text-sm font-semibold text-foam">{pct(b.pick, 2)}</p>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {i === 0 && (
-                        <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border border-gold/30 bg-gold/10 text-gold">
-                          Maior lift
-                        </span>
-                      )}
                       {tags.map((t) => (
                         <span
                           key={t.key}
@@ -289,61 +178,20 @@ export default function BuildsSection({
                         </span>
                       ))}
                     </div>
-                  </div>
-
-                  <div className="space-y-1.5 min-w-0">
-                    <div className="flex items-center justify-between gap-2 text-[11px]">
-                      <span className="text-mist">Lift vs mais usada</span>
-                      <span
-                        className={cx(
-                          "num font-bold",
-                          !liftOk ? "text-mist" : (lift as number) >= 0 ? "text-emerald-300" : "text-rose-300",
-                        )}
-                      >
-                        {liftOk ? signed(lift as number, 4) : "—"}
+                    {liftOk && (
+                      <span className={cx("text-[11px] font-semibold", positive ? "text-emerald-300" : "text-rose-300")}>
+                        {positive ? "▲ Vence mais que o normal" : "▼ Vence menos que o normal"}
                       </span>
-                    </div>
-                    <LiftBar lift={lift} />
-                    <div className="flex items-center justify-between gap-2 text-[11px] text-mist">
-                      <span>
-                        vs média{" "}
-                        <b className="text-foam font-semibold">
-                          {b.lift_vs_mean != null && Number.isFinite(b.lift_vs_mean) ? num(b.lift_vs_mean, 4) : "—"}
-                        </b>
-                      </span>
-                      <span>ref {pct(b.reference_win ?? refWin)}</span>
-                    </div>
+                    )}
                   </div>
 
                   <BuildLoadout build={b} />
-
-                  <div className="flex items-center justify-end gap-2 flex-wrap pt-1 border-t border-line/60">
-                    <ForkLink
-                      build={b}
-                      heroId={heroId}
-                      lane={lane ?? ""}
-                      rank={rank}
-                      window={window}
-                    />
-                  </div>
                 </div>
               </article>
             );
           })
         )}
       </div>
-
-      <footer className="flex items-center justify-between gap-3 flex-wrap pt-1">
-        <p className="text-[11px] text-mist leading-relaxed max-w-xl">
-          Lift = win da build − win da referência. Sem referência, o valor fica em aberto — nunca 0.
-        </p>
-        <Link
-          to={`/builds?view=hero&hero=${heroId}&rank=${rank}&window=${window}&lane=${lane}`}
-          className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gold text-abyss text-sm font-bold hover:bg-gold-light transition-colors min-h-[44px]"
-        >
-          Abrir builds na rota plana →
-        </Link>
-      </footer>
     </section>
   );
 }

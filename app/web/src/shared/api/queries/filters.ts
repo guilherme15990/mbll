@@ -2,7 +2,7 @@
  * Vocabulário de filtros/ordenação compartilhado por quase toda a web.
  *
  * `GRID_SERVER_SORT` é o mapeamento honesto grade → sorts reais do backend
- * (`routes.js` qHeroes: sort=d|win|pick|ban|q). `sort=win` ordena por wrAdj
+ * (`application/scoring.js` qHeroes: sort=d|win|pick|ban|q). `sort=win` ordena por wrAdj
  * (θ̂); `sort=pick` por pick; `sort=ban` por qBan (posto monotônico do ban —
  * mesma ordem do ban bruto). `win` observado e `nome` NÃO têm sort no servidor
  * (string vazia = ordenação local, só na página atual).

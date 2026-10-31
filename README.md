@@ -27,14 +27,14 @@ app/api/src
   http/          servidor, router, estáticos, erros, log (sem regra de negócio)
   routes/        handlers verticais por contexto (fio HTTP)
   application/   coleta, pontuação, catálogos, agregados (sem HTTP)
-  infra/         arena, cache, snapshot history, config, db
+  infra/         cache, snapshot history, config, db
+  providers/     clientes externos (arena), contratos e logging
 
 app/web/src
   App.tsx        shell (header, sidebar, footer)
   app/           shell e infra de UI (router, providers, filters, ErrorBoundary, Sidebar)
   features/      um diretório por contexto (EN/kebab): dashboard, hero-list,
-                 hero-detail, strength, confidence, ranks, temporal, matchups,
-                 draft, blind, builds, exposure
+                 hero-detail, matchups, builds, build-manager, loadout
   shared/        reuso sem dono de contexto
     format.ts    formatação numérica defensiva (fonte única)
     api/         transporte + dados: http, errors, queries/<domínio>
@@ -64,6 +64,10 @@ se qualquer regra quebrar.
 npm install                 # monorepo (workspaces)
 npm run dev                 # :5173 — web + /v1 no mesmo processo (Vite plugin)
 ```
+
+Gerenciador único: **npm** (`package-lock.json`, lockfile v3). O
+`pnpm-workspace.yaml` herdado do bootstrap foi removido em 2026-10-27, e o gate
+falha se um segundo manifesto de gerenciador reaparecer.
 
 API isolada (para consumir `/v1` sem o front):
 
@@ -132,14 +136,11 @@ fallback silencioso (`app/api/src/infra/config.js`).
 | `/health` | liveness (fora de `/v1`) |
 | `/v1/heroes?rank=&window=&class=&sort=&order=&size=&index=` | lote pontuado + `meta`, `pickSumCheck`, `prior` |
 | `/v1/heroes/:id` | herói + trends 30d + meta do lote |
-| `/v1/heroes/:id/confidence` | trio posterior/IC/probabilidade (provisório) |
-| `/v1/heroes/:id/rank-diff?a=&b=` | diferença ajustada entre ranks |
-| `/v1/heroes/:id/temporal?window=&base=` | delta temporal + avaliação da série |
 | `/v1/heroes/:id/distortion` | resíduos de pick/ban (nunca somados) |
 | `/v1/heroes/:id/matchups` | counters/sinergias (δ do par) |
 | `/v1/heroes/:id/blind` | proxy de blind pick (p10 adverso) |
 | `/v1/heroes/:id/builds?lane=` | builds + lift (422 sem lane) |
-| `/v1/builds/aggregate?lane=&rank=&window=&top=` | agregado de sistema B0–B5 |
+| `/v1/builds/aggregate?lane=&rank=&window=&top=` | agregado de sistema B0–B5 (`top=10\|20\|all`) |
 | `/v1/views/:view` | recortes (semana/elo/tier) |
 | `/v1/gems` | joias (q baixo, força alta, pick/ban baixos) |
 | `/v1/catalog`, `/v1/equipment`, `/v1/heroes/lanes` | catálogos e lanes |

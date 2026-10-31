@@ -341,7 +341,7 @@ Quando não há variante de core, usar o lift por contexto (4.2).
 | Item/pacote | `adoption` (share de builds) | `lift_item` | 5% / 2 pp | **Não** chamar de pick; eixo é frequência de construção |
 | Conjunto | `k` (heróis) | `lift_set` | k≥2, 2 pp | Cobertura primeiro |
 
-Tags existentes (`popular`, `emergente`, `situacional`, `abaixo da ref`) valem para build. Para item/pacote, usar as mesmas palavras com o rótulo "frequência" e **silêncio** quando `|lift| ≤ 2 pp` (exceto `emergente`: `pick < 2%` e `lift > 1,5 pp`).
+Tags existentes (`popular`, `emergente`, `situacional`) valem para build. Para item/pacote, usar as mesmas palavras com o rótulo "frequência" e **silêncio** quando `|lift| ≤ 2 pp` (exceto `emergente`: `pick < 2%` e `lift > 1,5 pp`).
 
 ### 4.8 Variantes do mesmo core vs core diferente
 

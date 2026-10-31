@@ -9,7 +9,7 @@ export const THRESHOLDS_VERSION = "thresholds-v1";
 
 // Relevância prática mínima p/ diferença de win rate / δ em logit (proporção
 // 0–1, nunca %): abaixo disso o sinal é ruído. Donos consumidores: build-tags
-// (situacional/abaixo-da-ref), build-quadrant (alta), tempo-signal
+// (situacional), build-quadrant (alta), tempo-signal
 // (trendDirectionOf), rank-profile (default de Δr), lane-timing (movimento).
 export const PRACTICAL_DELTA = 0.02;
 

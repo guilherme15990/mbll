@@ -44,13 +44,6 @@ export function getBuildTags(b) {
       tone: "situ",
       title: "Vantagem observada neste contexto de rota/rank. Não generalizar para qualquer partida.",
     });
-  } else if (liftOk && l < -PRACTICAL_DELTA) {
-    tags.push({
-      key: "abaixo-da-ref",
-      label: "abaixo da ref",
-      tone: "down",
-      title: "Desempenho abaixo da referência padrão; pode refletir uso defensivo em partidas desfavoráveis.",
-    });
   }
   return tags;
 }

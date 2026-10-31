@@ -36,8 +36,8 @@ check("mesma key do hook (api única)", /\["matchups",\s*id,\s*rank,\s*days\]/.t
 
 // 2 — honestidade e copy sem antropomorfismo/causalidade.
 check("sem Teme/ama na capa", !/Teme|·\s*ama/.test(hero));
-check("capa declara associação, não probabilidade", /n.o probabilidade/.test(preview));
-check("par ausente nunca vira 0", /nunca 0/.test(preview));
+check("átomos declaram associação, não probabilidade", /n.o probabilidade/.test(atoms));
+check("δ ausente não vira 0 (só pares finitos)", /hasFiniteDelta/.test(preview));
 check("δ do par em 3 casas (sem 4 casas)", !/num\([^)]*delta[^)]*,\s*4\)/.test(hero + preview));
 
 // 3 — átomos compartilhados, sem tone map/DeltaChip duplicados.

@@ -4,10 +4,11 @@ import assert from "node:assert/strict";
 // Cache em memória: o teste não deve gravar um corpo sintético no SQLite local.
 process.env.SQLITE_CACHE = "off";
 const { cacheSet } = await import("../src/infra/cacheStore.js");
-const { router, aggCacheKey } = await import("../src/routes.js");
+const { router } = await import("../src/http/router.js");
+const { aggCacheKey } = await import("../src/application/buildsAggregate.js");
 
 describe("validação da rota de agregado sem tocar no upstream", () => {
-  it("lane obrigatória, population=pro fora do MVP, top só 10/20", async () => {
+  it("lane obrigatória, population=pro fora do MVP, top só 10/20/all", async () => {
     assert.equal((await router("/builds/aggregate", new URLSearchParams())).status, 422);
     const pro = await router("/builds/aggregate", new URLSearchParams({ lane: "gold", population: "pro" }));
     assert.equal(pro.status, 400);
@@ -15,6 +16,14 @@ describe("validação da rota de agregado sem tocar no upstream", () => {
     assert.equal((await router("/builds/aggregate", new URLSearchParams({ lane: "gold", top: "50" }))).status, 400);
     assert.equal((await router("/builds/aggregate", new URLSearchParams({ lane: "gold", rank: "xyz" }))).status, 400);
     assert.equal((await router("/builds/aggregate", new URLSearchParams({ lane: "gold", window: "2" }))).status, 400);
+  });
+
+  it("top=all é aceito (profundidade máxima) e serve do cache", async () => {
+    const key = aggCacheKey({ rank: "mythic", lane: "gold", top: "all", population: "ranked", window: 7 });
+    cacheSet(key, { context: { rank: "mythic", lane: "gold", window: 7, top: "all", population: "ranked" }, sources: {}, cells: [] });
+    const res = await router("/builds/aggregate", new URLSearchParams({ lane: "gold", rank: "mythic", top: "all" }));
+    assert.equal(res.status, 200);
+    assert.equal(res.body.context.top, "all");
   });
 
   it("corpo parcial em cache responde 200 + partial=true (não 206)", async () => {

@@ -162,7 +162,7 @@
  * @property {Array<number | string>} [rune_skill]
  * @property {number | string | null} [runeid]
  * @property {{ data?: ArenaBuildEmblem }} [emblem]
- * @property {{ data?: { skillname?: string | null, skillicon?: string | null } }} [battleskill]
+ * @property {{ data?: { skillname?: string | null, skillicon?: string | null, __data?: { skillname?: string | null, skillicon?: string | null } } }} [battleskill]
  */
 
 /**

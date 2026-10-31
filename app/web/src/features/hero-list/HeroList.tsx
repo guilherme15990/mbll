@@ -2,16 +2,17 @@ import { Link, useSearchParams } from "react-router-dom";
 import { num, useHeroLanes, useHeroes } from "../../shared/api";
 import { useFilters, withLanes } from "../../app/filters";
 import HeroPicker from "../../shared/ui/patterns/HeroPicker";
-import { PrimaryAction } from "../../shared/ui/patterns/PrimaryAction";
 import {
-  Avatar, CtxBar, Empty, ErrBox,
+  Avatar, Empty, ErrBox,
   Loading, SectionTitle, TierBadge,
 } from "../../shared/ui";
 
 /**
  * /hero — lista de entrada (nível entrada).
- * Busca via HeroPicker + cartões (Avatar+nome+tier+θ̂) → /hero/:id (home).
- * A tabela analítica segue em /forca (nada duplicado aqui, nada removido de lá).
+ * Busca via HeroPicker + cartões (Avatar+nome+tier+θ̂) → ficha /hero/:id.
+ *
+ * Sem faixa de contexto (CtxBar), sem cartão de ação primária, sem legenda de
+ * rota e sem atalhos de PRD (ADR-055): a página é a busca + a grade de heróis.
  */
 export default function HeroList() {
   const { rank, window, hero, lanes } = useFilters();
@@ -38,34 +39,13 @@ export default function HeroList() {
   const shown = filtering
     ? heroes.filter((h) => (lanesMap[h.id] ?? []).some((l) => lanes.includes(l)))
     : heroes;
-  const fichaTo = hero
-    ? withLanes(`/hero/${hero}?rank=${rank}&window=${window}`, lanes)
-    : "/hero";
 
   return (
     <section className="space-y-5" aria-label="Lista de heróis">
-      <CtxBar
-        id="SHR"
-        name="Entrada de heróis"
-        question="Qual herói abrir na ficha?"
-        status="provisório (entrada)"
-        prdRef="Nível entrada · análise em /forca"
-      />
-
-      <SectionTitle
-        kicker="Entrada"
-        title="Heróis"
-        subtitle="Busque e abra a ficha. A leitura analítica por faixa segue na tabela de /forca."
-      />
-
-      <PrimaryAction
-        label="Abrir a Ficha do Herói"
-        to={fichaTo}
-        disabledReason={!hero ? "selecione um herói abaixo para abrir a ficha" : null}
-      />
+      <SectionTitle kicker="Entrada" title="Heróis" />
 
       <div>
-        <HeroPicker hero={hero || null} onPick={pickHero} />
+        <HeroPicker hero={hero || null} onPick={pickHero} showPrdSuggestions={false} />
       </div>
 
       {lanes.length > 0 && !lanesReady ? (
@@ -73,10 +53,6 @@ export default function HeroList() {
           {lanesQuery.isLoading
             ? `carregando mapa de rotas… (${lanes.join(" + ")})`
             : `mapa de rotas indisponível — lista sem filtro de rota (${lanes.join(" + ")})`}
-        </p>
-      ) : filtering ? (
-        <p className="text-[11px] text-mist" role="note">
-          filtro global de rota {lanes.join(" + ")} (topo) · {shown.length} de {heroes.length} heróis
         </p>
       ) : null}
 

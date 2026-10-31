@@ -163,8 +163,6 @@ export default function ConfrontosPreview({
   const favorCount = (m?.countersUp?.length ?? 0) + (m?.synergiesUp?.length ?? 0);
   const totalPairs = threatCount + favorCount;
   const hasPairs = totalPairs > 0;
-  const rankLabel = needsRank ? "sem elo" : `elo ${rank.toUpperCase()}`;
-
   return (
     <section
       data-testid="hero-confrontos-preview"
@@ -178,10 +176,6 @@ export default function ConfrontosPreview({
             <Swords size={15} aria-hidden="true" />
           </span>
           <div className="min-w-0">
-            <p className="lbl">
-              Confrontos · {rankLabel} · janela {days}d
-              {!q.isLoading && !q.isError && totalPairs > 0 ? ` · ${totalPairs} pares` : ""}
-            </p>
             <h2 className="text-sm md:text-base font-bold tracking-tight text-foam">
               Pior contra · melhor com
             </h2>
@@ -301,10 +295,6 @@ export default function ConfrontosPreview({
               ) : null}
             </SideColumn>
           </div>
-
-          <p className="text-[11px] text-mist/80 leading-relaxed">
-            δ = associação do par, não probabilidade; não somar entre inimigos. Par ausente = desconhecido, nunca 0.
-          </p>
         </>
       )}
     </section>

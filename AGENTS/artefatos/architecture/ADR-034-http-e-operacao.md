@@ -108,6 +108,9 @@ Range/streaming); `startServer`/sinais são cobertos por smoke de runtime, não 
    relativo (trade-off: rodar sem `npm install`) na F3/F5.
 4. **Dois gerenciadores**: `pnpm-workspace.yaml` + `workspaces` npm + `package-lock.json`.
    Padronizar npm e remover o arquivo pnpm.
+   → **Resolvido em 2026-10-27**: `pnpm-workspace.yaml` removido; `packageManager: npm@11.12.1`
+   no `package.json` raiz; o gate falha se `pnpm-*`, `yarn.lock`, `.yarnrc.yml` ou `bun.lock*`
+   reaparecerem. O bootstrap lean (`tools/bootstrap-web.ps1`) não usa pnpm e não foi afetado.
 5. **Web**: `.old/` versionado e `pages/` como depósito de features — F4a.
    → **Resolvido na F4a** (ADR-036): `.old/`, `DddModal`, `ExportEvidence` e
    `heroSeal` removidos; ciclo `página → App` morto; rotas lazy e boundary.

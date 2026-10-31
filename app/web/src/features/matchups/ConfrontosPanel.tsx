@@ -148,7 +148,7 @@ export default function ConfrontosPanel({ rank, window, hero, dossier, picker }:
 
       <PrimaryAction
         label="Levar par p/ o draft"
-        to={`/draft?hero=${hero}&rank=${rank}&window=${window}`}
+        to={`/hero/${hero}?tab=draft&rank=${rank}&window=${window}`}
         disabledReason={!hero ? "selecione um par" : null}
       />
 

@@ -1,7 +1,6 @@
 // Agregado de builds (sistema) — B0–B5.
-// Cache derivado C 24 h + SWR. Fan-out limitado: 4 catálogos + páginas de rank
-// + 1 request por herói do top-N (máx. 20). Computações serializadas para não
-// somar rajadas de lanes/ranks diferentes.
+// Cache derivado C 24 h + SWR. Fan-out: 4 catálogos + páginas de rank + 1 request
+// por herói do recorte (`top=10|20` ou `top=all`). Computações serializadas.
 import {
   getPositions, getExpandedEquipment, getEmblems, getSpells, getHeroBuilds, mapConc,
 } from "../providers/arena/index.js";
@@ -19,6 +18,7 @@ import {
 } from "@radar/proprietary-engine";
 
 export const AGG_TOP_VALUES = new Set([10, 20]);
+export const AGG_TOP_ALL = "all";
 const AGG_INTERACTIVE_LIMIT = 30;
 /** @type {Promise<any>} */
 let aggChain = Promise.resolve();
@@ -81,7 +81,7 @@ async function aggRankRows(rank, window, top) {
   try {
     const f = await fetchRankAll({
       days: window, rank, retries: 1,
-      timeoutMs: top <= 10 ? 6000 : 9000,
+      timeoutMs: top === AGG_TOP_ALL ? 9000 : top <= 10 ? 6000 : 9000,
     });
     const { scored } = scoreLot(f.rows, { prior: f.prior ?? null, gameVersion: f.gameVersion ?? null });
     return {
@@ -167,8 +167,8 @@ async function computeBuildsAggregate({ rank, lane, window, top, population }) {
   // Deadline é da FASE DE BUILDS, não da carga inteira. Prep fria (positions + rank
   // + catálogos) pode passar de 6 s; se o deadline nascer no request, todo o
   // fan-out de builds nasce vencido e a página vira 200 com partial=true e 10 células em erro.
-  const perReqTimeout = top <= 10 ? 7000 : 9000;
-  const buildDeadlineMs = top <= 10 ? 6000 : 9000;
+  const perReqTimeout = top === AGG_TOP_ALL ? 12000 : top <= 10 ? 7000 : 9000;
+  const buildDeadlineMs = top === AGG_TOP_ALL ? 30000 : top <= 10 ? 6000 : 9000;
   const requests = { positions: 0, rank: 0, equipment: 0, emblems: 0, spells: 0, builds: 0 };
   const cacheHits = { positions: 0, rank: 0, equipment: 0, emblems: 0, spells: 0, builds: 0 };
 
@@ -208,7 +208,7 @@ async function computeBuildsAggregate({ rank, lane, window, top, population }) {
     ((b.z ?? -Infinity) - (a.z ?? -Infinity)) ||
     a.id - b.id
   );
-  const roster = ranked.slice(0, top);
+  const roster = top === AGG_TOP_ALL ? ranked : ranked.slice(0, top);
 
   const prepMs = Date.now() - startedAt;
   const buildStartedAt = Date.now();
@@ -288,7 +288,7 @@ async function computeBuildsAggregate({ rank, lane, window, top, population }) {
       cold_budget: 4 + 3 + roster.length,
     },
     budget: {
-      depth: top <= 10 ? "top10" : "top20",
+      depth: top === AGG_TOP_ALL ? "all" : top <= 10 ? "top10" : "top20",
       deadline_ms: buildDeadlineMs,
       deadline_scope: "build_phase",
       prep_ms: prepMs,
@@ -306,13 +306,17 @@ async function computeBuildsAggregate({ rank, lane, window, top, population }) {
       spells: sp?.source ?? "error",
     },
     notes: [
-      "Custo frio = 4 catálogos + páginas de rank + 1 request por herói do top-N.",
+      top === AGG_TOP_ALL ? "Profundidade máxima: 1 request por herói com dados na lane (sem top-N)." : "Custo frio = 4 catálogos + páginas de rank + 1 request por herói do top-N.",
       "Cache derivado C 24 h; quente = 0 requests.",
-      "Deadline de 6 s (top-10) / 9 s (top-20) vale só para o fan-out de builds; prep não o consome.",
+      "Deadline do fan-out de builds = 6 s (top-10) / 9 s (top-20) / 30 s (all); prep não o consome.",
       "window afeta apenas a ordem dos heróis; builds não têm janela na fonte.",
     ],
   };
 
+  // Contrato único: `@radar/contracts` define o corpo; o motor declara
+  // `buildAggregate()` com esse tipo e a web importa o mesmo nome. A borda só
+  // acrescenta os metadados de rodada (cache/deadline) abaixo.
+  /** @type {import("@radar/contracts").BuildsAggregateResponse} */
   const body = buildAggregate({
     lane, rank, window, top, population,
     contexts,

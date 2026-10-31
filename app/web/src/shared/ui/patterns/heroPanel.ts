@@ -1,8 +1,7 @@
 // Contrato dos painéis de contexto por herói (F4b).
 //
-// `ForcaPanel` é o painel genérico (tabela + dossier + picker) e `HeroPanelProps`
-// é usado por todos os painéis de features diferentes. O tipo mora em `shared/`
-// para que `features/blind` não dependa de `features/forca`.
+// `HeroPanelProps` é usado pelos painéis de rotas planas (Confrontos, Builds). O
+// tipo mora em `shared/` para que uma feature não dependa de outra (ADR-037).
 import type { ReactNode } from "react";
 
 export interface HeroPanelProps {

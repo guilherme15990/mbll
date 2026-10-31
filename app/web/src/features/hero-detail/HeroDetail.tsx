@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
-  Activity, BarChart3, Clock, Crosshair, Hammer, LayoutDashboard, ShieldCheck, Swords, TriangleAlert, UserSearch,
+  Crosshair, Hammer, LayoutDashboard, Swords, TriangleAlert, UserSearch,
 } from "lucide-react";
 import { LANES, num, pct, useBlind, useBuilds, useCatalog, useDistortion, useHero, useHeroLanes } from "../../shared/api";
 import { BUILD_TAG_CLASS } from "../../shared/domain/buildLabel";
@@ -14,20 +14,15 @@ import {
   Avatar, Empty, ErrBox, TierBadge,
 } from "../../shared/ui";
 import { selectTopBuildsByLift } from "@radar/proprietary-engine";
-import { verdictShort } from "@radar/proprietary-engine";
 import ConfrontosSection from "./sections/ConfrontosSection";
 import ConfrontosPreview from "./sections/ConfrontosPreview";
 import DraftSection from "./sections/DraftSection";
 import BuildsSection from "./sections/BuildsSection";
-import ForcaSection from "./sections/ForcaSection";
-import ConfiancaSection from "./sections/ConfiancaSection";
-import RanksSection from "./sections/RanksSection";
-import TempoSection from "./sections/TempoSection";
 
-type HeroContextId = "SHR" | "CNF" | "RNK" | "TMP" | "M6" | "DRF" | "BPS" | "BDL";
+type HeroContextId = "M6" | "DRF" | "BPS" | "BDL";
 
 /**
- * Ordem de decisão: home → confrontos → draft (picks + pressão) → builds → fundamento.
+ * Ordem de decisão: home → confrontos → draft (picks + pressão) → builds.
  * Cada aba tem um Contexto de Interface fixo, repetido em toda a ficha.
  */
 const HERO_TABS: { slug: string; label: string; contextId: HeroContextId; icon: ReactNode }[] = [
@@ -35,10 +30,6 @@ const HERO_TABS: { slug: string; label: string; contextId: HeroContextId; icon: 
   { slug: "confrontos", label: "Confrontos", contextId: "M6", icon: <Swords size={13} aria-hidden="true" /> },
   { slug: "draft", label: "Draft", contextId: "DRF", icon: <Crosshair size={13} aria-hidden="true" /> },
   { slug: "builds", label: "Builds", contextId: "BDL", icon: <Hammer size={13} aria-hidden="true" /> },
-  { slug: "forca", label: "Força", contextId: "SHR", icon: <Activity size={13} aria-hidden="true" /> },
-  { slug: "confianca", label: "Confiança", contextId: "CNF", icon: <ShieldCheck size={13} aria-hidden="true" /> },
-  { slug: "ranks", label: "Ranks", contextId: "RNK", icon: <BarChart3 size={13} aria-hidden="true" /> },
-  { slug: "tempo", label: "Tempo", contextId: "TMP", icon: <Clock size={13} aria-hidden="true" /> },
 ];
 
 const TAB_SLUGS = HERO_TABS.map((t) => t.slug);
@@ -319,12 +310,10 @@ export default function HeroDetail() {
                   <HeroMetric label="Shrinkage B" value={num(h.B, 2)} hint="peso do dado" />
                 </dl>
                 <div className="mt-2 flex items-start justify-between gap-2 flex-wrap">
-                  <p className="text-[11px] text-mist/80">{verdictShort(h)}</p>
                   {escasso && (
                     <p className="text-[11px] text-amber-200 flex items-center gap-1.5 flex-wrap">
                       <TriangleAlert size={12} aria-hidden="true" />
                       Amostra escassa — número puxado à média.
-                      <Link to={tabUrl("confianca")} className="underline hover:text-gold">ver Confiança →</Link>
                     </p>
                   )}
                 </div>
@@ -339,7 +328,7 @@ export default function HeroDetail() {
           </div>
         ) : null}
 
-        {/* Tablist das 8 abas + home (roving tabindex preservado) */}
+        {/* Tablist das 4 abas + home (roving tabindex preservado) */}
         <div
           role="tablist"
           aria-label="Seções da ficha do herói"
@@ -502,10 +491,6 @@ export default function HeroDetail() {
           {activeSlug === "confrontos" && <ConfrontosSection heroId={hero} rank={rank} window={window} />}
           {activeSlug === "draft" && <DraftSection heroId={hero} rank={rank} window={window} hero={h} meta={heroQuery.data?.meta} />}
           {activeSlug === "builds" && <BuildsSection heroId={hero} rank={rank} window={window} />}
-          {activeSlug === "forca" && <ForcaSection hero={h} rank={rank} window={window} meta={heroQuery.data?.meta} />}
-          {activeSlug === "confianca" && <ConfiancaSection heroId={hero} rank={rank} window={window} />}
-          {activeSlug === "ranks" && <RanksSection heroId={hero} window={window} />}
-          {activeSlug === "tempo" && <TempoSection heroId={hero} rank={rank} window={window} heroName={heroName} />}
         </div>
       )}
     </section>
