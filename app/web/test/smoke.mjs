@@ -22,7 +22,6 @@ const must = [
   "src/features/dashboard/BuildsTab.tsx",
   "src/features/hero-list/HeroList.tsx",
   "src/features/hero-detail/HeroDetail.tsx",
-  "src/features/matchups/Matchups.tsx",
   "src/features/builds/Builds.tsx",
   "src/features/build-manager/BuildManager.tsx",
   "src/features/draft-management/DraftManagement.tsx",

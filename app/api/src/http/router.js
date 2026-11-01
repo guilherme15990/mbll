@@ -8,7 +8,6 @@ import { viewsRoute } from "../routes/views.js";
 import { gemsRoute } from "../routes/gems.js";
 import { heroCatalogRoute, equipmentRoute, heroLanesRoute } from "../routes/catalog.js";
 import { matchupsRoute, blindRoute } from "../routes/matchups.js";
-import { heroDraftScoreRoute } from "../routes/draftScore.js";
 import { aggregateRoute, heroBuildsRoute } from "../routes/builds.js";
 import { modulesRoute, statusRoute } from "../routes/meta.js";
 
@@ -28,7 +27,6 @@ export async function router(path, sp) {
   if (path === "/catalog") return heroCatalogRoute();
   if (path === "/equipment") return equipmentRoute();
   if (path === "/heroes/lanes") return heroLanesRoute(sp);
-  if (path === "/heroes/draft-score") return heroDraftScoreRoute(sp);
   if ((m = MATCHUPS.exec(path))) return matchupsRoute(sp, Number(m[1]));
   if (path === "/builds/aggregate") return aggregateRoute(sp);
   if ((m = BUILDS.exec(path))) return heroBuildsRoute(sp, Number(m[1]));

@@ -6,7 +6,6 @@ import {
   encodeLoadout,
   forkObservedBuild,
   freeCompositionItems,
-  loadoutHref,
   matchLoadout,
   observedEvidence,
   signatureOfPick,
@@ -65,18 +64,10 @@ describe("codec do loadout", () => {
     assert.equal(decodeLoadout(`${code}==`).ok, true);
   });
 
-  it("URL carrega o código e mantém o shell coerente", () => {
-    const href = loadoutHref(loadout());
-    assert.match(href, /^\/preparar\?/);
-    assert.match(href, /[?&]l=[A-Za-z0-9_-]+/);
-    assert.match(href, /rank=mythic/);
-    assert.match(href, /window=7/);
-  });
-
   it("recusa URL vazia com mensagem acionável", () => {
     const result = decodeLoadout(null);
     assert.equal(result.ok, false);
-    assert.match(result.error, /Preparar a partir desta build/);
+    assert.match(result.error, /não traz nenhum loadout/i);
   });
 
   it("recusa código ilegível sem lançar", () => {

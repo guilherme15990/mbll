@@ -2,7 +2,7 @@
  * Superfície pública da camada de dados da web.
  *
  * Fronteira única de `shared/api`: `http.ts` (transporte + taxonomia de erro),
- * `queries/` (18 hooks + tipos, 1 domínio por arquivo) e os reexports de
+ * `queries/` (17 hooks + tipos, 1 domínio por arquivo) e os reexports de
  * formatação/higiene que a UI consome junto dos hooks.
  *
  * O arquivo era um monólito de ~520 linhas com 18 hooks e 40 tipos de 12
@@ -28,5 +28,4 @@ export * from "./queries/filters";
 export * from "./queries/heroes";
 export * from "./queries/builds";
 export * from "./queries/matchups";
-export * from "./queries/draftScore";
 export * from "./queries/insights";

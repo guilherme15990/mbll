@@ -42,7 +42,7 @@ check("páginas importam app/filters", /from ["'][^"']*app\/filters["']/.test(pa
 
 // 2 — code splitting por rota (o mapa vive em `app/router.tsx` desde a ADR-043).
 const lazyCount = (router.match(/lazy\(\(\) => import\("\.\.\/features\//g) ?? []).length;
-check("rotas lazy (>= 7)", lazyCount >= 7, `${lazyCount} rotas`);
+check("rotas lazy (>= 6)", lazyCount >= 6, `${lazyCount} rotas`);
 check("Suspense com fallback", /<Suspense\s+fallback=/.test(router));
 check("fallback acessível", /data-testid="route-loading"/.test(router));
 

@@ -324,38 +324,3 @@ export type BuildsAggregateResponse = {
   partial: boolean;
   stale?: boolean;
 };
-
-// ── draft score do herói (número único — motor hero-draft-score-v1) ─────────
-//
-// Resposta de `/v1/heroes/draft-score`. UM número 0–100 por herói: min–max da WR
-// no recorte (o melhor WR lê 100, o pior lê 0). Só o desfecho medido entra —
-// `pick`/`ban` são exposição, nunca força; sem pesos nem constantes declaradas.
-// Número RELATIVO ao elo+janela. NUNCA probabilidade.
-
-export type HeroDraftScoreRow = {
-  id: number;
-  name: string | null;
-  head: string | null;
-  /** Min–max da WR no recorte (0–100): melhor WR = 100, pior = 0; `null` sem WR. */
-  draft_score: number | null;
-};
-
-export type HeroDraftScoreResponse = {
-  version: "hero-draft-score-v1";
-  rank: string;
-  days: number;
-  collectedAgoMs: number;
-  truncated: boolean;
-  stale: boolean;
-  ageMs?: number;
-  rows: HeroDraftScoreRow[];
-  meta: {
-    n_heroes: number;
-    with_data: number;
-    /** Âncoras da escala no recorte (fração 0–1). */
-    wr_min: number | null;
-    wr_max: number | null;
-    calibrated: false;
-    note: string;
-  };
-};

@@ -208,18 +208,9 @@ export function encodeLoadout(loadout: Loadout): string {
   return bytesToCode(new TextEncoder().encode(JSON.stringify(payload)));
 }
 
-/** Caminho canônico de um loadout. Mantém o shell (rank/janela) coerente com a carga. */
-export function loadoutHref(loadout: Loadout): string {
-  const params = new URLSearchParams();
-  params.set("l", encodeLoadout(loadout));
-  params.set("rank", loadout.rank);
-  params.set("window", loadout.window);
-  return `/preparar?${params.toString()}`;
-}
-
 export function decodeLoadout(code: string | null | undefined): LoadoutResult {
   if (code == null || !code.trim()) {
-    return { ok: false, error: "A URL não traz nenhum loadout — abra uma build e use “Preparar a partir desta build”." };
+    return { ok: false, error: "A URL não traz nenhum loadout (código ausente ou vazio)." };
   }
   const trimmed = code.trim().replace(/=+$/, "");
   if (trimmed.length > LOADOUT_CODE_MAX) {

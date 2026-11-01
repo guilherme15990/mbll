@@ -90,12 +90,9 @@ contexto global na URL.
 | `/dashboard` | Panorama do meta (T1) |
 | `/hero` | Grade de heróis com paginação/ordenação no servidor (T2) |
 | `/hero/:id` | Ficha do herói: **Visão geral · Confrontos · Draft · Builds** |
-| `/confrontos` | Confrontos & sinergias (M6) |
 | `/draft` | Draft Management — composição e poder (DMP) |
-| `/draft-score` | Página de **teste** da métrica 0–100 (`hero-draft-score-v1`) |
 | `/builds` | Builds — visão de sistema e por herói (BDL) |
 | `/build`, `/build/:id` | Gerenciar build — núcleo, builds e slots (BMS) |
-| `/preparar` | Preparar loadout |
 
 ## Como funciona
 
@@ -116,7 +113,7 @@ contexto global na URL.
    uma única coleta (single-flight).
 2. **Modelagem.** As rotas delegam ao `@radar/engine` — funções puras de
    estatística, inferência e agregação. Nada de I/O dentro do motor.
-3. **Fio.** Cada `/v1/*` devolve um envelope JSON estável, com `meta`,
+3. **Contrato.** Cada `/v1/*` devolve um envelope JSON estável, com `meta`,
    verificações (`pickSumCheck`) e o status de evidência de cada número.
 4. **Apresentação.** A web consome os DTOs de `@radar/contracts` via hooks do
    TanStack Query; cada rota é um chunk lazy (ADR-043).
@@ -148,7 +145,7 @@ app/web/src
   App.tsx        shell: header + menu horizontal + main + footer
   app/           infra de UI (router, providers, filters, TopNav, ErrorBoundary)
   features/      um diretório por contexto: dashboard, hero-list, hero-detail,
-                 matchups, builds, build-manager, draft-management, loadout
+                 builds, build-manager, draft-management
   shared/        reuso sem dono de contexto
     format.ts    formatação numérica defensiva (fonte única)
     api/         transporte + dados: http, errors, queries/<domínio> e o barrel
@@ -227,11 +224,11 @@ fallback silencioso (`app/api/src/infra/config.js`).
 | `SQLITE_FILE` | `$DATA_DIR/cache.sqlite` | override explícito do arquivo |
 | `SQLITE_CACHE` | ligado | `off` desliga SQLite (fallback em memória) |
 | `ARENA_BASE` | `https://arena.fastapicloud.dev` | fonte |
-| `ARENA_ALT_HOSTS` | vazio | hosts de failover permitidos (lista por vírgula) |
-| `ARENA_CONC` | `4` | fan-out concorrente (1..32) |
+| `ARENA_ALT_HOSTS` | vazio | hosts de failover aceitos (o header `x-alt-host` da fonte só é seguido se o host estiver nesta lista); vazio = sem failover |
+| `ARENA_CONC` | `4` | requisições paralelas à fonte (1..32; acima disso a fonte responde **429**) |
 | `LOG_LEVEL` | `info` | `silent｜error｜info｜debug` |
-| `TRUST_PROXY` | `false` | confia em `X-Forwarded-For` (só atrás de proxy) |
-| `RATE_LIMIT_OFF` | `false` | desliga o token bucket |
+| `TRUST_PROXY` | `false` | confia em `X-Forwarded-For` p/ o rate limit — **só ligue atrás de proxy conhecido**; sem proxy é irrelevante (e o header vira forjável) |
+| `RATE_LIMIT_OFF` | `false` | `1` desliga o rate limit por IP (útil em teste de carga local) |
 | `RATE_LIMIT_RPS` / `RATE_LIMIT_BURST` | `20` / `60` | taxa por cliente |
 | `SHUTDOWN_TIMEOUT_MS` | `10000` | prazo do shutdown gracioso |
 | `WEB_DIST` | `app/web/dist` | diretório servido em produção |
@@ -250,7 +247,6 @@ Modelo em `.env.example`.
 | `/v1/heroes/:id/matchups` | counters/sinergias (δ do par) |
 | `/v1/heroes/:id/blind` | proxy de blind pick (p10 adverso) |
 | `/v1/heroes/:id/builds?lane=` | builds + lift (**422** sem lane) |
-| `/v1/heroes/draft-score?rank=&window=` | métrica 0–100 do recorte (`hero-draft-score-v1`) |
 | `/v1/builds/aggregate?lane=&rank=&window=&top=` | agregado de sistema B0–B5 (`top=10\|20\|all`) |
 | `/v1/views/:view` | recortes (semana/elo/tier) |
 | `/v1/gems` | joias (q baixo, força alta, pick/ban baixos) |
@@ -263,7 +259,7 @@ Limites e semântica de cada indicador estão nos ADRs e nos docs de módulo em
 ## Documentação
 
 - **ADRs** — `AGENTS/artefatos/architecture/`. Comece por `ADR-033`
-  (arquitetura-alvo, monólito modular). As decisões recentes: `ADR-061` a `ADR-066`.
+  (arquitetura-alvo, monólito modular). As decisões recentes: `ADR-061` a `ADR-067`.
 - **Contratos de tela e UX** — `AGENTS/artefatos/{spec,ux,qa,reviews}/`.
 - **Regras de negócio / evidência** — `packages/engine/src` (os comentários de
   módulo explicam a unidade e o limite de cada número).

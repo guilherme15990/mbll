@@ -13,12 +13,9 @@ import { filtersQuery } from "./filters";
  */
 const Dashboard = lazy(() => import("../features/dashboard/Dashboard"));
 const HeroList = lazy(() => import("../features/hero-list/HeroList"));
-const Matchups = lazy(() => import("../features/matchups/Matchups"));
 const DraftManagement = lazy(() => import("../features/draft-management/DraftManagement"));
-const DraftScore = lazy(() => import("../features/draft-management/DraftScorePage"));
 const Builds = lazy(() => import("../features/builds/Builds"));
 const BuildManager = lazy(() => import("../features/build-manager/BuildManager"));
-const Preparar = lazy(() => import("../features/loadout/Preparar"));
 const HeroDetail = lazy(() => import("../features/hero-detail/HeroDetail"));
 
 function RouteFallback() {
@@ -42,13 +39,10 @@ export function AppRoutes({ rank, window, lanes }: { rank: string; window: strin
         <Route path="/" element={<Navigate to={`/dashboard?${filtersQuery({ rank, window, hero: "", lanes })}`} replace />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/hero" element={<HeroList />} />
-        <Route path="/confrontos" element={<Matchups />} />
         <Route path="/draft" element={<DraftManagement />} />
-        <Route path="/draft-score" element={<DraftScore />} />
         <Route path="/builds" element={<Builds />} />
         <Route path="/build" element={<BuildManager />} />
         <Route path="/build/:id" element={<BuildManager />} />
-        <Route path="/preparar" element={<Preparar />} />
         <Route path="/hero/:id" element={<HeroDetail />} />
         {/* Aliases permanentes da ficha (links antigos seguem válidos) */}
         <Route path="/hero/detalhes" element={<HeroDetail />} />

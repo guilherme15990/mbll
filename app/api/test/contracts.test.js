@@ -1,4 +1,4 @@
-// Contratos dos 20 endpoints internos (/v1/*) — rede de segurança da F1.
+// Contratos dos 19 endpoints internos (/v1/*) — rede de segurança da F1.
 //
 // POR QUÊ: antes da refatoração, 14 dos 20 endpoints não tinham nenhum teste
 // direto e `routes.js` tinha 47% de cobertura. Este arquivo trava o ENVELOPE de
@@ -216,47 +216,6 @@ describe("GET /heroes/:id/matchups — counters e sinergias", () => {
     assert.equal(pair.profile, "snowball", "win cai com a duração no mock");
     assert.equal((await call("/heroes/1/matchups", { rank: "xyz" })).status, 400);
     assert.equal((await call("/heroes/1/matchups", { rank: "mythic", days: "5" })).status, 400, "days só aceita as janelas 1/3/7/15/30");
-  });
-});
-
-// ── /heroes/draft-score ──────────────────────────────────────────────────────
-describe("GET /heroes/draft-score — Draft Score do herói (número único)", () => {
-  it("envelope, uma linha por herói, ordenação pela WR e min–max 0–100 (melhor=100, pior=0)", async () => {
-    const r = await call("/heroes/draft-score", { rank: "mythic", window: "7" });
-    assert.equal(r.status, 200);
-    envelope(r.body, [
-      "rows", "meta", "rank", "days", "collectedAgoMs",
-      "truncated", "stale", "ageMs",
-    ], "/heroes/draft-score");
-    assert.equal(r.body.meta.calibrated, false);
-    assert.equal(r.body.meta.n_heroes, HEROES.length);
-    assert.equal(r.body.meta.with_data, HEROES.length);
-    assert.equal(r.body.rank, "mythic");
-    assert.equal(r.body.days, 7);
-
-    assert.equal(r.body.rows.length, HEROES.length);
-    const top = [...r.body.rows].sort((a, b) => b.draft_score - a.draft_score)[0];
-    assert.equal(top.id, 1, "maior WR ⇒ 100 (Alpha)");
-    assert.equal(top.draft_score, 100, "melhor WR do lote ⇒ 100");
-    const bottom = [...r.body.rows].sort((a, b) => a.draft_score - b.draft_score)[0];
-    assert.equal(bottom.id, 12);
-    assert.equal(bottom.draft_score, 0, "pior WR do lote ⇒ 0");
-
-    for (const row of r.body.rows) {
-      for (const k of ["id", "name", "head", "draft_score"]) assert.ok(k in row, `falta ${k} em ${row.id}`);
-      assert.ok(row.draft_score === null || (row.draft_score >= 0 && row.draft_score <= 100), "draft_score é 0–100 (ou null)");
-    }
-    // Escala min–max do recorte: WR 50% cai no meio da faixa (0.44–0.56) ⇒ 50.
-    assert.equal(r.body.rows.find((x) => x.id === 7).draft_score, 50, "meio da faixa ⇒ 50");
-    // Âncoras da escala expostas no meta (fração 0–1).
-    assert.equal(r.body.meta.wr_min, 0.44);
-    assert.equal(r.body.meta.wr_max, 0.56);
-  });
-
-  it("validação de query: 400 fora de rank/janela conhecidos", async () => {
-    assert.equal((await call("/heroes/draft-score", { rank: "xyz" })).status, 400);
-    assert.equal((await call("/heroes/draft-score", { rank: "mythic", window: "5" })).status, 400);
-    assert.equal((await call("/heroes/draft-score", { rank: "mythic" })).status, 200, "window default = 7");
   });
 });
 

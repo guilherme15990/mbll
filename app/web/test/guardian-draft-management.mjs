@@ -237,40 +237,5 @@ check(
 // 7. Nada de import cruzado entre features.
 check("não importa outra feature", !featureFiles.some((f) => /from\s+["'][^"']*features\//.test(f.body)));
 
-// 8. Página de TESTE do Draft Score do herói (`/draft-score`) — separada do índice
-//    `/draft`. O número (0–100 = min–max da WR no recorte: melhor=100, pior=0) é
-//    composto no SERVIDOR (`/v1/heroes/draft-score`, motor `hero-draft-score-v1`):
-//    a web consome 1 request por recorte, sem fan-out no navegador.
-const scorePagePath = `${feature}/DraftScorePage.tsx`;
-const scorePage = exists(scorePagePath) ? read(scorePagePath) : "";
-const scoreTablePath = `${feature}/DraftScoreTable.tsx`;
-const scoreHookPath = "src/shared/api/queries/draftScore.ts";
-const scoreHook = exists(scoreHookPath) ? read(scoreHookPath) : "";
-check("página de teste existe", exists(scorePagePath), scorePagePath);
-check(
-  "chunk lazy da página de teste",
-  /const DraftScore = lazy\(\(\) => import\("\.\.\/features\/draft-management\/DraftScorePage"\)\)/.test(router),
-);
-check("rota /draft-score separada de /draft", /<Route path="\/draft-score" element=\{<DraftScore \/>\} \/>/.test(router));
-check("tabela do Draft Score existe", exists(scoreTablePath), scoreTablePath);
-check(
-  "página de teste consome o número pronto (hook de shared/api)",
-  /useHeroDraftScore\s*\(/.test(scorePage) && scoreHook.length > 0,
-);
-check(
-  "hook do Draft Score bate no endpoint composto do servidor",
-  /heroes\/draft-score/.test(scoreHook) && /useQuery\s*/.test(scoreHook),
-);
-check(
-  "DTO do fio vem de @radar/contracts (sem cópia local)",
-  /from\s+["']@radar\/contracts["']/.test(scoreHook) && !/type\s+HeroDraftScoreResponse\s*=/.test(scoreHook),
-);
-check(
-  "página de teste não faz fan-out",
-  !/matchupsQuery\s*\(/.test(scorePage) && !/matchupsQuery\s*\(/.test(scoreHook),
-);
-check("página de teste declara a ressalva", /não é[\s\S]{0,40}probabilidade/i.test(scorePage) && /previsão/i.test(scorePage));
-check("página de teste sem endpoint literal", !/\/v1\//.test(scorePage));
-
 console.log(bad ? `GUARDIAN DRAFT MANAGEMENT FAIL (${bad})` : "GUARDIAN DRAFT MANAGEMENT OK");
 process.exit(bad ? 1 : 0);

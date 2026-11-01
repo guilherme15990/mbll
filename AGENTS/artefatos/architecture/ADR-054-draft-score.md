@@ -1,5 +1,10 @@
 # ADR-054 — Draft Score: delta esperado de WR com incerteza explícita
 
+> **NOTA (2026-11-01, ADR-067).** A tela `/draft-score` e o endpoint
+> `/v1/heroes/draft-score` foram **removidos** (web + API + contrato). A **engine**
+> do Draft Score **permanece** (`packages/engine/src/matchups/draft-score.js`,
+> `scoreHeroDraftScore`) — "por hora", como única superfície.
+
 **Data:** 2026-10-30 · **Status:** aceito · **Contexto:** auditoria do app legado
 (`mlbb_draft_assistant_single_matrix5x5.html`) diagnosticou 12 defeitos no
 `scoreCandidatesWithSTEAM`; o pedido é um Draft Score defensável dentro do motor.

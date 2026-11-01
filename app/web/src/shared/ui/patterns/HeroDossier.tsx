@@ -13,13 +13,18 @@ interface HeroDossierProps {
 }
 
 const CONTEXT_LINKS = [
-  { id: "M6", to: "/confrontos", label: "Confrontos", icon: Swords },
+  { id: "M6", to: "/hero", label: "Confrontos", icon: Swords },
   { id: "DRF", to: "/hero", label: "Draft", icon: Radar },
   { id: "BDL", to: "/builds", label: "Builds", icon: Hammer },
 ];
 
-/** Draft (DRF/BPS) vive só na ficha: a rota aponta para a aba, não para página plana. */
+/**
+ * Confrontos (M6) e Draft (DRF/BPS) vivem só na ficha: o link aponta para a aba,
+ * não para página plana. As rotas planas `/confrontos` e `/draft-score` saíram
+ * do app (ADR-067); a matemática segue na engine.
+ */
 function contextHref(c: { id: string; to: string }, heroId: string, rank: string, window: string) {
+  if (c.id === "M6") return `/hero/${heroId}?tab=confrontos&rank=${rank}&window=${window}`;
   if (c.id === "DRF") return `/hero/${heroId}?tab=draft&rank=${rank}&window=${window}`;
   return `${c.to}?hero=${heroId}&rank=${rank}&window=${window}${c.id === "BDL" ? "&view=hero" : ""}`;
 }
