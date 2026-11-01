@@ -69,6 +69,6 @@ describe("BuildManager (caracterização)", () => {
     mockBase([buildFixture()]);
     renderAt("/build?hero=42&lane=mid");
     expect(screen.getByText(/Núcleo de Akai/)).toBeInTheDocument();
-    expect(screen.getByText(/1 build observada/)).toBeInTheDocument();
+    expect(screen.getByText("Quadro para montar e testar")).toBeInTheDocument();
   });
 });

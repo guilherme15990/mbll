@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
-  Crosshair, Hammer, LayoutDashboard, Swords, TriangleAlert, UserSearch,
+  Crosshair, Hammer, LayoutDashboard, Swords, UserSearch,
 } from "lucide-react";
 import { LANES, num, pct, useBlind, useBuilds, useCatalog, useDistortion, useHero, useHeroLanes } from "../../shared/api";
 import { BUILD_TAG_CLASS } from "../../shared/domain/buildLabel";
@@ -11,9 +11,10 @@ import { getBuildTags, getDraftPatterns } from "@radar/proprietary-engine";
 import { classifyBlindPick, classifyFirstPick } from "@radar/proprietary-engine";
 import { NeedsLane, NeedsRank } from "../../shared/ui/patterns/NeedsRankLane";
 import {
-  Avatar, Empty, ErrBox, TierBadge,
+  Avatar, Empty, ErrBox,
 } from "../../shared/ui";
 import { selectTopBuildsByLift } from "@radar/proprietary-engine";
+import { HeroDataCard } from "../../shared/ui/patterns/HeroDataCard";
 import ConfrontosSection from "./sections/ConfrontosSection";
 import ConfrontosPreview from "./sections/ConfrontosPreview";
 import DraftSection from "./sections/DraftSection";
@@ -111,17 +112,6 @@ function LaneBuilds({ hero, rank, lane, heroName, to }: { hero: string; rank: st
         </div>
       )}
     </Link>
-  );
-}
-
-/** Métrica compacta do card de identidade — metadata junto da identidade, sem seção separada. */
-function HeroMetric({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-[10px] uppercase tracking-wider text-mist">{label}</dt>
-      <dd className="font-mono tabular-nums text-sm font-bold text-foam leading-tight truncate">{value}</dd>
-      {hint ? <dd className="text-[10px] text-mist/60 leading-tight truncate">{hint}</dd> : null}
-    </div>
   );
 }
 
@@ -256,27 +246,16 @@ export default function HeroDetail() {
         {/* CARD DO HERÓI — identidade fixa no topo, vale para todas as abas.
             Nome/avatar vêm do catálogo (sem esperar useHero); selos entram quando o dado chega. */}
         {hero && heroValid ? (
-          <div className="rounded-2xl border border-line bg-panel p-4 md:p-5">
-            <div className="flex items-center gap-4 flex-wrap md:flex-nowrap">
-              <Avatar src={heroHead} name={heroName} size={64} />
-              <div className="min-w-0 flex-1 space-y-2">
-                <p className="text-[22px] md:text-[28px] leading-tight font-extrabold tracking-tight text-foam font-sans">
-                  {heroName}
-                </p>
-                {h ? (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <TierBadge tier={h.tier} />
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2" role="status" aria-label="carregando selos do herói">
-                    <span className="h-6 w-14 rounded-full bg-panel2/60 animate-pulse motion-reduce:animate-none" />
-                    <span className="h-6 w-20 rounded-full bg-panel2/60 animate-pulse motion-reduce:animate-none" />
-                    <span className="h-6 w-24 rounded-full bg-panel2/60 animate-pulse motion-reduce:animate-none" />
-                  </div>
-                )}
-              </div>
-
-              {lanes.length > 0 && (
+          <HeroDataCard
+            name={heroName}
+            head={heroHead}
+            tier={h?.tier ?? null}
+            metrics={h ?? null}
+            window={window}
+            loading={!h}
+            scarce={escasso}
+            aside={
+              lanes.length > 0 ? (
                 <div
                   role="group"
                   aria-label="Lanes do herói"
@@ -296,36 +275,9 @@ export default function HeroDetail() {
                     ))}
                   </div>
                 </div>
-              )}
-            </div>
-
-            {/* Métricas do herói no MESMO card — sem seção/banner separado. */}
-            {h ? (
-              <>
-                <dl className="mt-4 pt-3 border-t border-line grid grid-cols-2 sm:grid-cols-5 gap-x-4 gap-y-2">
-                  <HeroMetric label="Força θ̂" value={num(h.wrAdj, 3)} hint="ajustada" />
-                  <HeroMetric label="WR obs" value={num(h.win, 3)} hint={`janela ${window}d`} />
-                  <HeroMetric label="Pick" value={pct(h.pick)} hint="slot share" />
-                  <HeroMetric label="Ban" value={pct(h.ban)} hint="fração" />
-                  <HeroMetric label="Shrinkage B" value={num(h.B, 2)} hint="peso do dado" />
-                </dl>
-                <div className="mt-2 flex items-start justify-between gap-2 flex-wrap">
-                  {escasso && (
-                    <p className="text-[11px] text-amber-200 flex items-center gap-1.5 flex-wrap">
-                      <TriangleAlert size={12} aria-hidden="true" />
-                      Amostra escassa — número puxado à média.
-                    </p>
-                  )}
-                </div>
-              </>
-            ) : (
-              <div className="mt-4 pt-3 border-t border-line grid grid-cols-2 sm:grid-cols-5 gap-2" role="status" aria-label="carregando métricas do herói">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <span key={i} className="h-9 rounded-lg bg-panel2/50 animate-pulse motion-reduce:animate-none" />
-                ))}
-              </div>
-            )}
-          </div>
+              ) : null
+            }
+          />
         ) : null}
 
         {/* Tablist das 4 abas + home (roving tabindex preservado) */}

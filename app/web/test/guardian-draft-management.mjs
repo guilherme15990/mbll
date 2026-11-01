@@ -66,7 +66,10 @@ check(
 // 2. Reuso dos contratos oficiais, sem backend novo.
 check("hook de dados separado da tela", exists(dataPath));
 check("tela usa o hook de dados", /useDraftData\s*\(/.test(screen));
-check("hook usa o lote oficial /heroes", /useHeroes\s*\(/.test(data) && /size=133|,\s*133/.test(data));
+check(
+  "hook usa o lote COMPLETO oficial /heroes (sem tamanho de lote fixo)",
+  /useAllHeroes\s*\(/.test(data) && !/useHeroes\s*\(/.test(data) && !/\bsize\b/.test(data),
+);
 check("hook usa o catálogo oficial", /useCatalog\s*\(/.test(data));
 check("hook usa o mapa oficial de rotas", /useHeroLanes\s*\(/.test(data));
 check("fan-out usa a query oficial de matchups", /matchupsQuery\s*\(/.test(data));
@@ -193,7 +196,7 @@ check(
 );
 check(
   "divisão do índice é rotulada como divisão",
-  /Divisão do índice somado/.test(read(`${feature}/StrengthBar.tsx`)),
+  /divisão do índice/.test(read(`${feature}/StrengthBar.tsx`)),
 );
 check(
   "curva é proxy das duplas, não do time",
@@ -223,7 +226,10 @@ check("sem copy de promessa", hits.length === 0, hits.join(", "));
 check("ressalva explícita do índice", /não é probabilidade/i.test(screen) && /não é previsão/i.test(screen));
 check("sugestão não é recomendação", /não (são|é) recomendação/i.test(featureFiles.map((f) => f.body).join("\n")));
 check("proxy é rotulado como proxy", /proxy/i.test(featureFiles.map((f) => f.body).join("\n")));
-check("50 = neutro declarado na tela", /50 = neutro/.test(screen));
+check(
+  "50 = neutro declarado na tela",
+  /50 = neutro/.test(featureFiles.map((f) => f.body).join("\n")),
+);
 check(
   "causalidade só aparece negada",
   featureFiles

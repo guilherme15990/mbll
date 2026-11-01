@@ -1,11 +1,16 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  ANTISYNERGY_WEIGHT,
   BALANCE_WEIGHT,
   BAN_SLOTS,
   COMPONENT_WEIGHTS,
+  COUNTER_WEIGHT,
   DRAFT_LANES,
   DRAFT_SLOTS,
+  EXPOSURE_WEIGHT,
+  META_WEIGHT,
+  PAIR_SCALE,
   POWER_SCALE_K,
   actionsUntilNextPick,
   analyzeDraft,
@@ -463,13 +468,12 @@ describe("sugestões", () => {
     9: hero(9, { name: "Z", wrAdj: 0.95, B: 1, lanes: ["exp"], pick: 0.2, ban: 0.3 }),
   };
 
-  it("encaixe de rota vem antes do score bruto", () => {
-    const list = pickSuggestions(emptyDraft(), pool, {}, 0.5);
-    assert.equal(list[0]?.heroId, 9, "θ̂ maior e encaixa em exp");
-    const a = list.find((c) => c.heroId === 1);
-    const b = list.find((c) => c.heroId === 2);
-    assert.ok(list.indexOf(b) < list.indexOf(a), "fora da rota cai para depois do encaixe");
-    assert.equal(a?.laneFit, false);
+  it("ordena pelo score dos cinco fatores e respeita a lane alvo", () => {
+    const list = pickSuggestions(emptyDraft(), pool, {}, 0.5, { lane: "exp" });
+    assert.equal(list[0]?.heroId, 9, "maior percentil do meta em exp");
+    assert.ok((list[0]?.meta ?? 0) > (list.find((c) => c.heroId === 2)?.meta ?? 0));
+    assert.equal(list.some((c) => c.heroId === 1), false, "herói de outra lane sai da lista");
+    assert.equal(list.at(-1)?.heroId, 3, "menor percentil da lane");
   });
 
   it("herói já usado não é sugerido e a disponibilidade é proxy", () => {
@@ -729,17 +733,88 @@ describe("meta da lane e candidatos", () => {
   });
 });
 
-describe("recomendador de dois fatores", () => {
+describe("recomendador de cinco fatores", () => {
+  it("declara os pesos dos cinco fatores e a escala do par", () => {
+    assert.equal(BALANCE_WEIGHT, 0.25);
+    assert.equal(META_WEIGHT, 1);
+    assert.equal(COUNTER_WEIGHT, 1);
+    assert.equal(ANTISYNERGY_WEIGHT, 1);
+    assert.equal(EXPOSURE_WEIGHT, 1);
+    assert.ok(PAIR_SCALE > 0, "escala de exibição do par precisa ser positiva");
+  });
+
   it("balanceOf marca contrapeso, repetição e neutro", () => {
     const scaling = { top: "scaling", n: 2, total: 3 };
     const snowball = { top: "snowball", n: 2, total: 3 };
     const uniforme = { top: "uniforme", n: 2, total: 3 };
-    assert.equal(BALANCE_WEIGHT, 0.25);
     assert.equal(balanceOf(scaling, "scaling"), 1);
     assert.equal(balanceOf(snowball, "scaling"), -1);
     assert.equal(balanceOf(uniforme, "scaling"), 0);
     assert.equal(balanceOf(null, "scaling"), null);
     assert.equal(balanceOf(scaling, null), null);
+  });
+
+  it("meta é o percentil do θ̂ na lane; sem dado de lane fica atrás", () => {
+    const pool = {
+      1: hero(1, { name: "Top", wrAdj: 0.9, lanes: ["exp"] }),
+      2: hero(2, { name: "Meio", wrAdj: 0.6, lanes: ["exp"] }),
+      3: hero(3, { name: "Fora", wrAdj: 0.9, lanes: ["gold"] }),
+      4: hero(4, { name: "SemDado", wrAdj: 0.95, lanes: [] }),
+    };
+    const list = pickSuggestions(emptyDraft(), pool, {}, 0.5, { lane: "exp" });
+    assert.equal(list[0]?.heroId, 1, "maior percentil da lane");
+    assert.ok((list[0]?.meta ?? 0) > (list.find((c) => c.heroId === 2)?.meta ?? 1));
+    assert.equal(list.some((c) => c.heroId === 3), false, "outra lane não é candidata");
+    assert.equal(list.find((c) => c.heroId === 4)?.laneFit, null, "sem dado de lane");
+    assert.equal(list.find((c) => c.heroId === 4)?.meta, null, "sem lane, o meta sai do denominador");
+    assert.equal(list.at(-1)?.heroId, 4, "sem encaixe nem fator, vai por último");
+  });
+
+  it("counter contra o inimigo eleva o score", () => {
+    const pool = {
+      1: hero(1, { name: "Counter" }),
+      2: hero(2, { name: "SemPar" }),
+      7: hero(7, { name: "Inimigo" }),
+    };
+    const books = { 1: book(1, { countersUp: [pair(7, 0.06)] }) };
+    const state = setPick(emptyDraft(), "them", 0, 7);
+    const list = pickSuggestions(state, pool, books, 0.5, { lane: "exp" });
+    const counter = list.find((c) => c.heroId === 1);
+    const semPar = list.find((c) => c.heroId === 2);
+    assert.deepEqual(counter?.counter.ids, [7]);
+    assert.ok((counter?.counter.value ?? 0) > 0, "counter é positivo para nós");
+    assert.equal(semPar?.counter.value, null, "sem par o fator fica null, nunca 0");
+    assert.equal(semPar?.score, null, "sem nenhum fator observado não há score");
+    assert.equal(list[0]?.heroId, 1);
+    assert.equal(list.at(-1)?.heroId, 2, "quem não tem sinal fica por último");
+  });
+
+  it("antisinergia com o nosso time derruba o score", () => {
+    const pool = {
+      1: hero(1, { name: "Antis" }),
+      5: hero(5, { name: "Aliado" }),
+    };
+    const books = { 1: book(1, { synergiesDown: [pair(5, 0.05)] }) };
+    const state = setPick(emptyDraft(), "us", 0, 5);
+    const list = pickSuggestions(state, pool, books, 0.5, { lane: "exp" });
+    const antis = list.find((c) => c.heroId === 1);
+    assert.deepEqual(antis?.antisynergy.ids, [5]);
+    assert.ok((antis?.antisynergy.value ?? 0) < 0, "antisinergia é negativa para nós");
+    assert.ok((antis?.score ?? 1) < 0.5, "fica abaixo do neutro do fator");
+  });
+
+  it("exposição ao counter inimigo derruba o score", () => {
+    const pool = {
+      1: hero(1, { name: "Expoto" }),
+      7: hero(7, { name: "Inimigo" }),
+    };
+    const books = { 1: book(1, { countersDown: [pair(7, 0.06)] }) };
+    const state = setPick(emptyDraft(), "them", 0, 7);
+    const list = pickSuggestions(state, pool, books, 0.5, { lane: "exp" });
+    const exposed = list.find((c) => c.heroId === 1);
+    assert.deepEqual(exposed?.exposure.ids, [7]);
+    assert.ok((exposed?.exposure.value ?? 0) < 0, "exposto é negativo para nós");
+    assert.ok((exposed?.score ?? 1) < 0.5, "fica abaixo do neutro do fator");
   });
 
   it("empate de meta é desempatado pelo tipo que contrabalança", () => {

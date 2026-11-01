@@ -13,6 +13,7 @@
 
 export { Avatar } from "./primitives/Avatar";
 export { TierBadge } from "./primitives/TierBadge";
+export { BuildsBadge } from "./primitives/BuildsBadge";
 export { ClassSeal } from "./primitives/ClassSeal";
 export { CtxSeal } from "./primitives/CtxSeal";
 export { CtxBar } from "./primitives/CtxBar";

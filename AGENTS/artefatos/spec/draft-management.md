@@ -38,7 +38,7 @@ Quando a sala de draft começa (ou antes dela), quero registrar os 5 picks de ca
 
 | Fonte | Uso na tela |
 |---|---|
-| `GET /v1/heroes?rank&window&size=133` | θ̂ (`wrAdj`), pick, ban, tier, `B`, IC 95%, flags; `meta.mu` como baseline |
+| `GET /v1/heroes?rank&window&size&index` | θ̂ (`wrAdj`), pick, ban, tier, `B`, IC 95%, flags; `meta.mu` como baseline. Lote **completo** via `useAllHeroes`: página 1 descobre `total` e o resto é paginado por `index` — `size` é o teto do servidor (`HEROES_PAGE_CAP`), nunca o tamanho do lote |
 | `GET /v1/catalog` | nome/avatar de todo herói, inclusive sem dado no recorte |
 | `GET /v1/heroes/lanes?rank` | rota de cada herói (cobertura/flex) |
 | `GET /v1/heroes/:id/matchups?rank&days` | pares `countersUp/Down`, `synergiesUp/Down` com δ — 1 request por herói escolhido (máx. 10), via `useQueries` na mesma query key do hook oficial |

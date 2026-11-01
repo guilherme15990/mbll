@@ -1,45 +1,75 @@
 /**
- * Draft Management — candidatos ao próximo pick e alvos de ban (ADR-053 D5/D6).
+ * Draft Management — candidatos ao próximo pick e alvos de ban (ADR-053 D5/D6 +
+ * ADR-057).
  *
- * Recomendador de DOIS fatores, na rota do slot:
- *   1. meta da lane  → percentil do θ̂ entre os heróis daquela lane (peso 1);
- *   2. tipo adequado → contrabalança o arquétipo dominante inimigo (peso 0,25).
+ * Recomendador de CINCO fatores declarados, todos lidos do recorte atual:
+ *   1. counter      → herói countera alguém do time inimigo (peso 1);
+ *   2. antisinergia → herói tem antisinergia com alguém do meu time (peso 1);
+ *   3. exposição    → herói é counterado por alguém do time inimigo (peso 1);
+ *   4. meta         → percentil do θ̂ do herói no recorte (peso 1);
+ *   5. balanceamento→ arquétipo que contrabalança o dominante inimigo (peso 0,25).
  *
- * `score = Σ w·v / Σ w` só com os fatores DISPONÍVEIS (fator sem dado sai do
- * denominador, como no índice). O score é um rank 0–1, nunca probabilidade, e
- * a UI mostra os dois fatores por extenso em vez do número.
+ * Cada fator vira uma bondade 0–1 (0,5 = neutro) e o `score` é a média
+ * ponderada SÓ dos fatores disponíveis: fator sem par observado sai do
+ * denominador, como no índice — nunca vira 0. O score é um rank 0–1, nunca
+ * probabilidade, e a UI mostra os cinco fatores por extenso em vez do número.
  *
- * Leitura ordenada, nunca recomendação. Sobrevivência é hazard proxy.
+ * A LANE ALVO manda na lista: herói de outra lane não é candidato e o encaixe
+ * na lane vem antes do score na ordem (`laneFitRank`). Herói sem dado de lane
+ * fica, mas atrás de quem encaixa.
+ *
+ * Honestidade (INV-DMP-002..005): direção do par vem da LISTA
+ * (`countersUp`/`countersDown`, `synergiesUp`/`synergiesDown`), não do sinal do
+ * δ; counter é média por par, nunca soma entre os cinco inimigos. Leitura
+ * ordenada, nunca recomendação. Sobrevivência é hazard proxy.
  */
 import { DRAFT_LANES, clamp, finite, mean } from "./common.ts";
 import type { DraftLane } from "./common.ts";
 import { actionsUntilNextPick, nextPickStep, usedIds, type DraftState } from "./state.ts";
-import { availabilityProxy, deltaOf, type DraftHero, type HeroPool, type MatchupBooks } from "./pairs.ts";
+import { availabilityProxy, deltaOf, type HeroPool, type MatchupBooks, type PairObs } from "./pairs.ts";
 import { laneFitOf } from "./power.ts";
-import { laneMetaStats, lanePercentile, laneAbove, type LaneMeta } from "./laneMeta.ts";
+import { laneMetaStats, lanePercentile, type LaneMeta } from "./laneMeta.ts";
 import { heroArchetype, type Archetype, type ArchetypeRead } from "./archetype.ts";
 
-/** Peso declarado do ajuste de tipo: 1 degrau ≈ 25 pontos de percentil. */
+/** Peso do balanceamento de arquétipo: 1 degrau ≈ 25 pontos de bondade. */
 export const BALANCE_WEIGHT = 0.25;
+/** Pesos declarados dos quatro fatores de sinal, na mesma escala. */
+export const META_WEIGHT = 1;
+export const COUNTER_WEIGHT = 1;
+export const ANTISYNERGY_WEIGHT = 1;
+export const EXPOSURE_WEIGHT = 1;
+/** Escala de exibição do par (|δ| → bondade). NÃO é calibração de win rate. */
+export const PAIR_SCALE = 0.05;
 
 export type BalanceFit = -1 | 0 | 1;
+
+/** Leitura de um fator de par: valor líquido assinado + suporte observado. */
+export type PairRead = {
+  /** Média por par dos pares observados (|δ| com o sinal da direção). null = sem par. */
+  value: number | null;
+  /** Pares observados que sustentam o fator. */
+  ids: number[];
+  /** Pares possíveis no lado oposto — denominador do suporte. */
+  total: number;
+};
 
 export type Candidate = {
   heroId: number;
   name: string | null;
   head: string | null;
-  lane: DraftLane;
+  /** Encaixe na lane alvo. false = outra lane (fica fora da lista); null = sem dado. */
   laneFit: boolean | null;
-  percentile: number | null;
-  above: number | null;
+  /** Percentil do θ̂ do herói no recorte (0–1). null = fora das lanes/sem θ̂. */
+  meta: number | null;
+  counter: PairRead;
+  antisynergy: PairRead;
+  exposure: PairRead;
   archetype: ArchetypeRead | null;
   balance: BalanceFit | null;
   target: Archetype | null;
-  /** Rank 0–1 dos fatores disponíveis. Nunca exibido como probabilidade. */
+  /** Média ponderada dos fatores disponíveis (0–1). Nunca exibido como probabilidade. */
   score: number | null;
-  strength: number | null;
-  synergy: number | null;
-  matchup: number | null;
+  /** Quantos dos cinco fatores têm sinal observado (0–5). */
   observed: number;
   availability: number | null;
   k: number;
@@ -56,34 +86,57 @@ export type BanTarget = {
   pressure: number;
 };
 
-function candidateStrength(hero: DraftHero, baseline: number | null): number | null {
-  if (!finite(hero.wrAdj)) return null;
-  const mu = finite(baseline) && baseline > 0.2 && baseline < 0.8 ? baseline : 0.5;
-  const weight = hero.smallSample ? 0.25 : clamp(finite(hero.B) ? hero.B : 0.5, 0.05, 1);
-  return (hero.wrAdj - mu) * weight;
+/** |δ| cru dos dois sentidos do par; o primeiro observado vale (é o mesmo par). */
+function pairDelta(
+  first: readonly PairObs[] | undefined,
+  firstId: number,
+  second: readonly PairObs[] | undefined,
+  secondId: number,
+): number | null {
+  return deltaOf(first, firstId) ?? deltaOf(second, secondId);
 }
 
-function candidateSynergy(heroId: number, ourIds: readonly number[], books: MatchupBooks): number | null {
+/** Fator 1: o herói countera os inimigos (direção vem de `countersUp`/`countersDown`). */
+function counterRead(heroId: number, enemyIds: readonly number[], books: MatchupBooks): PairRead {
   const observations: number[] = [];
-  for (const ally of ourIds) {
-    if (ally === heroId) continue;
-    const up = deltaOf(books[ally]?.synergiesUp, heroId);
-    const down = deltaOf(books[ally]?.synergiesDown, heroId);
-    if (up != null) observations.push(up);
-    if (down != null) observations.push(-down);
-  }
-  return mean(observations);
-}
-
-function candidateMatchup(heroId: number, enemyIds: readonly number[], books: MatchupBooks): number | null {
-  const observations: number[] = [];
+  const ids: number[] = [];
   for (const enemy of enemyIds) {
-    const countersEnemy = deltaOf(books[enemy]?.countersDown, heroId);
-    const enemyCounters = deltaOf(books[enemy]?.countersUp, heroId);
-    if (countersEnemy != null) observations.push(countersEnemy);
-    if (enemyCounters != null) observations.push(-enemyCounters);
+    const value = pairDelta(books[heroId]?.countersUp, enemy, books[enemy]?.countersDown, heroId);
+    if (value != null) {
+      observations.push(value);
+      ids.push(enemy);
+    }
   }
-  return mean(observations);
+  return { value: mean(observations), ids, total: enemyIds.length };
+}
+
+/** Fator 2: antisinergia com o nosso time (`synergiesDown`; positivo ajuda, então negamos). */
+function antisynergyRead(heroId: number, allyIds: readonly number[], books: MatchupBooks): PairRead {
+  const observations: number[] = [];
+  const ids: number[] = [];
+  const allies = allyIds.filter((id) => id !== heroId);
+  for (const ally of allies) {
+    const value = pairDelta(books[heroId]?.synergiesDown, ally, books[ally]?.synergiesDown, heroId);
+    if (value != null) {
+      observations.push(-value);
+      ids.push(ally);
+    }
+  }
+  return { value: mean(observations), ids, total: allies.length };
+}
+
+/** Fator 3: exposição aos inimigos (o inimigo countera o herói; negativo para nós). */
+function exposureRead(heroId: number, enemyIds: readonly number[], books: MatchupBooks): PairRead {
+  const observations: number[] = [];
+  const ids: number[] = [];
+  for (const enemy of enemyIds) {
+    const value = pairDelta(books[heroId]?.countersDown, enemy, books[enemy]?.countersUp, heroId);
+    if (value != null) {
+      observations.push(-value);
+      ids.push(enemy);
+    }
+  }
+  return { value: mean(observations), ids, total: enemyIds.length };
 }
 
 /** Ajuste de tipo: contrabalança o dominante inimigo, repete ou fica neutro. */
@@ -97,17 +150,22 @@ export function balanceOf(
   return -1;
 }
 
-function combinedScore(percentile: number | null, balance: BalanceFit | null): number | null {
-  const parts: { value: number; weight: number }[] = [];
-  if (percentile != null) parts.push({ value: percentile, weight: 1 });
-  if (balance != null) parts.push({ value: (balance + 1) / 2, weight: BALANCE_WEIGHT });
-  const weightSum = parts.reduce((sum, part) => sum + part.weight, 0);
-  if (!weightSum) return null;
-  return parts.reduce((sum, part) => sum + part.value * part.weight, 0) / weightSum;
+/** |δ| líquido → bondade 0–1 (0,5 = neutro). Positivo ajuda, negativo atrapalha. */
+function goodnessOf(value: number | null): number | null {
+  return value == null ? null : clamp(0.5 + 0.5 * Math.tanh(value / PAIR_SCALE), 0, 1);
 }
 
-function availabilityRank(value: boolean | null): number {
-  return value === true ? 0 : value == null ? 1 : 2;
+/** Média ponderada só dos fatores presentes; sem nenhum, null. */
+function combinedScore(parts: readonly { value: number | null; weight: number }[]): number | null {
+  const present = parts.filter((part): part is { value: number; weight: number } => part.value != null);
+  const weightSum = present.reduce((sum, part) => sum + part.weight, 0);
+  if (!weightSum) return null;
+  return present.reduce((sum, part) => sum + part.value * part.weight, 0) / weightSum;
+}
+
+/** Encaixe na lane domina a ordem: herói da lane sempre acima do sem dado. */
+function laneFitRank(value: boolean | null): number {
+  return value === true ? 0 : 1;
 }
 
 /** Sementes da lista: livros já carregados, pares vizinhos e top θ̂ do pool. */
@@ -124,6 +182,7 @@ function seedIds(
   }
   for (const id of enemyIds) {
     for (const pair of books[id]?.countersDown ?? []) seeds.add(pair.id);
+    for (const pair of books[id]?.countersUp ?? []) seeds.add(pair.id);
   }
   Object.values(pool)
     .filter((hero) => finite(hero.wrAdj))
@@ -135,11 +194,15 @@ function seedIds(
 
 export type SuggestionOptions = { lane?: DraftLane; target?: Archetype | null; limit?: number };
 
+/**
+ * `baseline` fica na assinatura por compatibilidade com o índice (a força média
+ * já é lida em `power.ts`), mas o fator de meta aqui é o percentil do θ̂.
+ */
 export function pickSuggestions(
   state: DraftState,
   pool: HeroPool,
   books: MatchupBooks,
-  baseline: number | null,
+  _baseline: number | null,
   opts: SuggestionOptions = {},
 ): Candidate[] {
   const ourNext = nextPickStep(state, "us");
@@ -159,39 +222,52 @@ export function pickSuggestions(
     const hero = pool[heroId];
     if (!hero) continue;
 
+    // Respeita a lane alvo: herói de OUTRA lane não é candidato (ADR-057 D2).
     const fit = laneFitOf(hero, lane);
-    const percentile = lanePercentile(hero, meta);
+    if (fit === false) continue;
+
+    const metaValue = lanePercentile(hero, meta);
+    const counter = counterRead(heroId, enemyIds, books);
+    const antisynergy = antisynergyRead(heroId, ourIds, books);
+    const exposure = exposureRead(heroId, enemyIds, books);
     const archetype = heroArchetype(heroId, books);
     const balance = balanceOf(archetype, target);
-    const strength = candidateStrength(hero, baseline);
-    const synergy = candidateSynergy(heroId, ourIds, books);
-    const matchup = candidateMatchup(heroId, enemyIds, books);
-    const parts = [strength, synergy, matchup].filter(finite);
+    const balanceGoodness = balance == null ? null : (balance + 1) / 2;
+
+    const score = combinedScore([
+      { value: metaValue, weight: META_WEIGHT },
+      { value: goodnessOf(counter.value), weight: COUNTER_WEIGHT },
+      { value: goodnessOf(antisynergy.value), weight: ANTISYNERGY_WEIGHT },
+      { value: goodnessOf(exposure.value), weight: EXPOSURE_WEIGHT },
+      { value: balanceGoodness, weight: BALANCE_WEIGHT },
+    ]);
 
     const reasons: string[] = [];
-    if (percentile != null) reasons.push(`meta da lane: ${Math.round(percentile * 100)}º percentil`);
-    if (archetype) reasons.push(`tipo: ${archetype.top} (${archetype.n}/${archetype.total})`);
-    if (strength != null) reasons.push(`força ${strength >= 0 ? "+" : ""}${strength.toFixed(3)}`);
-    if (synergy != null) reasons.push(`sinergia ${synergy >= 0 ? "+" : ""}${synergy.toFixed(3)}`);
-    if (matchup != null) reasons.push(`confronto ${matchup >= 0 ? "+" : ""}${matchup.toFixed(3)}`);
+    if (metaValue != null) reasons.push(`meta: ${Math.round(metaValue * 100)}º percentil`);
+    if (counter.value != null) reasons.push(`countera ${counter.ids.length} inimigo(s)`);
+    if (antisynergy.value != null) reasons.push(`antisinergia com ${antisynergy.ids.length} aliado(s)`);
+    if (exposure.value != null) reasons.push(`exposto a ${exposure.ids.length} inimigo(s)`);
+    if (balance != null) {
+      reasons.push(balance > 0 ? "balanceia o dominante inimigo" : balance < 0 ? "repete a janela inimiga" : "neutro no tipo");
+    }
     if (!reasons.length) reasons.push("sem par observado neste recorte");
+
+    const factorValues = [metaValue, counter.value, antisynergy.value, exposure.value, balanceGoodness];
 
     candidates.push({
       heroId,
       name: hero.name,
       head: hero.head,
-      lane,
       laneFit: fit,
-      percentile,
-      above: laneAbove(hero, meta),
+      meta: metaValue,
+      counter,
+      antisynergy,
+      exposure,
       archetype,
       balance,
       target,
-      score: combinedScore(percentile, balance),
-      strength,
-      synergy,
-      matchup,
-      observed: parts.length,
+      score,
+      observed: factorValues.filter((value) => value != null).length,
       availability: availabilityProxy(hero, k),
       k,
       reasons,
@@ -201,10 +277,10 @@ export function pickSuggestions(
   return candidates
     .sort(
       (a, b) =>
-        availabilityRank(a.laneFit) - availabilityRank(b.laneFit) ||
+        laneFitRank(a.laneFit) - laneFitRank(b.laneFit) ||
         (b.score ?? -Infinity) - (a.score ?? -Infinity) ||
-        (b.percentile ?? -Infinity) - (a.percentile ?? -Infinity) ||
-        (b.strength ?? -Infinity) - (a.strength ?? -Infinity) ||
+        b.observed - a.observed ||
+        (b.meta ?? -Infinity) - (a.meta ?? -Infinity) ||
         (a.name ?? "").localeCompare(b.name ?? ""),
     )
     .slice(0, Math.max(0, opts.limit ?? 8));

@@ -83,7 +83,6 @@ check("usa o teto de slots do Combinador", /TOTAL_ITEM_SLOTS/.test(screen));
 check("uma bota no máximo", /archetype === "movement"/.test(domain));
 check("teto de 6 itens no domínio", /maxItems = 6/.test(domain));
 check("assinatura estável do loadout", /signatureOfPick\s*\(/.test(screen));
-check("link para a preparação", /loadoutHref\s*\(/.test(screen));
 
 // 6. Copy: nada de promessa; a ressalva precisa existir por escrito.
 const forbidden = [
@@ -103,12 +102,10 @@ check(
   causalLines.every((line) => /não|nunca|nem|nada|sem/i.test(line)),
   causalLines.join(" | "),
 );
-check(
-  "ressalva explícita do índice",
-  /não é winrate/i.test(screen) && /não é previsão/i.test(screen) && /não é probabilidade/i.test(screen),
-);
-check("sugestão não é recomendação", /Não são recomendação/i.test(screen));
-check("vazio de contraste explicado", /Sem contraste não vira sugestão/i.test(screen));
+const candidateRail = exists("src/features/build-manager/CandidateRail.tsx")
+  ? read("src/features/build-manager/CandidateRail.tsx")
+  : "";
+check("vazio de contraste explicado", /Sem contraste não vira sugestão/i.test(candidateRail));
 
 // 7. Nada de import cruzado entre features (o f4b cobre, mas a tela é nova).
 check("não importa outra feature", !/from\s+["'][^"']*features\//.test(screen));

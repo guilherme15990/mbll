@@ -1,4 +1,5 @@
-import { Users, Info } from "lucide-react";
+import { useMemo } from "react";
+import { Users } from "lucide-react";
 import { cx } from "../../shared/api";
 import {
   ARCHETYPES,
@@ -13,77 +14,14 @@ import {
 } from "./model";
 
 /**
- * Mix de arquétipos e relação entre composições (ADR-053 D4).
+ * Mix de arquétipos em barras divergentes de mesma escala: o nome fica no meio,
+ * a barra do meu time pende para a esquerda e a do inimigo para a direita, com
+ * o valor em cada ponta. Escala única (`max` = maior contagem do painel) para
+ * comparar valores próximos.
  *
  * O perfil vem dos pares de cada herói (dominantProfileOf). Sem par com perfil
- * o herói sai do denominador — nunca vira “uniforme”. A relação descreve
- * janelas (cedo/tarde), não resultado.
+ * o herói sai do denominador — nunca vira “uniforme”.
  */
-const TONE: Record<MixRelation["tone"], string> = {
-  emerald: "border-emerald-400/30 bg-emerald-400/10",
-  amber: "border-amber-400/30 bg-amber-400/10",
-  slate: "border-line bg-abyss/60",
-};
-
-function SideMix({
-  label,
-  mix,
-  ids,
-  books,
-  pool,
-  bar,
-}: {
-  label: string;
-  mix: TeamMix;
-  ids: readonly number[];
-  books: MatchupBooks;
-  pool: HeroPool;
-  bar: "sky" | "rose";
-}) {
-  return (
-    <div className="space-y-1.5 min-w-0">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[11px] font-bold text-foam">{label}</span>
-        <span className="text-[9px] font-mono text-mist/60">
-          {mix.observed} com perfil{mix.semDado ? ` · ${mix.semDado} sem dado` : ""}
-        </span>
-      </div>
-      {ARCHETYPES.map((archetype: Archetype) => {
-        const count = mix.counts[archetype];
-        const heroes = ids
-          .filter((id) => heroArchetype(id, books)?.top === archetype)
-          .map((id) => pool[id]?.name ?? `#${id}`);
-        const width = mix.observed ? (count / mix.observed) * 100 : 0;
-        return (
-          <div key={archetype} className="space-y-0.5">
-            <div className="flex items-baseline justify-between gap-2 text-[10px]">
-              <span className={cx("font-semibold", mix.dominant === archetype ? "text-gold" : "text-foam/80")}>
-                {ARCHETYPE_LABEL[archetype]}
-                {mix.dominant === archetype ? " · dominante" : ""}
-              </span>
-              <span className="font-mono text-mist" title={ARCHETYPE_NOTE[archetype]}>
-                {count}
-              </span>
-            </div>
-            <div className="h-1.5 rounded-full bg-abyss border border-line/50 overflow-hidden">
-              <span
-                className={cx("block h-full", bar === "sky" ? "bg-sky-400/80" : "bg-rose-400/80")}
-                style={{ width: `${width}%` }}
-                aria-hidden="true"
-              />
-            </div>
-            {heroes.length > 0 && (
-              <p className="text-[9px] text-mist/70 truncate" title={heroes.join(", ")}>
-                {heroes.join(", ")}
-              </p>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 export default function ArchetypePanel({
   mix,
   teams,
@@ -95,37 +33,66 @@ export default function ArchetypePanel({
   books: MatchupBooks;
   pool: HeroPool;
 }) {
+  const max = useMemo(() => {
+    const counts = ARCHETYPES.flatMap((archetype) => [mix.ours.counts[archetype], mix.theirs.counts[archetype]]);
+    return Math.max(1, ...counts);
+  }, [mix]);
+
+  const heroesOf = (ids: readonly number[], archetype: Archetype) =>
+    ids
+      .filter((id) => heroArchetype(id, books)?.top === archetype)
+      .map((id) => pool[id]?.name ?? `#${id}`);
+
   return (
-    <section className="card p-3.5 space-y-3" aria-label="Relação entre arquétipos">
+    <section className="card p-3.5 space-y-2.5" aria-label="Relação entre arquétipos">
       <header className="flex items-center justify-between gap-2">
         <p className="lbl flex items-center gap-1.5">
           <Users size={12} className="text-gold" aria-hidden="true" /> Arquétipos
         </p>
-        <span className="text-[9px] font-mono text-mist/60">janela dos pares</span>
       </header>
 
-      <div className="grid grid-cols-2 gap-3">
-        <SideMix label="Nós" mix={mix.ours} ids={teams.us} books={books} pool={pool} bar="sky" />
-        <SideMix label="Eles" mix={mix.theirs} ids={teams.them} books={books} pool={pool} bar="rose" />
+      <div className="space-y-2">
+        {ARCHETYPES.map((archetype: Archetype) => {
+          const us = mix.ours.counts[archetype];
+          const them = mix.theirs.counts[archetype];
+          const usDominant = mix.ours.dominant === archetype;
+          const themDominant = mix.theirs.dominant === archetype;
+          const usHeroes = heroesOf(teams.us, archetype);
+          const themHeroes = heroesOf(teams.them, archetype);
+          return (
+            <div key={archetype} className="space-y-1">
+              <p
+                className={cx(
+                  "text-center text-[10px] font-semibold",
+                  usDominant || themDominant ? "text-gold" : "text-foam/80",
+                )}
+                title={ARCHETYPE_NOTE[archetype]}
+              >
+                {ARCHETYPE_LABEL[archetype]}
+              </p>
+              <div className="flex items-center gap-1.5">
+                <span className="w-4 text-right text-[9px] font-mono text-mist shrink-0">{us}</span>
+                <div className="flex-1 flex justify-end min-w-0" title={usHeroes.join(", ") || "sem herói com perfil"}>
+                  <span
+                    className="h-1.5 rounded-l-full bg-sky-400/80"
+                    style={{ width: `${(us / max) * 100}%` }}
+                    aria-hidden="true"
+                  />
+                </div>
+                <span className="w-px h-3 bg-line shrink-0" aria-hidden="true" />
+                <div className="flex-1 min-w-0" title={themHeroes.join(", ") || "sem herói com perfil"}>
+                  <span
+                    className="block h-1.5 rounded-r-full bg-rose-400/80"
+                    style={{ width: `${(them / max) * 100}%` }}
+                    aria-hidden="true"
+                  />
+                </div>
+                <span className="w-4 text-[9px] font-mono text-mist shrink-0">{them}</span>
+              </div>
+            </div>
+          );
+        })}
       </div>
-
-      <div className={cx("rounded-xl border px-2.5 py-2 space-y-0.5", TONE[mix.relation.tone])}>
-        <p className="text-[11px] font-bold text-foam">{mix.relation.label}</p>
-        <p className="text-[10px] text-mist/85 leading-relaxed">{mix.relation.detail}</p>
-        {mix.relation.target && (
-          <p className="text-[10px] text-foam/90">
-            contrapeso declarado: <b className="text-gold">{ARCHETYPE_LABEL[mix.relation.target]}</b>
-          </p>
-        )}
-      </div>
-
-      <p className="text-[9px] text-mist/70 flex items-start gap-1.5">
-        <Info size={10} className="mt-0.5 shrink-0" aria-hidden="true" />
-        <span>
-          Perfil dominante dos pares de cada herói (n/total), como no selo da carta. Sem par → sem dado, nunca
-          “uniforme” inventado. A leitura é de janela, não de resultado.
-        </span>
-      </p>
     </section>
   );
 }

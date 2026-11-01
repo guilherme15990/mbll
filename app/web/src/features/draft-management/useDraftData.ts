@@ -2,9 +2,9 @@ import { useMemo } from "react";
 import { useQueries } from "@tanstack/react-query";
 import {
   matchupsQuery,
+  useAllHeroes,
   useCatalog,
   useHeroLanes,
-  useHeroes,
   type CatalogEntry,
   type Hero,
   type LotMeta,
@@ -22,7 +22,8 @@ import {
 /**
  * Dados da tela de draft (ADR-052 D4 + ADR-053 D8).
  *
- * - `/heroes` (lote do recorte) → θ̂, pick, ban, B, IC.
+ * - `/heroes` (lote COMPLETO do recorte via `useAllHeroes`) → θ̂, pick, ban, B, IC.
+ *   O tamanho do lote não é fixado: o hook pagina pelo `total` do servidor.
  * - `/catalog` → nome/avatar de todo herói, mesmo sem dado no recorte.
  * - `/heroes/lanes` → rota por herói.
  * - `/heroes/:id/matchups` → pares, via `useQueries` sobre a MESMA query key
@@ -108,7 +109,7 @@ function pairs(list: MatchupsResponse["countersUp"] | undefined): PairObs[] {
 
 export function useDraftData(rank: string, window: string, ids: number[], lane: DraftLane): DraftData {
   const enabled = rank !== "all";
-  const heroesQ = useHeroes(rank, window, "", 1, 133, enabled);
+  const heroesQ = useAllHeroes(rank, window, "", enabled);
   const catalogQ = useCatalog();
   const lanesQ = useHeroLanes(rank, enabled);
 

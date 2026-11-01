@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { Route, Routes } from "react-router-dom";
 
 vi.mock("../../src/features/draft-management/useDraftData", () => ({
@@ -47,6 +47,7 @@ const pool = {
   4: hero(4, "Lancelot", { wrAdj: 0.58, pick: 0.09, ban: 0.06, B: 0.6, tier: "Forte", lanes: ["exp"] }),
   5: hero(5, "Bruno", { wrAdj: 0.6, pick: 0.07, ban: 0.05, B: 0.7, lanes: ["gold", "mid"] }),
   6: hero(6, "Chou", { wrAdj: 0.55, pick: 0.06, ban: 0.03, B: 0.5, lanes: ["exp"] }),
+  7: hero(7, "Atlas", { wrAdj: 0.5, pick: 0.04, ban: 0.02, B: 0.6, lanes: ["gold"] }),
 };
 
 const curve = [
@@ -111,7 +112,6 @@ describe("DraftManagement (caracterização v2)", () => {
     mockData();
     renderAt("/draft?rank=mythic&window=7&first=us");
     expect(screen.getByText("Monte o draft e leia o que os sinais sustentam")).toBeInTheDocument();
-    expect(screen.getByText(/Comece pelo seletor de 1º pick/)).toBeInTheDocument();
     expect(screen.getAllByText(/não é probabilidade, não é previsão/).length).toBeGreaterThan(0);
     // Percentual não existe com um lado vazio: mostra o aviso, nunca 100%.
     expect(screen.getByText("falta índice de um dos lados")).toBeInTheDocument();
@@ -124,7 +124,6 @@ describe("DraftManagement (caracterização v2)", () => {
     expect(screen.getAllByText("Fanny").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Tigreal").length).toBeGreaterThan(0);
     expect(screen.getByText("Força dos times")).toBeInTheDocument();
-    expect(screen.getByText(/Divisão do índice somado/)).toBeInTheDocument();
     expect(screen.getByText("Confronto 5×5")).toBeInTheDocument();
     expect(screen.getByText("Arquétipos")).toBeInTheDocument();
     expect(screen.getByText("Evolução por duração")).toBeInTheDocument();
@@ -134,7 +133,6 @@ describe("DraftManagement (caracterização v2)", () => {
     expect(screen.getByText("Força média")).toBeInTheDocument();
     expect(screen.getByText("Sinergia observada")).toBeInTheDocument();
     expect(screen.getByText("Confronto por par")).toBeInTheDocument();
-    expect(screen.getByText("Leitura incompleta")).toBeInTheDocument();
     // A seção de ordem do draft saiu da tela.
     expect(screen.queryByText(/Ordem do draft/i)).not.toBeInTheDocument();
     // Destaque dos extremos de θ̂ do time (Fanny forte, Miya fraca).
@@ -146,20 +144,17 @@ describe("DraftManagement (caracterização v2)", () => {
     mockData();
     renderAt(`/draft?rank=mythic&window=7&first=us&${DRAFTED}`);
     expect(screen.getByRole("img", { name: /divisão do índice/ })).toBeInTheDocument();
-    expect(screen.getByText(/não é probabilidade nem previsão/)).toBeInTheDocument();
+    expect(screen.getAllByText(/não é probabilidade, não é previsão/).length).toBeGreaterThan(0);
     expect(screen.queryByText(/chance de vitória|probabilidade de vitória/i)).not.toBeInTheDocument();
   });
 
-  it("card maior traz os dois fatores e todos os candidatos têm Pick e Ban", () => {
+  it("card maior e todos os candidatos têm Pick e Ban", () => {
     mockData();
     renderAt(`/draft?rank=mythic&window=7&first=us&lane=gold&${DRAFTED}`);
 
     expect(screen.getByText("Mais indicado agora")).toBeInTheDocument();
-    expect(screen.getByText(/leitura ordenada por dois fatores, não é recomendação/)).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /^Pickar / }).length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByRole("button", { name: /^Banir / }).length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByText(/meta da lane:/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/tipo:/).length).toBeGreaterThan(0);
   });
 
   it("Pick do card grava no próximo slot nosso e some da lista", () => {
@@ -202,19 +197,33 @@ describe("DraftManagement (caracterização v2)", () => {
     expect(screen.getByText("eles (1 duplas)")).toBeInTheDocument();
   });
 
-  it("seletor de primeiro pick grava na URL e reflete o estado", () => {
+  it("clicar no slot abre o modal e escolhe o herói", () => {
     mockData();
-    renderAt(`/draft?rank=mythic&window=7&first=us&${DRAFTED}`);
+    renderAt(`/draft?rank=mythic&window=7&${DRAFTED}`);
 
-    const us = screen.getByRole("button", { name: "Meu time" });
-    const them = screen.getByRole("button", { name: "Inimigo" });
-    expect(us).toHaveAttribute("aria-pressed", "true");
-    expect(them).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(screen.getByRole("button", { name: "Escolher herói para o slot 3 do nosso time" }));
+    const dialog = screen.getByRole("dialog", { name: /Escolher herói.*Slot 3.*nosso time/ });
+    expect(dialog).toBeInTheDocument();
 
-    fireEvent.click(them);
+    fireEvent.change(within(dialog).getByRole("textbox", { name: "Buscar herói" }), { target: { value: "Chou" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: /Chou/ }));
 
-    expect(screen.getByRole("button", { name: "Inimigo" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "Meu time" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Trocar Chou no slot 3 do nosso time" })).toBeInTheDocument();
+  });
+
+  it("seção de bans marca ban pelo modal, no mesmo modelo dos heróis", () => {
+    mockData();
+    renderAt(`/draft?rank=mythic&window=7&${DRAFTED}`);
+
+    fireEvent.click(screen.getByRole("button", { name: "Banir herói no ban 1 do nosso time" }));
+    const dialog = screen.getByRole("dialog", { name: /Banir herói.*Ban 1.*nosso time/ });
+
+    fireEvent.change(within(dialog).getByRole("textbox", { name: "Buscar herói" }), { target: { value: "Chou" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: /Chou/ }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Trocar ban 1 do nosso time \(Chou\)/ })).toBeInTheDocument();
   });
 
   it("elo ALL não calcula proxy: pede elo explícito", () => {

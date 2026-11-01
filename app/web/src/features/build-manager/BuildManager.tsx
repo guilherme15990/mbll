@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
-  AlertTriangle, ArrowRight, Crosshair, Info, RotateCcw, Sparkles, Swords,
+  ArrowRight, RotateCcw,
 } from "lucide-react";
 import { orderBuildsByLift } from "@radar/proprietary-engine";
 import {
@@ -15,15 +15,16 @@ import {
   type PickCandidate, type SlotRef,
 } from "../../shared/domain/buildManager";
 import {
-  LOADOUT_VERSION, decodeLoadout, encodeLoadout, loadoutHref, signatureOfPick, type Loadout,
+  LOADOUT_VERSION, decodeLoadout, encodeLoadout, signatureOfPick, type Loadout,
 } from "../../shared/domain/loadout";
 import {
   TOTAL_ITEM_SLOTS, scoreCombination, type CombinerPick, type CombinerScore,
 } from "../../shared/domain/combiner";
 import {
-  Avatar, CtxBar, Empty, ErrBox, FreshLine, GhostNote, Loading, SectionTitle, TierBadge,
+  Empty, ErrBox, GhostNote, Loading, SectionTitle,
 } from "../../shared/ui";
 import HeroPicker from "../../shared/ui/patterns/HeroPicker";
+import { HeroDataCard } from "../../shared/ui/patterns/HeroDataCard";
 import ItemComposer, {
   type ComposerItem, type ComposerSpell,
 } from "../../shared/ui/patterns/ItemComposer";
@@ -484,11 +485,7 @@ export default function BuildManager() {
     setActionError(null);
   };
 
-  const currentLoadout = selected ? buildLoadoutFor(pick) : null;
-  const prepareHref = currentLoadout ? loadoutHref(currentLoadout) : "";
   const heroHref = `/hero/${hero}?${new URLSearchParams({ tab: "builds", rank, window, lane }).toString()}`;
-  const draftHref = `/hero/${hero}?${new URLSearchParams({ tab: "draft", rank, window, lane }).toString()}`;
-  const matchupsHref = `/confrontos?${new URLSearchParams({ hero, rank, window, lane }).toString()}`;
 
   const pickHero = (id: string) => {
     const next = new URLSearchParams(sp);
@@ -621,15 +618,6 @@ export default function BuildManager() {
 
   return (
     <section className="space-y-5 animate-fadeIn motion-reduce:animate-none" data-testid="build-manager">
-      <CtxBar
-        id="BDL"
-        name="Build Management — build do herói"
-        question="Qual composição eu levo e quanto ela ganha da referência?"
-        status="observado + índice relativo"
-        formula="índice = base + pontos_por_pp × média(contraste do componente no mesmo herói+lane+rank, encolhido por n/(n+K)); núcleo = itens que mais se repetem nas builds observadas; lift da fonte é fração 0–1 e aparece em pontos percentuais."
-        prdRef="ADR-030 · ADR-044 · ADR-047"
-      />
-
       {!hero ? (
         <>
           <SectionTitle
@@ -645,66 +633,23 @@ export default function BuildManager() {
         </>
       ) : (
         <>
-          <div className="rounded-2xl border border-line bg-panel p-4 md:p-5 space-y-3">
-            <div className="flex items-center gap-4 flex-wrap">
-              <Avatar src={heroData?.head ?? null} name={heroName} size={64} />
-              <div className="min-w-0 flex-1 space-y-1.5">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-[22px] md:text-[28px] leading-tight font-extrabold tracking-tight text-foam">{heroName}</h1>
-                  {heroData && <TierBadge tier={heroData.tier} />}
-                  <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border border-gold/40 bg-gold/10 text-gold">
-                    Build Management
-                  </span>
-                </div>
-                {heroData ? (
-                  <p className="text-[11px] text-mist">
-                    Força θ̂ <b className="num text-gold">{num(heroData.wrAdj, 3)}</b> · win {pct(heroData.win)} · pick {pct(heroData.pick)} · ban {pct(heroData.ban)}
-                  </p>
-                ) : heroQuery.isLoading ? (
-                  <p className="text-[11px] text-mist" role="status">carregando força do herói…</p>
-                ) : (
-                  <p className="text-[11px] text-amber-200">Sem detalhe do herói neste recorte; as builds continuam tentando carregar.</p>
-                )}
-              </div>
+          <HeroDataCard
+            name={heroName}
+            head={heroData?.head ?? null}
+            tier={heroData?.tier ?? null}
+            metrics={heroData ?? null}
+            window={window}
+            loading={heroQuery.isLoading && !heroData}
+            titleAs="h1"
+            aside={
               <Link
                 to={heroHref}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-line bg-panel2 text-xs font-semibold text-mist hover:text-foam transition-colors min-h-[44px]"
               >
                 Abrir ficha <ArrowRight size={13} />
               </Link>
-            </div>
-
-            <details className="rounded-xl border border-line bg-abyss/30 px-3 py-2">
-              <summary className="cursor-pointer text-[11px] font-semibold text-foam/90">Trocar herói</summary>
-              <div className="pt-2">
-                <HeroPicker hero={hero} onPick={pickHero} compact />
-              </div>
-            </details>
-
-            <div className="flex items-center gap-2 flex-wrap" role="group" aria-label="Escolha a lane da build">
-              <span className="lbl text-[10px]">Lane</span>
-              {LANES.map((l) => {
-                const mapped = heroLanes.includes(l);
-                return (
-                  <button
-                    key={l}
-                    type="button"
-                    onClick={() => pickLane(l)}
-                    aria-pressed={lane === l}
-                    title={mapped ? "Rota mapeada do herói" : "Rota sem mapeamento do herói"}
-                    className={cx(
-                      "px-3 py-1.5 rounded-xl text-xs font-bold uppercase transition-all min-h-[40px] inline-flex items-center gap-1.5",
-                      lane === l ? "bg-gold text-abyss shadow-sm" : "bg-abyss/60 text-mist hover:text-foam border border-line",
-                    )}
-                  >
-                    {l}
-                    {mapped && <span className={cx("w-1 h-1 rounded-full", lane === l ? "bg-abyss" : "bg-gold")} aria-hidden="true" />}
-                  </button>
-                );
-              })}
-              <span className="text-[10px] text-mist/70">• ponto = rota mapeada do herói</span>
-            </div>
-          </div>
+            }
+          />
 
           {!lane ? (
             <NeedsLane onPick={pickLane} />
@@ -728,21 +673,7 @@ export default function BuildManager() {
                     />
                   ) : (
                     <>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <FreshLine
-                          stale={aggregateQuery.data?.context.stale}
-                          ageMs={aggregateQuery.data?.context.age_ms}
-                        />
-                        <span className="text-[11px] text-mist">
-                          {rank.toUpperCase()} · {lane.toUpperCase()} · {totalBuilds} build{totalBuilds === 1 ? "" : "s"} observada{totalBuilds === 1 ? "" : "s"}
-                        </span>
-                        <span className="ml-auto text-[10px] text-mist">
-                          {pick.itemIds.length}/{TOTAL_ITEM_SLOTS} itens · {sameAsBase ? "base observada" : "composição sua"}
-                        </span>
-                      </div>
-
                       <SectionTitle
-                        kicker="1 · Núcleo"
                         title={stableCore ? `Núcleo de ${heroName} na ${lane.toUpperCase()}` : "Itens mais frequentes"}
                         subtitle="Itens que mais se repetem nas builds observadas. Presença é descritiva; não é ordem de compra nem prova de causa."
                       />
@@ -754,18 +685,11 @@ export default function BuildManager() {
                         ) : (
                           <GhostNote>As builds deste recorte não trazem id de item — não há núcleo para contar.</GhostNote>
                         )}
-                        <p className="text-[10px] text-mist/80">
-                          Contagem por build (item repetido na mesma build conta uma vez). {stableCore
-                            ? "Itens com 50% ou mais de presença formam o núcleo."
-                            : "Nenhum item passa de 50% das builds: a lista mostra só os mais frequentes."}
-                        </p>
                       </div>
 
                       <SectionTitle
-                        kicker="2 · Sua composição"
                         title="Quadro para montar e testar"
                         subtitle="Comece pela base observada ou pelo núcleo. Clique em qualquer slot para abrir o seletor; o poder relativo muda ao vivo."
-                        right={<span className="text-[11px] text-mist">{TOTAL_ITEM_SLOTS} itens · 3 talentos · 1 emblema · 1 feitiço</span>}
                       />
 
                       <div className="grid gap-3 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
@@ -848,8 +772,6 @@ export default function BuildManager() {
                           <CompositionPower
                             score={score}
                             baseScore={baseScore}
-                            sameAsBase={sameAsBase}
-                            base={selected?.build ?? null}
                           />
                           <RuneCombos
                             combos={combos}
@@ -881,87 +803,6 @@ export default function BuildManager() {
                           onOpenCatalog={() => openPicker({ kind: "item", index: full ? 0 : pick.itemIds.length })}
                         />
                       </div>
-
-                      <div className="card p-3.5 bg-panel2/40 border-line space-y-2">
-                        <p className="flex items-start gap-1.5 text-[11px] text-mist">
-                          <Info size={13} className="mt-0.5 shrink-0" />
-                          O índice é relativo: não é winrate, não é previsão, não é probabilidade e não é o número
-                          interno do jogo. Sugestões não são recomendação. Sem contraste não vira sugestão. O lift é a
-                          diferença de win vs a build mais usada, exibida em pontos percentuais.
-                        </p>
-                        <details className="text-[11px] text-mist">
-                          <summary className="cursor-pointer text-foam/90">Como isso foi calculado</summary>
-                          <div className="mt-2 space-y-1.5">
-                            <p>{combiner?.scale.index_rule ?? "Índice = base + pontos por pp × média dos pesos por contraste. Sem o bloco de componentes, o índice fica em aberto."}</p>
-                            <p>
-                              <b className="text-foam/90">Núcleo:</b> itens contados uma vez por build observada; a fração usa o total de builds do recorte.
-                            </p>
-                            <p>
-                              <b className="text-foam/90">Sugestões:</b> somente componentes com valor observado ou estimado; item sem contraste não entra.
-                              Uma bota no máximo e teto de {TOTAL_ITEM_SLOTS} itens.
-                            </p>
-                            <p>
-                              <b className="text-foam/90">Combinações prontas:</b> só o conjunto exato de emblema + talentos + feitiço que apareceu junto
-                              em uma build. Uma build não vira “padrão recorrente”; ela é mostrada como 1 build.
-                            </p>
-                            <p>
-                              <b className="text-foam/90">Editar:</b> a composição deixa de ser a build observada e vira <code>custom</code>.
-                              Win/pick/lift da origem não são herdados pela sua versão.
-                            </p>
-                            <p>Sem N de partidas. Nada aqui é causal.</p>
-                          </div>
-                        </details>
-                      </div>
-
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Link
-                          to={prepareHref || heroHref}
-                          className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gold text-abyss text-sm font-bold hover:bg-gold-light transition-colors min-h-[44px]"
-                        >
-                          {sameAsBase ? "Levar esta build para a preparação" : "Levar composição editada para a preparação"} →
-                        </Link>
-                        <Link
-                          to={heroHref}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-line bg-panel2 text-xs font-semibold text-mist hover:text-foam transition-colors min-h-[44px]"
-                        >
-                          Ver ficha
-                        </Link>
-                      </div>
-
-                      <SectionTitle
-                        kicker="4 · Próximo passo"
-                        title="Da build para a partida"
-                        subtitle="Leve o herói e o contexto para a leitura de confrontos ou para o draft. Nenhum número de composição de time é inventado."
-                      />
-                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                        <Link
-                          to={matchupsHref}
-                          className="card p-3.5 bg-panel border-line hover:border-gold/40 transition-colors space-y-1"
-                        >
-                          <p className="text-xs font-bold text-foam flex items-center gap-1.5"><Swords size={14} className="text-gold" /> Confrontos</p>
-                          <p className="text-[11px] text-mist">Quem este herói enfrenta e com qual evidência.</p>
-                        </Link>
-                        <Link
-                          to={draftHref}
-                          className="card p-3.5 bg-panel border-line hover:border-gold/40 transition-colors space-y-1"
-                        >
-                          <p className="text-xs font-bold text-foam flex items-center gap-1.5"><Crosshair size={14} className="text-gold" /> Draft</p>
-                          <p className="text-[11px] text-mist">Pressão de pick/ban antes de entrar na rankeada.</p>
-                        </Link>
-                        <Link
-                          to={heroHref}
-                          className="card p-3.5 bg-panel border-line hover:border-gold/40 transition-colors space-y-1"
-                        >
-                          <p className="text-xs font-bold text-foam flex items-center gap-1.5"><Sparkles size={14} className="text-gold" /> Ficha completa</p>
-                          <p className="text-[11px] text-mist">Força, confiança, ranks e tempo no mesmo recorte.</p>
-                        </Link>
-                      </div>
-
-                      <p className="text-[10px] text-mist/70 flex items-start gap-1.5">
-                        <AlertTriangle size={12} className="mt-0.5 shrink-0" />
-                        Itens fora do recorte não aparecem: o seletor só usa o catálogo observado e os pesos da lane.
-                        Trocar de lane ou de herói limpa a composição.
-                      </p>
                     </>
                   )}
                 </>

@@ -1,10 +1,15 @@
 /**
- * Domínio: heróis — lista paginada, detalhe, catálogo e mapa de lanes.
+ * Domínio: heróis — lista paginada, lote completo, detalhe, catálogo e mapa de lanes.
  *
  * Consumido por `app/` e `shared/` além das features, por isso mora em `shared/api`
  * (a fronteira proíbe `app|shared → features`).
+ *
+ * `useHeroes` = 1 página. `useAllHeroes` = lote inteiro (pagina pelo `total`,
+ * sem tamanho de lote fixo). `useHero` = detalhe. `useCatalog` = nome/avatar de
+ * todo herói. `useHeroLanes` = rota por herói.
  */
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQueries, useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { getJSON } from "../http";
 import { PAGE_SIZE } from "./filters";
 
@@ -68,6 +73,96 @@ export const useHeroes = (rank: string, window: string, extra = "", index = 1, s
     enabled,
     queryFn: () => getJSON<HeroesResponse>(`/v1/heroes?rank=${rank}&window=${window}&size=${size}&index=${index}&${extra}`),
   });
+
+/**
+ * Teto de `size` por request imposto pelo SERVIDOR (`qHeroes` clampa em 133 —
+ * `app/api/src/application/scoring.js`). NÃO é o tamanho do lote: o lote é lido
+ * de `total` e coberto por paginação (`index`), para que um herói novo apareça
+ * sozinho, sem mexer em constante alguma.
+ */
+export const HEROES_PAGE_CAP = 133;
+
+/** Resultado do lote COMPLETO: todas as páginas concatenadas + estado do hook. */
+export type AllHeroesResult = {
+  data: HeroesResponse | undefined;
+  isLoading: boolean;
+  isError: boolean;
+  isSuccess: boolean;
+  refetch: () => void;
+};
+
+/** Query de uma página extra (mesma query key do `useHeroes`; cache compartilhado). */
+function heroPageQuery(rank: string, window: string, extra: string, index: number) {
+  return {
+    queryKey: ["heroes", rank, window, extra, index, HEROES_PAGE_CAP],
+    placeholderData: keepPreviousData,
+    queryFn: () =>
+      getJSON<HeroesResponse>(
+        `/v1/heroes?rank=${rank}&window=${window}&size=${HEROES_PAGE_CAP}&index=${index}&${extra}`,
+      ),
+  };
+}
+
+/**
+ * Lote COMPLETO do recorte: a página 1 descobre `total` e o resto é paginado
+ * por `index` até cobrir tudo. O tamanho do lote NÃO é fixado no cliente — o
+ * único número é o teto de request do servidor (`HEROES_PAGE_CAP`). O lote
+ * atual (≤ teto) cabe em 1 request; se crescer, as páginas extras vêm sozinhas.
+ *
+ * `truncated` fica true só quando a FONTE cortou (`fetched.truncated`) ou quando,
+ * com todas as páginas carregadas, ainda faltar linha do `total` — nunca por
+ * página ainda em voo.
+ */
+export function useAllHeroes(
+  rank: string,
+  window: string,
+  extra = "",
+  enabled = true,
+): AllHeroesResult {
+  const first = useHeroes(rank, window, extra, 1, HEROES_PAGE_CAP, enabled);
+  const firstCount = first.data?.data.length ?? 0;
+  const total = first.data?.total ?? 0;
+  const pages = firstCount > 0 ? Math.ceil(total / firstCount) : 1;
+
+  const rest = useQueries({
+    queries: Array.from({ length: Math.max(0, pages - 1) }, (_, k) =>
+      heroPageQuery(rank, window, extra, k + 2),
+    ),
+  });
+
+  // Assinatura das páginas extras: o memo recomputa quando qualquer uma muda
+  // (dado ou estado), sem depender da identidade instável do array do useQueries.
+  const restStamp = rest.map((query) => `${query.dataUpdatedAt}:${query.status}`).join("|");
+
+  const combined = useMemo<HeroesResponse | undefined>(() => {
+    if (!first.data) return undefined;
+    const rows = [...first.data.data];
+    let settled = true;
+    for (const query of rest) {
+      if (query.data) rows.push(...query.data.data);
+      if (!query.isSuccess) settled = false;
+    }
+    return {
+      ...first.data,
+      data: rows,
+      total,
+      truncated: Boolean(first.data.truncated) || (settled && rows.length < total),
+    };
+    // `rest` é derivado de restStamp; o memo cobre toda mudança de página extra.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [first.data, restStamp, total]);
+
+  return {
+    data: combined,
+    isLoading: first.isLoading || rest.some((query) => query.isLoading),
+    isError: first.isError || rest.some((query) => query.isError),
+    isSuccess: first.isSuccess,
+    refetch: () => {
+      void first.refetch();
+      for (const query of rest) void query.refetch();
+    },
+  };
+}
 
 export const useHero = (id: string | null | undefined, rank: string, window: string) =>
   useQuery({

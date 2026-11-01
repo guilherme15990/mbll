@@ -1,40 +1,16 @@
-import { cx, pct, type Build } from "../../shared/api";
+import { cx } from "../../shared/api";
 import type { CombinerScore } from "../../shared/domain/combiner";
-import { liftPp, liftTone, signed } from "../../shared/format";
+import { signed } from "../../shared/format";
 
 type Props = {
   score: CombinerScore | null;
   baseScore: CombinerScore | null;
-  sameAsBase: boolean;
-  base: Build | null;
 };
 
-const LIFT_TONE_CLASS = {
-  unknown: "text-mist",
-  neutral: "text-mist",
-  positive: "text-emerald-300",
-  negative: "text-rose-300",
-} as const;
-
-function liftText(build: Build): string {
-  const lift = build.lift_vs_most_used;
-  const tone = liftTone(lift);
-  if (tone === "unknown") return "sem referência";
-  if (tone === "neutral") return `sem diferença relevante (${liftPp(lift)})`;
-  return liftPp(lift);
-}
-
-export default function CompositionPower({
-  score,
-  baseScore,
-  sameAsBase,
-  base,
-}: Props) {
+export default function CompositionPower({ score, baseScore }: Props) {
   const index = score?.index ?? null;
   const baseIndex = baseScore?.index ?? null;
   const delta = index != null && baseIndex != null ? +(index - baseIndex).toFixed(1) : null;
-  const lift = base?.lift_vs_most_used ?? null;
-  const tone = liftTone(lift);
 
   return (
     <div className="card space-y-3 border-line bg-panel p-3.5">
@@ -54,23 +30,6 @@ export default function CompositionPower({
               {delta >= 0 ? "▲" : "▼"} {signed(delta, 1)} vs base
             </span>
           ) : null}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-1.5">
-        <div className="rounded-xl border border-line bg-abyss/40 px-2 py-1.5">
-          <p className="lbl text-[9px]">Win da base</p>
-          <p className="num text-sm font-bold text-foam">{sameAsBase ? pct(base?.win) : "—"}</p>
-        </div>
-        <div className="rounded-xl border border-line bg-abyss/40 px-2 py-1.5">
-          <p className="lbl text-[9px]">Pick da base</p>
-          <p className="num text-sm font-bold text-foam">{sameAsBase ? pct(base?.pick, 2) : "—"}</p>
-        </div>
-        <div className="rounded-xl border border-line bg-abyss/40 px-2 py-1.5">
-          <p className="lbl text-[9px]">Lift vs mais usada</p>
-          <p className={cx("num text-sm font-bold", sameAsBase ? LIFT_TONE_CLASS[tone] : "text-mist")}>
-            {base ? liftText(base) : "—"}
-          </p>
         </div>
       </div>
     </div>

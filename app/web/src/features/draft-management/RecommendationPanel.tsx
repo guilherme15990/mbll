@@ -1,6 +1,5 @@
 import { Ban as BanIcon, Check, Sparkles, Crosshair } from "lucide-react";
-import { cx, pct } from "../../shared/api";
-import { num } from "../../shared/format";
+import { cx } from "../../shared/api";
 import { Avatar } from "../../shared/ui";
 import {
   ARCHETYPE_LABEL,
@@ -13,26 +12,72 @@ import {
 import { LANE_LABEL } from "./labels";
 
 /**
- * Recomendações na rota do slot (ADR-053 D5/D6).
+ * Recomendações na lane alvo (ADR-053 D5/D6 + ADR-055).
  *
- * Dois fatores declarados: percentil do θ̂ na lane (peso 1) e tipo que
- * contrabalança o arquétipo dominante inimigo (peso 0,25). O score NÃO é
- * exibido — a UI mostra os fatores por extenso. Leitura, não recomendação.
+ * O motor ordena por CINCO fatores: counter contra o inimigo, antisinergia com
+ * o nosso time, exposição aos counters inimigos, meta (percentil do θ̂) e
+ * balanceamento de arquétipo. O score NÃO é exibido — a UI mostra só os sinais
+ * observados por extenso. Leitura, não recomendação.
  */
-function metaText(candidate: Candidate): string {
-  if (candidate.percentile == null) return "meta da lane: sem θ̂ no recorte";
-  const percentile = Math.round(candidate.percentile * 100);
-  const above = candidate.above == null ? "" : ` · ${candidate.above} acima`;
-  return `meta da lane: ${percentile}º percentil${above}`;
+type SignalTone = "good" | "bad" | "flat";
+type Signal = { key: string; label: string; tone: SignalTone };
+
+function signalsOf(candidate: Candidate): Signal[] {
+  const signals: Signal[] = [];
+  if (candidate.counter.value != null) {
+    signals.push({ key: "counter", label: `countera ${candidate.counter.ids.length}`, tone: "good" });
+  }
+  if (candidate.antisynergy.value != null) {
+    signals.push({ key: "antisynergy", label: `antisinergia ${candidate.antisynergy.ids.length}`, tone: "bad" });
+  }
+  if (candidate.exposure.value != null) {
+    signals.push({ key: "exposure", label: `exposto ${candidate.exposure.ids.length}`, tone: "bad" });
+  }
+  if (candidate.meta != null) {
+    signals.push({
+      key: "meta",
+      label: `meta ${Math.round(candidate.meta * 100)}`,
+      tone: candidate.meta >= 0.5 ? "good" : "flat",
+    });
+  }
+  if (candidate.balance != null) {
+    signals.push({
+      key: "balance",
+      label: candidate.balance > 0 ? "balanceia" : candidate.balance < 0 ? "repete" : "neutro",
+      tone: candidate.balance > 0 ? "good" : candidate.balance < 0 ? "bad" : "flat",
+    });
+  }
+  return signals;
 }
 
-function typeText(candidate: Candidate): string {
-  if (!candidate.archetype) return "tipo: sem par com perfil";
-  const base = `${ARCHETYPE_LABEL[candidate.archetype.top]} (${candidate.archetype.n}/${candidate.archetype.total})`;
-  if (candidate.balance === 1 && candidate.target) return `tipo: ${base} — contrabalança ${ARCHETYPE_LABEL[candidate.target]}`;
-  if (candidate.balance === -1) return `tipo: ${base} — repete a janela inimiga`;
-  if (candidate.balance === 0) return `tipo: ${base} — sem inclinação`;
-  return `tipo: ${base} — sem alvo de contrapeso`;
+const TONE_CLASS: Record<SignalTone, string> = {
+  good: "border-emerald-400/30 text-emerald-300",
+  bad: "border-rose-400/30 text-rose-300",
+  flat: "border-line text-mist",
+};
+
+function SignalRow({ candidate, compact }: { candidate: Candidate; compact: boolean }) {
+  const signals = signalsOf(candidate);
+  if (!signals.length) {
+    return <p className="text-[9px] font-mono text-mist/60 truncate">sem par observado neste recorte</p>;
+  }
+  return (
+    <ul className="flex items-center gap-1 flex-wrap" aria-label="Sinais observados">
+      {signals.map((signal) => (
+        <li
+          key={signal.key}
+          className={cx(
+            "rounded-full border bg-abyss/50 font-mono text-mist/80 whitespace-nowrap",
+            compact ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-0.5 text-[10px]",
+            TONE_CLASS[signal.tone],
+          )}
+          title={candidate.reasons.join(" · ")}
+        >
+          {signal.label}
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 function Actions({
@@ -99,7 +144,6 @@ export default function RecommendationPanel({
   const { suggestions, next, mix } = analysis;
   const top = suggestions[0] ?? null;
   const rest = suggestions.slice(1);
-  const waiting = next?.side === "them";
   const topName = top ? (pool[top.heroId]?.name ?? top.name ?? `Herói #${top.heroId}`) : "";
 
   return (
@@ -111,9 +155,6 @@ export default function RecommendationPanel({
           </p>
           <span className="text-[9px] font-mono text-mist/60">{suggestions.length} candidatos</span>
         </div>
-        <p className="text-[11px] text-mist">
-          Lane <b className="text-foam">{LANE_LABEL[lane]}</b> · leitura ordenada por dois fatores, não é recomendação.
-        </p>
         <div
           role="group"
           aria-label="Lane alvo das recomendações"
@@ -142,12 +183,6 @@ export default function RecommendationPanel({
         )}
       </header>
 
-      {waiting && (
-        <p className="text-[10px] text-amber-300/90 rounded-lg border border-amber-400/25 bg-amber-400/5 px-2 py-1.5">
-          O inimigo picka agora — a lista vale para quando a vez voltar.
-        </p>
-      )}
-
       {!next ? (
         <p className="text-[11px] text-mist py-2">Draft completo: não há próximo pick para ordenar.</p>
       ) : suggestions.length === 0 ? (
@@ -163,23 +198,10 @@ export default function RecommendationPanel({
                 <div className="min-w-0 flex-1">
                   <p className="text-[9px] uppercase tracking-wider font-bold text-gold">Mais indicado agora</p>
                   <p className="text-base font-black text-foam truncate">{topName}</p>
-                  <p className="text-[10px] text-mist font-mono truncate">
-                    {top.laneFit === true ? `rota ${LANE_LABEL[top.lane]}` : top.laneFit === false ? "fora da rota" : "rota sem dado"}
-                    {pool[top.heroId]?.tier ? ` · ${pool[top.heroId]?.tier}` : ""}
-                  </p>
+                  <p className="text-[10px] text-mist font-mono truncate">{pool[top.heroId]?.tier ?? "sem tier no recorte"}</p>
                 </div>
               </div>
-              <ul className="space-y-1 text-[10px]">
-                <li className="text-foam/90">
-                  <span className="text-mist">1.</span> {metaText(top)}
-                </li>
-                <li className="text-foam/90">
-                  <span className="text-mist">2.</span> {typeText(top)}
-                </li>
-                <li className="text-mist/70 font-mono">
-                  sobrevivência proxy até o pick: {top.availability == null ? "sem dado" : `${pct(top.availability, 0)} vivo`}
-                </li>
-              </ul>
+              <SignalRow candidate={top} compact={false} />
               <Actions
                 candidate={top}
                 name={topName}
@@ -202,15 +224,9 @@ export default function RecommendationPanel({
                     className="flex items-center gap-2 rounded-xl border border-line/60 bg-abyss/40 px-2 py-1.5"
                   >
                     <Avatar src={pool[candidate.heroId]?.head ?? candidate.head} name={name} size={28} />
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 flex-1 space-y-0.5">
                       <p className="text-[11px] font-semibold text-foam truncate">{name}</p>
-                      <p className="text-[9px] text-mist/80 truncate" title={`${metaText(candidate)} · ${typeText(candidate)}`}>
-                        {candidate.percentile == null ? "sem θ̂ na lane" : `${Math.round(candidate.percentile * 100)}º pct`}
-                        {" · "}
-                        {candidate.archetype ? ARCHETYPE_LABEL[candidate.archetype.top] : "sem par"}
-                        {candidate.balance === 1 ? " (contrapeso)" : ""}
-                        {candidate.availability != null ? ` · ${num(candidate.availability * 100, 0)}% vivo` : ""}
-                      </p>
+                      <SignalRow candidate={candidate} compact={true} />
                     </div>
                     <Actions
                       candidate={candidate}
@@ -228,11 +244,6 @@ export default function RecommendationPanel({
           )}
         </>
       )}
-
-      <p className="text-[9px] text-mist/60 leading-relaxed pt-1 border-t border-line/60">
-        Fatores: percentil do θ̂ na lane (peso 1) e tipo que contrabalança o dominante inimigo (peso 0,25 declarado).
-        A ordem é leitura — não é probabilidade. “vivo” é proxy de hazard.
-      </p>
     </section>
   );
 }

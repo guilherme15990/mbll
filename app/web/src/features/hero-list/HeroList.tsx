@@ -1,5 +1,5 @@
 import { Link, useSearchParams } from "react-router-dom";
-import { num, useHeroLanes, useHeroes } from "../../shared/api";
+import { num, useAllHeroes, useHeroLanes } from "../../shared/api";
 import { useFilters, withLanes } from "../../app/filters";
 import HeroPicker from "../../shared/ui/patterns/HeroPicker";
 import {
@@ -13,11 +13,17 @@ import {
  *
  * Sem faixa de contexto (CtxBar), sem cartão de ação primária, sem legenda de
  * rota e sem atalhos de PRD (ADR-055): a página é a busca + a grade de heróis.
+ *
+ * O lote vem COMPLETO via `useAllHeroes`: a página descobre o tamanho pelo
+ * `total` do servidor e pagina sozinha (`index`) — nenhum tamanho de lote é
+ * fixado no cliente, então um herói novo aparece sem mexer no código. A grade é
+ * ordenada por nome no cliente (por isso não usamos o pager do servidor, que
+ * ordenaria por θ̂); se a fonte cortar o lote, a contagem avisa.
  */
 export default function HeroList() {
   const { rank, window, hero, lanes } = useFilters();
   const [sp, setSp] = useSearchParams();
-  const heroesQuery = useHeroes(rank, window);
+  const heroesQuery = useAllHeroes(rank, window);
   const lanesQuery = useHeroLanes(rank);
   const lanesMap = (lanesQuery.data?.data ?? {}) as Record<number, string[]>;
 
@@ -31,6 +37,8 @@ export default function HeroList() {
   if (heroesQuery.isError) return <ErrBox onRetry={() => heroesQuery.refetch()} />;
 
   const heroes = [...(heroesQuery.data?.data ?? [])].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  const total = heroesQuery.data?.total ?? heroes.length;
+  const truncated = Boolean(heroesQuery.data?.truncated) || total > heroes.length;
   // Filtro global de rota (?lanes=, selecionado no header): join client com o
   // mapa /heroes/lanes. Mapa ainda não carregado/vazio = sem filtro (nunca
   // esconder tudo por falha de fonte).
@@ -39,6 +47,11 @@ export default function HeroList() {
   const shown = filtering
     ? heroes.filter((h) => (lanesMap[h.id] ?? []).some((l) => lanes.includes(l)))
     : heroes;
+  const count = truncated
+    ? `${heroes.length} de ${total} heróis no recorte · lote truncado na fonte`
+    : filtering
+      ? `${shown.length} de ${heroes.length} heróis no recorte · filtro de rota`
+      : `${heroes.length} de ${total} heróis no recorte`;
 
   return (
     <section className="space-y-5" aria-label="Lista de heróis">
@@ -47,6 +60,10 @@ export default function HeroList() {
       <div>
         <HeroPicker hero={hero || null} onPick={pickHero} showPrdSuggestions={false} />
       </div>
+
+      <p className="text-[10px] font-mono text-mist/70" role="status">
+        {count}
+      </p>
 
       {lanes.length > 0 && !lanesReady ? (
         <p className="text-[11px] text-mist" role="note">
