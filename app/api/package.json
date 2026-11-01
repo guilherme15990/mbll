@@ -7,8 +7,8 @@
     "start": "node src/index.js",
     "build": "node -e \"await import('./src/http/server.js')\" && node -e \"await import('./src/http/router.js')\" && node --check src/index.js && echo api-ok",
     "typecheck": "node ../../tools/tsc.mjs -p jsconfig.json",
-    "test": "node --test ./test/routes.test.js ./test/builds-aggregate.test.js ./test/contracts.test.js ./test/providers.test.js ./test/config.test.js ./test/rate-limit.test.js ./test/http.test.js ./test/db.test.js ./test/history.test.js ./test/history-retention.test.js ./test/single-flight.test.js",
-    "test:coverage": "node --test --experimental-test-coverage --test-coverage-lines=90 --test-coverage-branches=60 --test-coverage-functions=85 --test-coverage-exclude=**/packages/** --test-coverage-exclude=**/test/** ./test/routes.test.js ./test/builds-aggregate.test.js ./test/contracts.test.js ./test/providers.test.js ./test/config.test.js ./test/rate-limit.test.js ./test/http.test.js ./test/db.test.js ./test/history.test.js ./test/history-retention.test.js ./test/single-flight.test.js"
+    "test": "node --test ./test/routes.test.js ./test/builds-aggregate.test.js ./test/contracts.test.js ./test/providers.test.js ./test/config.test.js ./test/rate-limit.test.js ./test/http.test.js ./test/db.test.js ./test/single-flight.test.js",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-lines=90 --test-coverage-branches=60 --test-coverage-functions=85 --test-coverage-exclude=**/packages/** --test-coverage-exclude=**/test/** ./test/routes.test.js ./test/builds-aggregate.test.js ./test/contracts.test.js ./test/providers.test.js ./test/config.test.js ./test/rate-limit.test.js ./test/http.test.js ./test/db.test.js ./test/single-flight.test.js"
   },
   "dependencies": {
     "@radar/engine": "file:../../packages/engine",

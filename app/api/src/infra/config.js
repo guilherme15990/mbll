@@ -101,11 +101,6 @@ export function parseConfig(env = process.env) {
       sqlite: env.SQLITE_CACHE !== "off",
       file: sqliteFileOf(env, dataDir),
     },
-    history: {
-      // 0 = retenção desligada (default): histórico cresce append-only.
-      // >0 = arquiva em snapshot_history_archive e poda a tabela quente.
-      retentionDays: int(env, "HISTORY_RETENTION_DAYS", 0, { min: 0, max: 36_500 }),
-    },
     http: {
       webDist: env.WEB_DIST ? resolve(REPO_ROOT, String(env.WEB_DIST)) : DEFAULT_WEB_DIST,
       logLevel: logLevel(env),

@@ -2,9 +2,8 @@
 //
 // PROBLEMA QUE ISTO RESOLVE: `src/infra/db.js` resolve `SQLITE_FILE` e abre o
 // banco no topo do módulo (top-level await). Sem env própria, todo `node --test`
-// gravava no banco de dev. O histórico é append-only, então cada execução
-// acumulava linhas e a suíte passava a falhar de forma crescente (série de teste
-// com >200 coletas escondia o snapshot recém-inserido; ver listSnapshots).
+// gravava no banco de dev. O cache persiste em disco, então cada execução podia
+// servir dado velho de outra suíte; um banco temporário por processo isola isso.
 //
 // Este módulo DEVE ser o primeiro import do arquivo de teste: em ESM os módulos
 // são avaliados em ordem de import, então o env vale antes de `../src/routes.js`

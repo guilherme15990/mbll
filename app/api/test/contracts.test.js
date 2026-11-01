@@ -14,7 +14,6 @@ import { installUpstreamMock, HEROES } from "./support/upstream.mjs";
 
 const mock = installUpstreamMock();
 const { router } = await import("../src/http/router.js");
-const { recordSnapshot } = await import("../src/infra/snapshotHistory.js");
 const { resetArenaCircuit } = await import("../src/providers/arena/index.js");
 
 before(() => { mock.reset(); });
@@ -363,59 +362,6 @@ describe("módulos derivados por herói", () => {
   });
 });
 
-// ── /snapshots ───────────────────────────────────────────────────────────────
-describe("GET /snapshots — histórico append-only", () => {
-  it("lista ASC sem payload, com hash e verificações", async () => {
-    const r = await call("/snapshots", { fonte: "heroes", rank: "mythic" });
-    assert.equal(r.status, 200);
-    envelope(r.body, ["data", "total", "serie_contrato", "nota"], "/snapshots");
-    assert.ok(r.body.data.length >= 1);
-    const s = r.body.data[0];
-    for (const k of ["id", "fonte", "rank", "janela", "versao_jogo", "coletado_em", "coletado_em_iso", "payload_hash", "status", "n_heroes", "pick_sum"]) {
-      assert.ok(k in s, `falta ${k}`);
-    }
-    assert.equal("payload" in s, false, "lista nunca despeja payload");
-    assert.equal(s.payload_hash.length, 64);
-    assert.ok(r.body.data.every((x, i, a) => i === 0 || a[i - 1].coletado_em <= x.coletado_em), "ordem ASC");
-  });
-
-  it("diff entre duas coletas (C-105): resumo, contagens e aviso", async () => {
-    // Série isolada (rank/janela próprios) para não depender da ordem dos
-    // testes: duas coletas com win deslocado em todos os heróis.
-    const rowsAt = (win) => HEROES.map((h) => ({ id: h.id, name: h.name, win, pick: h.pick, ban: h.ban }));
-    const antes = recordSnapshot({ fonte: "heroes", rank: "epic", janela: 1, versao_jogo: "mock-1", rows: rowsAt(0.5) });
-    const depois = recordSnapshot({ fonte: "heroes", rank: "epic", janela: 1, versao_jogo: "mock-2", rows: rowsAt(0.51) });
-
-    const r = await call(`/snapshots/${depois.coletado_em}/diff`, {});
-    assert.equal(r.status, 200);
-    for (const k of ["base_ts", "contra_ts", "antes_ts", "depois_ts", "fonte", "rank", "janela", "versao", "status_coletas", "pick_sum", "n_antes", "n_depois", "n_iguais", "n_adicionados", "n_removidos", "n_mudados", "mudancas", "truncado", "aviso_revisado", "aviso", "nota"]) {
-      assert.ok(k in r.body, `falta ${k}`);
-    }
-    assert.equal(r.body.contra_ts, antes.coletado_em, "default = coleta anterior");
-    assert.equal(r.body.base_ts, depois.coletado_em);
-    assert.equal(r.body.n_antes, HEROES.length);
-    assert.equal(r.body.n_depois, HEROES.length);
-    assert.equal(r.body.n_iguais, 0);
-    assert.equal(r.body.n_mudados, HEROES.length);
-    assert.equal(r.body.n_adicionados, 0);
-    assert.equal(r.body.n_removidos, 0);
-    assert.equal(r.body.truncado, false);
-    assert.equal(r.body.aviso_revisado, true);
-    assert.equal(typeof r.body.aviso, "string");
-    assert.deepEqual(r.body.versao, { antes: "mock-1", depois: "mock-2" });
-    assert.equal(r.body.mudancas[0].campos.includes("win"), true);
-    assert.equal("payload" in r.body, false);
-    assert.equal((await call(`/snapshots/${antes.coletado_em}/diff`, { contra: String(antes.coletado_em) })).status, 400);
-    assert.equal((await call("/snapshots/1/diff", {})).status, 404);
-  });
-
-  it("validação de filtros do histórico", async () => {
-    assert.equal((await call("/snapshots", { rank: "xyz" })).status, 400);
-    assert.equal((await call("/snapshots", { janela: "99" })).status, 400);
-    assert.equal((await call("/snapshots", { fonte: "!!!" })).status, 400);
-  });
-});
-
 // ── /modules e /meta/status ──────────────────────────────────────────────────
 describe("metadados do sistema", () => {
   it("/modules — 6 contextos ativos com status e endpoint", async () => {
@@ -427,12 +373,11 @@ describe("metadados do sistema", () => {
     assert.equal(r.body.c_reference, 1e5);
   });
 
-  it("/meta/status — saúde, cache, histórico e versões", async () => {
+  it("/meta/status — saúde, cache e versões", async () => {
     const r = await call("/meta/status");
     assert.equal(r.status, 200);
-    envelope(r.body, ["startedAt", "health", "cache", "history", "versions", "impossibilities", "lanes"], "/meta/status");
+    envelope(r.body, ["startedAt", "health", "cache", "versions", "impossibilities", "lanes"], "/meta/status");
     assert.equal(typeof r.body.cache.sqlite, "boolean");
-    assert.equal(typeof r.body.history.total, "number");
     assert.deepEqual(r.body.lanes, ["exp", "mid", "roam", "jungle", "gold"]);
     assert.ok(r.body.impossibilities.length >= 3);
   });

@@ -1,11 +1,16 @@
 // Coleta e normalização do lote de heróis por rank/janela.
-// Porta fina para a Arena API (arena.js) + SnapshotHistory (cache.js); o resto
-// do sistema consome `fetchRankAll` e nunca fala com o upstream diretamente.
+// Porta fina para a Arena API (arena.js) + cache; o resto do sistema consome
+// `fetchRankAll` e nunca fala com o upstream diretamente.
 //
-// Fábrica com DI (Problema 3 da auditoria): o gateway, o cache e o histórico
-// entram por parâmetro pelo composition root. As funções PURAS
+// Fábrica com DI (Problema 3 da auditoria): o gateway e o cache entram por
+// parâmetro pelo composition root. As funções PURAS
 // (`normalize`/`lanesFromRoadsort`/`ROAD_SORT_TO_LANE`) seguem exportadas aqui —
 // não têm dependência de infraestrutura.
+//
+// ADR-065: o histórico append-only e o walk-forward (posterior de ontem = prior
+// de hoje) foram removidos. O lote é servido com `prior: null` (flat): o motor
+// ainda aceita um prior, mas a API não alimenta mais a cadeia — `meta.prior`
+// fica sempre "flat" e não há leitura/gravação de histórico.
 import { createSingleFlight } from "./singleFlight.js";
 
 export function normalize(rec) {
@@ -60,38 +65,16 @@ export function lanesFromRoadsort(roadsort) {
 }
 
 /**
- * @param {{ arena: { getRankPage: Function, mapConc: Function }, cacheStore: { cacheGet: Function, cacheSet: Function }, snapshotHistory: { recordSnapshot: Function, listSnapshots: Function }, versions: { currentGameVersion: Function }, engine: { checkPickSum: Function, median: Function, summarizeWalkPosterior: Function, isValidWalkPrior: Function } }} deps
+ * @param {{ arena: { getRankPage: Function, mapConc: Function }, cacheStore: { cacheGet: Function, cacheSet: Function }, versions: { currentGameVersion: Function } }} deps
  */
-export function createRankLot({ arena, cacheStore, snapshotHistory, versions, engine }) {
+export function createRankLot({ arena, cacheStore, versions }) {
   const { getRankPage, mapConc } = arena;
   const { cacheGet, cacheSet } = cacheStore;
-  const { recordSnapshot, listSnapshots } = snapshotHistory;
   const { currentGameVersion } = versions;
-  const { checkPickSum, median, summarizeWalkPosterior, isValidWalkPrior } = engine;
 
-  // ADR-023: último posterior VERIFICADO da série (mesmo fonte+rank+janela) vira o prior.
-  // Leitura local do SnapshotHistory (sem fetch ao upstream). Sem histórico/posterior ⇒ null (flat).
-  /**
-   * @param {{ fonte?: string, rank?: string, janela?: number }} [serie]
-   * @returns {{ mu: number, tau2: number, n: number, game_version: string } | null}
-   */
-  function lastVerifiedPosterior({ fonte = "heroes", rank, janela } = {}) {
-    try {
-      const serie = listSnapshots({ fonte, rank, janela, limit: 1000 });
-      for (let i = serie.length - 1; i >= 0; i--) {
-        const s = serie[i];
-        if (s.status !== "verificado") continue; // T5/analítico: só verificado alimenta prior
-        if (isValidWalkPrior(s.posterior)) return s.posterior;
-        return null; // verificado sem apêndice (pré-023) ⇒ flat honesto, sem herdar adiante
-      }
-    } catch { /* sem histórico ⇒ flat */ }
-    return null;
-  }
-
-  // F3: chamadas concorrentes idênticas compartilham UMA coleta. Isso também evita
-  // snapshots duplicados no histórico (duas rotas pedindo o mesmo lote ao mesmo tempo).
-  // A chave inclui retries/timeout: um agregado com deadline curto não "pega carona"
-  // numa coleta configurada para esperar mais.
+  // F3: chamadas concorrentes idênticas compartilham UMA coleta. A chave inclui
+  // retries/timeout: um agregado com deadline curto não "pega carona" numa coleta
+  // configurada para esperar mais.
   const rankFlights = createSingleFlight();
 
   function fetchRankAll(opts) {
@@ -106,10 +89,8 @@ export function createRankLot({ arena, cacheStore, snapshotHistory, versions, en
     const key = `rank:${rank}:${days}`;
     const hit = cacheGet(key, "A");
     if (hit.hit && !hit.stale) {
-      // Cache quente: sem nova gravação ⇒ ler o prior da série é seguro (sem auto-prior).
       const vg = currentGameVersion();
-      const prior = lastVerifiedPosterior({ fonte: "heroes", rank, janela: days });
-      return { rows: hit.body, ageMs: hit.ageMs, stale: false, fromCache: true, pages: 0, truncated: false, totalFonte: hit.body.length, prior, gameVersion: vg };
+      return { rows: hit.body, ageMs: hit.ageMs, stale: false, fromCache: true, pages: 0, truncated: false, totalFonte: hit.body.length, prior: null, gameVersion: vg };
     }
     const first = await getRankPage({ days, rank, size: 50, index: 1, retries, timeoutMs });
     const total = Number(first?.data?.total ?? 0) || 0;
@@ -120,39 +101,12 @@ export function createRankLot({ arena, cacheStore, snapshotHistory, versions, en
       (idx) => getRankPage({ days, rank, size: 50, index: idx, retries, timeoutMs }));
     const recs = [first, ...rest].flatMap((p) => p?.data?.records ?? []);
     const rows = recs.map(normalize).filter(Boolean);
-    // ADR-021-09 / DDD-V4-05: hook append-only — todo lote válido gravado no histórico (INSERT, nunca REPLACE).
-    // L2 (violado ENTRA marcado): snapshot violado entra com status "violado"+motivo para auditoria
-    // C-101/C-102 e comparação C-105; consumo analítico (T5) usa só "verificado". Excluir = proibido.
-    // O histórico nunca quebra a coleta; versão do jogo reaproveita o cache de patches (sem fetch novo).
-    // ADR-023: prior = último VERIFICADO da mesma série (carregado ANTES de inserir o atual,
-    // senão o lote viraria prior de si mesmo); o posterior do lote corrente vai como
-    // apêndice p/ a rodada seguinte (L2-WF-04). Só "verificado" alimenta o prior; violado
-    // entra marcado mas nunca como prior.
     const vg = currentGameVersion();
-    const chk = checkPickSum(rows.map((h) => h.pick));
-    const prior = chk.ok ? lastVerifiedPosterior({ fonte: "heroes", rank, janela: days }) : null;
-    let posterior = null;
-    try {
-      if (chk.ok) {
-        const wins = rows.filter((x) => x && Number.isFinite(x.win)).map((x) => x.win);
-        const muB = median(wins);
-        const madB = median(wins.map((x) => Math.abs(x - muB)).sort((a, b) => a - b)) || 1e-6;
-        const tB = 1.4826 * madB;
-        posterior = summarizeWalkPosterior({ muBatch: muB, tau2Batch: tB * tB, nBatch: wins.length, prior, gameVersion: vg });
-      }
-    } catch { posterior = null; }
-    try {
-      recordSnapshot({
-        fonte: "heroes", rank, janela: days,
-        versao_jogo: vg,
-        rows, status: chk.ok ? "verificado" : "violado", motivo: chk.ok ? null : `sigma_pick:${chk.sum}`,
-        posterior,
-      });
-    } catch { /* histórico nunca quebra a coleta */ }
     cacheSet(key, rows);
     // EC-010: refetch OK renova a idade; stale só quando servimos dado velho
-    return { rows, ageMs: 0, stale: false, fromCache: false, pages, truncated, totalFonte: total, prior, gameVersion: vg, posterior };
+    // prior: null fixo (flat) — sem histórico, não há cadeia walk-forward (ADR-065).
+    return { rows, ageMs: 0, stale: false, fromCache: false, pages, truncated, totalFonte: total, prior: null, gameVersion: vg };
   }
 
-  return { fetchRankAll, lastVerifiedPosterior };
+  return { fetchRankAll };
 }

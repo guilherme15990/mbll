@@ -21,19 +21,15 @@ describe("infra/db: conexão", () => {
     assert.equal(db.prepare("PRAGMA busy_timeout").get().timeout, 5000);
   });
 
-  it("cria cache, histórico e arquivo frio no boot", () => {
+  it("cria só a tabela cache no boot (histórico saiu — ADR-065)", () => {
     const tables = getDb()
       .prepare("SELECT name FROM sqlite_master WHERE type='table'")
       .all()
       .map((r) => r.name);
-    for (const t of ["cache", "snapshot_history", "snapshot_history_archive"]) {
-      assert.ok(tables.includes(t), `falta tabela ${t}`);
+    assert.ok(tables.includes("cache"), "falta tabela cache");
+    for (const t of ["snapshot_history", "snapshot_history_archive"]) {
+      assert.ok(!tables.includes(t), `tabela ${t} não deveria existir`);
     }
-    const indexes = getDb()
-      .prepare("SELECT name FROM sqlite_master WHERE type='index'")
-      .all()
-      .map((r) => r.name);
-    assert.ok(indexes.includes("idx_snapshot_history_ts"), "índice de retenção ausente");
   });
 
   it("reaproveita StatementSync por SQL", () => {

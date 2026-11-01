@@ -1,7 +1,12 @@
 # F3 — Cache, histórico e dados
 
+> **PARCIALMENTE SUPERADA pela ADR-065 (2026-11-01).** O histórico append-only, a
+> retenção por arquivamento e o schema `snapshot_history`/`snapshot_history_archive`
+> foram removidos. Cache com TTL, `DATA_DIR`, WAL e statements preparados
+> permanecem. Trechos abaixo sobre histórico/retenção são registro histórico.
+
 - Data: 2026-10-24
-- Status: concluída (F0, F1, F2 e F3 do plano da ADR-033)
+- Status: concluída (F0, F1, F2 e F3 do plano da ADR-033); histórico/retenção superados pela ADR-065
 - Pré-requisito: ADR-033 (F2), ADR-034
 - Decisão: ADR-035
 

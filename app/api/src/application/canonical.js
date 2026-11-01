@@ -1,7 +1,7 @@
 // JSON canônico + hash estável, sem dependência.
-// Usado pelo SnapshotHistory (hash do lote) e pelo agregado de builds (hash dos
-// catálogos/registros). Chaves de objeto ordenadas recursivamente; arrays mantêm
-// a ordem (a ordem É parte do payload).
+// Usado pelo agregado de builds (hash dos catálogos/registros): duas rodadas
+// com o mesmo payload produzem o mesmo hash. Chaves de objeto ordenadas
+// recursivamente; arrays mantêm a ordem (a ordem É parte do payload).
 import { createHash } from "node:crypto";
 
 export function canonicalPayload(v) {

@@ -1,7 +1,7 @@
-// Metadados do sistema: catálogo dos 6 módulos ativos e saúde/cache/histórico.
+// Metadados do sistema: catálogo dos 6 módulos ativos e saúde/cache/versões.
 // CNF/RNK/TMP saíram junto com as abas da ficha e as rotas planas (ADR-048).
+// O histórico append-only saiu junto com o walk-forward (ADR-065).
 import { cacheStats } from "../infra/cacheStore.js";
-import { historyStats } from "../infra/snapshotHistory.js";
 import { C_REFERENCE, LANES } from "@radar/engine";
 import { versions } from "../application/versions.js";
 import { startedAtIso, layerHealthState } from "../application/health.js";
@@ -21,5 +21,5 @@ export async function modulesRoute() {
 // GET /meta/status
 export async function statusRoute() {
   const vers = await versions();
-  return { status: 200, body: { startedAt: startedAtIso(), health: layerHealthState(), cache: cacheStats(), history: historyStats(), versions: vers?.slice?.(0, 3) ?? vers, impossibilities: ["academy/ratings offline (10407)", "builds e win-rate/timeline exigem ?lane (422 sem lane)", "sem dados por partida/draft completo — sem causal, sem IC de pseudo-contagem", "pick_rate é slot_share unvalidated, sem contagem absoluta", "janelas sobrepostas não são replicação independente"], lanes: LANES } };
+  return { status: 200, body: { startedAt: startedAtIso(), health: layerHealthState(), cache: cacheStats(), versions: vers?.slice?.(0, 3) ?? vers, impossibilities: ["academy/ratings offline (10407)", "builds e win-rate/timeline exigem ?lane (422 sem lane)", "sem dados por partida/draft completo — sem causal, sem IC de pseudo-contagem", "pick_rate é slot_share unvalidated, sem contagem absoluta", "janelas sobrepostas não são replicação independente"], lanes: LANES } };
 }

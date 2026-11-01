@@ -10,7 +10,6 @@ import { heroCatalogRoute, equipmentRoute, heroLanesRoute } from "../routes/cata
 import { matchupsRoute, blindRoute } from "../routes/matchups.js";
 import { heroDraftScoreRoute } from "../routes/draftScore.js";
 import { aggregateRoute, heroBuildsRoute } from "../routes/builds.js";
-import { snapshotsRoute, snapshotDiffRoute } from "../routes/snapshots.js";
 import { modulesRoute, statusRoute } from "../routes/meta.js";
 
 const HERO = /^\/heroes\/(\d+)$/;
@@ -19,7 +18,6 @@ const BUILDS = /^\/heroes\/(\d+)\/builds$/;
 const DISTORTION = /^\/heroes\/(\d+)\/distortion$/;
 const BLIND = /^\/heroes\/(\d+)\/blind$/;
 const TRENDS = /^\/heroes\/(\d+)\/trends$/;
-const SNAPSHOT_DIFF = /^\/snapshots\/(\d+)\/diff$/;
 
 export async function router(path, sp) {
   let m;
@@ -37,8 +35,6 @@ export async function router(path, sp) {
   if ((m = DISTORTION.exec(path))) return distortionRoute(sp, Number(m[1]));
   if ((m = BLIND.exec(path))) return blindRoute(sp, Number(m[1]));
   if ((m = TRENDS.exec(path))) return trendsRoute(sp, Number(m[1]));
-  if (path === "/snapshots") return snapshotsRoute(sp);
-  if ((m = SNAPSHOT_DIFF.exec(path))) return snapshotDiffRoute(sp, Number(m[1]));
   if (path === "/modules") return modulesRoute();
   if (path === "/meta/status") return statusRoute();
   return { status: 404, body: { error: "not_found", message: "Not found" } };

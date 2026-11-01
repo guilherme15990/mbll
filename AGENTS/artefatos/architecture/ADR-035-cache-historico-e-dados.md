@@ -1,7 +1,12 @@
 # ADR-035 — Cache, histórico e dados: DATA_DIR, WAL, split e retenção por arquivamento
 
+> **PARCIALMENTE SUPERADA pela ADR-065 (2026-11-01).** As decisões de `DATA_DIR`,
+> WAL, conexão única/statements preparados e single-flight continuam válidas. O
+> **histórico append-only, a retenção por arquivamento e o schema
+> `snapshot_history`/`snapshot_history_archive` foram removidos** (ADR-065).
+
 - Data: 2026-10-24
-- Status: aceita e implementada (F3 da ADR-033)
+- Status: aceita e implementada (F3 da ADR-033); histórico/retenção superados pela ADR-065
 - Contexto: `apps/api` zero-dep, SQLite da stdlib (`node:sqlite`), um processo,
   histórico append-only (ADR-021-09 / DDD-V4-05) e cache derivado reconstruível.
 

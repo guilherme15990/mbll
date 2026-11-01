@@ -2,7 +2,7 @@
 import { cacheGet } from "../infra/cacheStore.js";
 import { checkPickSum, walkPriorStamp } from "@radar/engine";
 import { rankLot } from "../composition.js";
-const { fetchRankAll, lastVerifiedPosterior } = rankLot;
+const { fetchRankAll } = rankLot;
 import { qHeroes, scoreLot, paginate } from "../application/scoring.js";
 import { versions, patchFlag, currentGameVersion } from "../application/versions.js";
 import { markLayerOk, markLayerError } from "../application/health.js";
@@ -24,11 +24,10 @@ export async function heroesRoute(sp) {
     const hit = cacheGet(`rank:${q.rank}:${q.window}`, "A");
     // EC-009: fallback aplica o mesmo filtro/ordem/página sobre o último dado válido
     if (hit.hit) {
-      const fbPrior = lastVerifiedPosterior({ fonte: "heroes", rank: q.rank, janela: q.window });
       const fbGv = currentGameVersion();
-      const fb = scoreLot(hit.body, { prior: fbPrior, gameVersion: fbGv });
+      const fb = scoreLot(hit.body, { prior: null, gameVersion: fbGv });
       const page = paginate(fb.scored, q);
-      return { status: 200, body: { data: page.data, total: page.total, stale: true, fallback: true, collectedAgoMs: hit.ageMs, rank: q.rank, window: q.window, pickSumCheck: checkPickSum((hit.body ?? []).map((h) => h.pick)), exposure: { unit: "slot_share", status: "unvalidated" }, meta: fb.meta, prior: walkPriorStamp(fbPrior), index_basis: { n: page.total } } };
+      return { status: 200, body: { data: page.data, total: page.total, stale: true, fallback: true, collectedAgoMs: hit.ageMs, rank: q.rank, window: q.window, pickSumCheck: checkPickSum((hit.body ?? []).map((h) => h.pick)), exposure: { unit: "slot_share", status: "unvalidated" }, meta: fb.meta, prior: walkPriorStamp(null), index_basis: { n: page.total } } };
     }
     return { status: 502, body: { error: "upstream_unavailable", message: "Upstream unavailable, try again" } };
   }

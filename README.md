@@ -118,7 +118,6 @@ fallback silencioso (`app/api/src/infra/config.js`).
 | `DATA_DIR` | `<repo>/data` | raiz de todo estado persistente (SQLite) |
 | `SQLITE_FILE` | `$DATA_DIR/cache.sqlite` | override explícito do arquivo |
 | `SQLITE_CACHE` | ligado | `off` desliga SQLite (fallback em memória) |
-| `HISTORY_RETENTION_DAYS` | `0` | `0` = append-only; `>0` arquiva e poda a tabela quente |
 | `ARENA_BASE` | `https://arena.fastapicloud.dev` | fonte |
 | `ARENA_ALT_HOSTS` | vazio | hosts de failover permitidos (lista por vírgula) |
 | `ARENA_CONC` | `4` | fan-out concorrente (1..32) |
@@ -134,7 +133,7 @@ fallback silencioso (`app/api/src/infra/config.js`).
 | Rota | Conteúdo |
 |---|---|
 | `/health` | liveness (fora de `/v1`) |
-| `/v1/heroes?rank=&window=&class=&sort=&order=&size=&index=` | lote pontuado + `meta`, `pickSumCheck`, `prior` |
+| `/v1/heroes?rank=&window=&class=&sort=&order=&size=&index=` | lote pontuado + `meta`, `pickSumCheck`, `prior` (sempre `flat` desde a ADR-065) |
 | `/v1/heroes/:id` | herói + trends 30d + meta do lote |
 | `/v1/heroes/:id/distortion` | resíduos de pick/ban (nunca somados) |
 | `/v1/heroes/:id/matchups` | counters/sinergias (δ do par) |
@@ -144,7 +143,6 @@ fallback silencioso (`app/api/src/infra/config.js`).
 | `/v1/views/:view` | recortes (semana/elo/tier) |
 | `/v1/gems` | joias (q baixo, força alta, pick/ban baixos) |
 | `/v1/catalog`, `/v1/equipment`, `/v1/heroes/lanes` | catálogos e lanes |
-| `/v1/snapshots`, `/v1/snapshots/:ts/diff` | histórico append-only e diff de payload |
 | `/v1/modules`, `/v1/meta/status` | catálogo dos módulos, saúde, cache e versões |
 
 Limites e semântica de cada indicador estão nos ADRs e nos docs de módulo em

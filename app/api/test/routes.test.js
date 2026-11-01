@@ -3,8 +3,6 @@ import "./support/env.mjs";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { score, scoreLot } from "../src/application/scoring.js";
-import { rankLot } from "../src/composition.js";
-const { lastVerifiedPosterior } = rankLot;
 import { classOf } from "@radar/engine";
 
 describe("contratos internos Fase 1 (zero-dep)", () => {
@@ -74,113 +72,6 @@ describe("contratos internos Fase 1 (zero-dep)", () => {
     assert.equal(unk.status, 404);
     const views = await router("/views/x", new URLSearchParams());
     assert.equal(views.status, 410);
-  });
-});
-
-describe("SnapshotHistory append-only (ADR-021-09, DDD-V4-05)", () => {
-  const FONTE = "test_hist";
-  const rowsA = [
-    { id: 1, name: "A", win: 0.55, pick: 0.1, ban: 0.1 },
-    { id: 2, name: "B", win: 0.5, pick: 0.2, ban: 0.2 },
-  ];
-  it("re-coleta gera 2 linhas (INSERT sempre, nunca REPLACE)", async () => {
-    const { recordSnapshot, listSnapshots, payloadHash } = await import("../src/infra/snapshotHistory.js");
-    const before = listSnapshots({ fonte: FONTE }).length;
-    const r1 = recordSnapshot({ fonte: FONTE, rank: "mythic", janela: 7, versao_jogo: "t1", rows: rowsA });
-    const r2 = recordSnapshot({ fonte: FONTE, rank: "mythic", janela: 7, versao_jogo: "t1", rows: rowsA });
-    assert.ok(r2.coletado_em > r1.coletado_em);
-    assert.equal(r1.payload_hash, r2.payload_hash); // duplicata detectável por hash, mantida (append-only)
-    assert.equal(r1.payload_hash.length, 64); // sha256 hex
-    assert.equal(r1.payload_hash, payloadHash([...rowsA].sort((a, b) => a.id - b.id)));
-    assert.equal(listSnapshots({ fonte: FONTE }).length, before + 2);
-  });
-  it("listSnapshots devolve as coletas MAIS RECENTES (janela DESC), em ordem ASC", async () => {
-    // Regressão: `ASC LIMIT n` devolvia as mais antigas e escondia o snapshot novo
-    // quando a série passava de `limit` coletas (foi o que derrubou o teste
-    // "violado ENTRA marcado" em bases de dev acumuladas).
-    const { recordSnapshot, listSnapshots } = await import("../src/infra/snapshotHistory.js");
-    const f = `${FONTE}_janela`;
-    const ts = [];
-    for (let i = 0; i < 5; i++) {
-      ts.push(recordSnapshot({ fonte: f, rank: "mythic", janela: 7, versao_jogo: `v${i}`, rows: rowsA }).coletado_em);
-    }
-    const janela = listSnapshots({ fonte: f, limit: 3 });
-    assert.equal(janela.length, 3);
-    assert.deepEqual(janela.map((s) => s.versao_jogo), ["v2", "v3", "v4"], "últimas 3, ordem crescente");
-    assert.deepEqual(janela.map((s) => s.coletado_em), ts.slice(-3));
-    assert.ok(janela.every((s, i, a) => i === 0 || a[i - 1].coletado_em < s.coletado_em), "ASC estrito");
-    // Contrato do consumidor: o último item é o mais novo (lastVerifiedPosterior).
-    const completa = listSnapshots({ fonte: f, limit: 1000 });
-    assert.equal(completa.at(-1).coletado_em, Math.max(...ts));
-  });
-  it("violado ENTRA marcado (L2) e some da T5", async () => {
-    const { recordSnapshot } = await import("../src/infra/snapshotHistory.js");
-    const { assessSeries } = await import("@radar/engine");
-    const { router } = await import("../src/http/router.js");
-    const v = recordSnapshot({ fonte: FONTE, rank: "mythic", janela: 7, versao_jogo: "t1", rows: rowsA, status: "violado", motivo: "sigma_pick:0.9" });
-    assert.equal(v.status, "violado");
-    const listed = await router("/snapshots", new URLSearchParams({ fonte: FONTE }));
-    assert.equal(listed.status, 200);
-    const me = listed.body.data.find((s) => s.coletado_em === v.coletado_em);
-    assert.ok(me && me.status === "violado" && me.motivo === "sigma_pick:0.9");
-    assert.ok(!("payload" in me) && !("payload_json" in me)); // sem payload, com hash + verificações
-    assert.ok(typeof me.payload_hash === "string" && typeof me.pick_sum === "number");
-    // violado não conta como replicação: 1 distinto verificado + N violados ⇒ serie_curta
-    const serie = assessSeries(listed.body.data.filter((s) => s.rank === "mythic")
-      .map((s) => ({ coletado_em: s.coletado_em, janela: s.janela, payload_hash: s.payload_hash, status: s.status })));
-    assert.equal(serie.status, "serie_curta");
-  });
-  it("diff detecta mudança p/ C-105 sem despejar payload", async () => {
-    const { recordSnapshot } = await import("../src/infra/snapshotHistory.js");
-    const { router } = await import("../src/http/router.js");
-    const f = `${FONTE}_diff`;
-    const b = recordSnapshot({ fonte: f, rank: "mythic", janela: 7, versao_jogo: "t1", rows: rowsA });
-    const rowsB = [
-      { id: 1, name: "A", win: 0.62, pick: 0.1, ban: 0.1 },
-      { id: 2, name: "B", win: 0.5, pick: 0.2, ban: 0.2 },
-    ];
-    const a = recordSnapshot({ fonte: f, rank: "mythic", janela: 7, versao_jogo: "t2", rows: rowsB });
-    const d = await router(`/snapshots/${a.coletado_em}/diff`, new URLSearchParams({ fonte: f }));
-    assert.equal(d.status, 200);
-    assert.equal(d.body.contra_ts, b.coletado_em); // default = coleta anterior
-    assert.equal(d.body.n_mudados, 1);
-    assert.deepEqual(d.body.mudancas[0].campos, ["win"]);
-    assert.deepEqual(d.body.mudancas[0].antes, { win: 0.55, pick: 0.1, ban: 0.1 });
-    assert.deepEqual(d.body.mudancas[0].depois, { win: 0.62, pick: 0.1, ban: 0.1 });
-    assert.equal(d.body.aviso_revisado, true);
-    assert.ok(typeof d.body.aviso === "string" && d.body.aviso.includes("valores revisados"));
-    assert.ok(!("payload" in d.body) && !("payload_json" in d.body));
-    const same = await router(`/snapshots/${a.coletado_em}/diff`, new URLSearchParams({ fonte: f, contra: String(a.coletado_em) }));
-    assert.equal(same.status, 400);
-    const missing = await router("/snapshots/1/diff", new URLSearchParams());
-    assert.equal(missing.status, 404);
-  });
-  it("history valida envelopes na mão", async () => {
-    const { router } = await import("../src/http/router.js");
-    assert.equal((await router("/snapshots", new URLSearchParams({ rank: "xyz" }))).status, 400);
-    assert.equal((await router("/snapshots", new URLSearchParams({ janela: "99" }))).status, 400);
-    assert.equal((await router("/snapshots", new URLSearchParams({ fonte: "!!!" }))).status, 400);
-    assert.equal((await router("/snapshots", new URLSearchParams({ fonte: FONTE, rank: "mythic", janela: "7" }))).status, 200);
-  });
-  it("assessSeries: <14d ou 1 snapshot → serie_curta/inconclusivo (INV4-015)", async () => {
-    const { assessSeries } = await import("@radar/engine");
-    const T0 = Date.now(), D = 86400e3;
-    assert.equal(assessSeries([]).status, "serie_curta");
-    assert.equal(assessSeries([{ coletado_em: T0, janela: 7, payload_hash: "h1", status: "verificado" }]).status, "serie_curta");
-    assert.equal(assessSeries([
-      { coletado_em: T0, janela: 7, payload_hash: "h1", status: "verificado" },
-      { coletado_em: T0 + D, janela: 7, payload_hash: "h2", status: "verificado" },
-    ]).status, "serie_curta"); // span 1d < 14d
-    assert.equal(assessSeries([
-      { coletado_em: T0, janela: 30, payload_hash: "h1", status: "verificado" },
-      { coletado_em: T0 + 15 * D, janela: 30, payload_hash: "h2", status: "verificado" },
-    ]).status, "inconclusivo"); // span ≥14d mas só janelas sobrepostas
-    const ok = assessSeries([
-      { coletado_em: T0, janela: 7, payload_hash: "h1", status: "verificado" },
-      { coletado_em: T0 + 15 * D, janela: 7, payload_hash: "h2", status: "verificado" },
-    ]);
-    assert.equal(ok.status, "avaliavel");
-    assert.equal(ok.nao_sobrepostos, true);
   });
 });
 
@@ -444,80 +335,18 @@ describe("lanes por herói (road_sort_title -> LANES)", () => {
   });
 });
 
-describe("walk-forward API ADR-023 (L2-WF-01/04/05)", () => {
-  const FONTE = `test_wf_${Date.now()}`;
+describe("prior flat na API (walk-forward removido — ADR-065)", () => {
   const mkRows = (bump = 0) => [
     ...Array.from({ length: 12 }, (_, i) => ({ id: 200 + i, name: `W${i}`, win: +(0.46 + i * 0.004).toFixed(4), pick: 0.05, ban: 0.05 })),
     { id: 1, name: "Spike", win: 0.60 + bump, pick: 0.008, ban: 0.05 },
   ];
-  function batchStats(rows) {
-    const wins = rows.filter((x) => x && Number.isFinite(x.win)).map((x) => x.win).sort((a, b) => a - b);
-    const mu = wins.length % 2 ? wins[Math.floor(wins.length / 2)] : (wins[wins.length / 2 - 1] + wins[wins.length / 2]) / 2;
-    const devs = wins.map((x) => Math.abs(x - mu)).sort((a, b) => a - b);
-    const madV = (devs.length % 2 ? devs[Math.floor(devs.length / 2)] : (devs[devs.length / 2 - 1] + devs[devs.length / 2]) / 2) || 1e-6;
-    const t = 1.4826 * madV;
-    return { mu, tau2: t * t, n: wins.length };
-  }
 
-  it("sem histórico = flat (selo + números de baseline)", async () => {
-    const FRESH = `${FONTE}_fresh`;
-    assert.equal(lastVerifiedPosterior({ fonte: FRESH, rank: "mythic", janela: 7 }), null);
+  it("sem histórico o lote é flat (selo em meta + sem `prior` por herói)", () => {
     const out = score(mkRows());
     assert.ok(out.length > 10);
     // MOTIVO: prior por herói → meta.prior (MIGRACAO §2); o fio não carrega mais `prior`.
     for (const h of out) assert.ok(!("prior" in h));
     assert.equal(scoreLot(mkRows(), {}).meta.prior, "flat");
-  });
-
-  it("round-trip: snapshot N alimenta N+1 com apêndice (L2-WF-04/05)", async () => {
-    const { recordSnapshot, listSnapshots, getSnapshot } = await import("../src/infra/snapshotHistory.js");
-    const { summarizeWalkPosterior } = await import("@radar/engine");
-    // N: primeiro lote, sem prior → posterior do lote corrente
-    const rowsA = mkRows();
-    const stA = batchStats(rowsA);
-    const postA = summarizeWalkPosterior({ muBatch: stA.mu, tau2Batch: stA.tau2, nBatch: stA.n, prior: null, gameVersion: "patch-1" });
-    const recA = recordSnapshot({ fonte: FONTE, rank: "mythic", janela: 7, versao_jogo: "patch-1", rows: rowsA, posterior: postA });
-    // N+1: carrega o último VERIFICADO e pontua com ele
-    const loaded = lastVerifiedPosterior({ fonte: FONTE, rank: "mythic", janela: 7 });
-    assert.deepEqual(loaded, postA);
-    const rowsB = mkRows(0.03); // spike andou
-    // MOTIVO: carimbo walk-forward em meta.prior (não mais por herói).
-    const scoredB = scoreLot(rowsB, { prior: loaded, gameVersion: "patch-1" });
-    assert.equal(scoredB.meta.prior, `walk-forward v${postA.n}`);
-    // estabilizou: anda menos que o flat
-    const flatB = score(rowsB);
-    const f = (a) => a.find((h) => h.id === 1).wrAdj;
-    assert.ok(Math.abs(f(scoredB.scored) - f(score(rowsA))) < Math.abs(f(flatB) - f(score(rowsA))));
-    // apêndice de N+1 acumula evidência (n soma) e alimenta N+2
-    const stB = batchStats(rowsB);
-    const postB = summarizeWalkPosterior({ muBatch: stB.mu, tau2Batch: stB.tau2, nBatch: stB.n, prior: loaded, gameVersion: "patch-1" });
-    assert.equal(postB.n, postA.n + stB.n);
-    const recB = recordSnapshot({ fonte: FONTE, rank: "mythic", janela: 7, versao_jogo: "patch-1", rows: rowsB, posterior: postB });
-    assert.deepEqual(lastVerifiedPosterior({ fonte: FONTE, rank: "mythic", janela: 7 }), postB);
-    // apêndice gravado: getSnapshot tem posterior; lista expõe sem despejar payload
-    assert.deepEqual(getSnapshot(recB.coletado_em).payload.posterior, postB);
-    const listed = listSnapshots({ fonte: FONTE });
-    const meB = listed.find((s) => s.coletado_em === recB.coletado_em);
-    assert.deepEqual(meB.posterior, postB);
-    assert.ok(!("payload" in meB) && !("payload_json" in meB));
-    assert.ok(recB.coletado_em > recA.coletado_em); // append-only intacto
-  });
-
-  it("violado nunca vira prior; verificado sem apêndice = flat honesto", async () => {
-    const F = `${FONTE}_viol`;
-    const { recordSnapshot } = await import("../src/infra/snapshotHistory.js");
-    const { summarizeWalkPosterior } = await import("@radar/engine");
-    const rows = mkRows();
-    const st = batchStats(rows);
-    const post = summarizeWalkPosterior({ muBatch: st.mu, tau2Batch: st.tau2, nBatch: st.n, prior: null, gameVersion: "patch-1" });
-    recordSnapshot({ fonte: F, rank: "mythic", janela: 7, versao_jogo: "patch-1", rows, posterior: post });
-    recordSnapshot({ fonte: F, rank: "mythic", janela: 7, versao_jogo: "patch-1", rows, status: "violado", motivo: "sigma_pick:9" });
-    assert.deepEqual(lastVerifiedPosterior({ fonte: F, rank: "mythic", janela: 7 }), post); // pula o violado
-    const F2 = `${FONTE}_legado`;
-    recordSnapshot({ fonte: F2, rank: "mythic", janela: 7, versao_jogo: "patch-1", rows }); // pré-023, sem apêndice
-    assert.equal(lastVerifiedPosterior({ fonte: F2, rank: "mythic", janela: 7 }), null);
-    // MOTIVO: carimbo em meta.prior (não mais por herói).
-    assert.equal(scoreLot(rows, { prior: null }).meta.prior, "flat");
   });
 
   it("GET /heroes carimba prior no payload (L2-WF-05, só o carimbo)", async () => {

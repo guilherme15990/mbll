@@ -34,7 +34,7 @@ export { AGG_TOP_VALUES, AGG_TOP_ALL, aggCacheKey, withAggCacheMeta };
  *   cacheStore: { cacheGet: Function, cacheSet: Function },
  *   singleFlight: { run: Function, peek: Function, has: Function },
  *   scoring: { scoreLot: Function },
- *   rankLot: { fetchRankAll: Function, lastVerifiedPosterior: Function },
+ *   rankLot: { fetchRankAll: Function },
  *   versions: { currentGameVersion: Function },
  *   canonical: { payloadHash: Function },
  *   engine: { buildAggregate: Function, normalizeEquipmentCatalog: Function, normalizeEmblemCatalog: Function, normalizeSpellCatalog: Function },
@@ -43,7 +43,7 @@ export { AGG_TOP_VALUES, AGG_TOP_ALL, aggCacheKey, withAggCacheMeta };
 export function createBuildsAggregate({ arena, cacheStore, singleFlight, scoring, rankLot, versions, canonical, engine }) {
   const { cacheGet, cacheSet } = cacheStore;
   const { mapConc, getHeroBuilds, getExpandedEquipment, getEmblems, getSpells } = arena;
-  const { fetchRankAll, lastVerifiedPosterior } = rankLot;
+  const { fetchRankAll } = rankLot;
   const { scoreLot } = scoring;
   const { currentGameVersion } = versions;
   const { payloadHash } = canonical;
@@ -86,7 +86,7 @@ export function createBuildsAggregate({ arena, cacheStore, singleFlight, scoring
       const hit = cacheGet(`rank:${rank}:${window}`, "A");
       if (hit.hit) {
         const { scored } = scoreLot(hit.body ?? [], {
-          prior: lastVerifiedPosterior({ fonte: "heroes", rank, janela: window }),
+          prior: null,
           gameVersion: currentGameVersion(),
         });
         return { rows: scored, stale: true, ageMs: hit.ageMs ?? 0, source: "stale", pages: 0 };

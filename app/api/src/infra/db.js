@@ -5,7 +5,7 @@
 // - `prepare(sql)` reaproveita StatementSync por SQL (o driver não prepara de novo);
 // - WAL + synchronous=NORMAL: leitura concorrente com escrita, menos fsync;
 // - busy_timeout=5s: duas instâncias não falham na hora com SQLITE_BUSY;
-// - schema criado no boot (cache, histórico e arquivo frio).
+// - schema criado no boot (só `cache`; o histórico append-only saiu na ADR-065).
 //
 // Se `node:sqlite` não existir/falhar, `db` fica null e os módulos caem no
 // fallback em memória — comportamento antigo preservado.
@@ -15,28 +15,6 @@ import { config } from "./config.js";
 
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS cache (key TEXT PRIMARY KEY, at INTEGER, body TEXT)`,
-  `CREATE TABLE IF NOT EXISTS snapshot_history(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    fonte TEXT NOT NULL, rank TEXT NOT NULL, janela INTEGER NOT NULL,
-    versao_jogo TEXT NOT NULL, coletado_em INTEGER NOT NULL,
-    payload_hash TEXT NOT NULL, payload_json TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'verificado', motivo TEXT
-  )`,
-  `CREATE INDEX IF NOT EXISTS idx_snapshot_history_serie
-    ON snapshot_history(fonte, rank, janela, coletado_em)`,
-  // F3: índice próprio para a retenção (WHERE coletado_em < cutoff).
-  `CREATE INDEX IF NOT EXISTS idx_snapshot_history_ts ON snapshot_history(coletado_em)`,
-  // Arquivo frio: MESMO schema + quando foi arquivado. Nada é apagado sem estar aqui.
-  `CREATE TABLE IF NOT EXISTS snapshot_history_archive(
-    id INTEGER PRIMARY KEY,
-    fonte TEXT NOT NULL, rank TEXT NOT NULL, janela INTEGER NOT NULL,
-    versao_jogo TEXT NOT NULL, coletado_em INTEGER NOT NULL,
-    payload_hash TEXT NOT NULL, payload_json TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'verificado', motivo TEXT,
-    archived_at INTEGER NOT NULL
-  )`,
-  `CREATE INDEX IF NOT EXISTS idx_snapshot_history_archive_ts
-    ON snapshot_history_archive(coletado_em)`,
 ];
 
 let db = null;

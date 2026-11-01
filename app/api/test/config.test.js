@@ -34,10 +34,6 @@ describe("config: defaults", () => {
     assert.ok(isAbsolute(c.cache.file), c.cache.file);
   });
 
-  it("retenção de histórico desligada por padrão", () => {
-    assert.equal(c.history.retentionDays, 0);
-  });
-
   it("http: webDist absoluto, log info, proxy off, limite 20/60, shutdown 10s", () => {
     assert.ok(isAbsolute(c.http.webDist), c.http.webDist);
     assert.match(c.http.webDist, /app[\\/]web[\\/]dist$/);
@@ -82,11 +78,6 @@ describe("config: valores válidos", () => {
     const c = parseConfig({ SQLITE_FILE: "meu-cache.sqlite" });
     assert.ok(isAbsolute(c.cache.file), c.cache.file);
     assert.match(c.cache.file, /meu-cache\.sqlite$/);
-  });
-
-  it("HISTORY_RETENTION_DAYS aceita 0 (desligado) e até 36500", () => {
-    assert.equal(parseConfig({ HISTORY_RETENTION_DAYS: "30" }).history.retentionDays, 30);
-    assert.equal(parseConfig({ HISTORY_RETENTION_DAYS: "36500" }).history.retentionDays, 36_500);
   });
 
   it("LOG_LEVEL normaliza caixa", () => {
@@ -149,12 +140,6 @@ describe("config: fail-fast", () => {
     throwsWith(() => parseConfig({ RATE_LIMIT_BURST: "0" }), "RATE_LIMIT_BURST");
     throwsWith(() => parseConfig({ SHUTDOWN_TIMEOUT_MS: "50" }), "SHUTDOWN_TIMEOUT_MS");
     throwsWith(() => parseConfig({ SHUTDOWN_TIMEOUT_MS: "abc" }), "SHUTDOWN_TIMEOUT_MS");
-  });
-
-  it("retenção inválida não vira NaN", () => {
-    throwsWith(() => parseConfig({ HISTORY_RETENTION_DAYS: "-1" }), "HISTORY_RETENTION_DAYS");
-    throwsWith(() => parseConfig({ HISTORY_RETENTION_DAYS: "36501" }), "HISTORY_RETENTION_DAYS");
-    throwsWith(() => parseConfig({ HISTORY_RETENTION_DAYS: "abc" }), "HISTORY_RETENTION_DAYS");
   });
 
   it("vazio explícito usa o default (não vira 0/NaN)", () => {
