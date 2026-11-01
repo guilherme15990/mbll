@@ -9,7 +9,7 @@ data
 *.zip
 *.bak
 
-# Segredos locais; o modelo versionado é .env.example
+# Segredos locais (nunca versionados). A documentação das variáveis de ambiente
+# vive em app/api/src/infra/config.js (default + efeito de cada uma).
 .env
 .env.*
-!.env.example

@@ -5,6 +5,9 @@
 - Contexto: `apps/api` zero-dep, Node 22+ (`node:http`), máquina de 4 GB, um único
   processo servindo `/v1/*` + `apps/web/dist`.
 
+> **NOTA (2026-11-01, ADR-068).** A documentação das variáveis de ambiente vive
+> agora no topo de `app/api/src/infra/config.js`; o `.env.example` foi removido.
+
 ## Problema
 
 O servidor da F1 era funcional, mas operacionalmente cego e frágil:

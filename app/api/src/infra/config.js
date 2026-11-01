@@ -9,6 +9,30 @@
 // F3: `DATA_DIR` ancora TODO estado persistente na raiz do repo (não no CWD).
 // Antes, `SQLITE_FILE=./data/cache.sqlite` criava um banco por diretório de
 // execução (data/, app/api/data, app/web/data, app/api/src/data).
+//
+// ── Variáveis de ambiente (ESTE bloco é a documentação; não há .env.example) ───
+//
+// O processo NÃO lê arquivo .env: os valores vêm do ambiente (`process.env`) e os
+// DEFAULTS abaixo são o que roda sem nada setado. Variável de ambiente é para
+// OPERAÇÃO (porta, caminho de dados, host externo) — regra de negócio não mora
+// aqui. Como passar: PowerShell `$env:PORT="3001"; node app/api/src/index.js`
+// ou Bash `PORT=3001 node app/api/src/index.js`. Booleano aceita 1/0, true/false,
+// on/off, yes/no (case-insensitive).
+//
+// PORT                 int 3001                 porta HTTP (0..65535)
+// DATA_DIR             <repo>/data             raiz de TODO estado local (SQLite); relativo à RAIZ DO REPO, não ao CWD
+// SQLITE_FILE          $DATA_DIR/cache.sqlite  override explícito do arquivo (relativo ao CWD)
+// SQLITE_CACHE         on                      "off" desliga o SQLite (fallback em memória)
+// ARENA_BASE           https://arena.fastapicloud.dev   base do upstream
+// ARENA_ALT_HOSTS      (vazio)                 allowlist de hosts de failover (o header x-alt-host só é seguido se o host estiver aqui); vazio = sem failover
+// ARENA_CONC           int 4                   requisições paralelas à fonte (1..32; acima disso a fonte responde 429)
+// LOG_LEVEL            info                    silent | error | warn | info | debug
+// TRUST_PROXY          false                   confia em X-Forwarded-For p/ o rate limit — só ligue atrás de proxy conhecido
+// RATE_LIMIT_OFF       false                   "1" desliga o rate limit por IP (útil em teste de carga local)
+// RATE_LIMIT_RPS       int 20                  requisições/s por cliente (1..10000)
+// RATE_LIMIT_BURST     int 60                  rajada por cliente (1..100000)
+// SHUTDOWN_TIMEOUT_MS  int 10000               prazo do shutdown gracioso (100..120000)
+// WEB_DIST             app/web/dist            diretório servido em produção (relativo à RAIZ DO REPO)
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 

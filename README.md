@@ -233,7 +233,8 @@ fallback silencioso (`app/api/src/infra/config.js`).
 | `SHUTDOWN_TIMEOUT_MS` | `10000` | prazo do shutdown gracioso |
 | `WEB_DIST` | `app/web/dist` | diretório servido em produção |
 
-Modelo em `.env.example`.
+A documentação completa de cada variável (default e efeito) vive em
+`app/api/src/infra/config.js`.
 
 ## API (`/v1`, JSON, GET)
 
@@ -259,7 +260,7 @@ Limites e semântica de cada indicador estão nos ADRs e nos docs de módulo em
 ## Documentação
 
 - **ADRs** — `AGENTS/artefatos/architecture/`. Comece por `ADR-033`
-  (arquitetura-alvo, monólito modular). As decisões recentes: `ADR-061` a `ADR-067`.
+  (arquitetura-alvo, monólito modular). As decisões recentes: `ADR-061` a `ADR-068`.
 - **Contratos de tela e UX** — `AGENTS/artefatos/{spec,ux,qa,reviews}/`.
 - **Regras de negócio / evidência** — `packages/engine/src` (os comentários de
   módulo explicam a unidade e o limite de cada número).

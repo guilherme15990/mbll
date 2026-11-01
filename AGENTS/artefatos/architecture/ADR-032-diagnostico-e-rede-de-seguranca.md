@@ -28,6 +28,9 @@ Consequências: `*.zip` (33 MB + 2 arquivos) passam a ser ignorados; `data/`,
 `dist/`, `*.sqlite` e `.env*` já estavam/são ignorados. `.env.example` é o único
 arquivo de configuração versionado.
 
+> **NOTA (2026-11-01, ADR-068).** O `.env.example` foi **removido**; a
+> documentação das variáveis passou para o topo de `app/api/src/infra/config.js`.
+
 ## Decisão 2 — Testes da API deixam de compartilhar o SQLite de dev
 
 **Problema comprovado.** `apps/api/src/cache.js` resolve `SQLITE_FILE` e abre o
