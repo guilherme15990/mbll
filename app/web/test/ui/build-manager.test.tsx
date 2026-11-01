@@ -55,7 +55,7 @@ describe("BuildManager (caracterização)", () => {
     mockBase();
     renderAt("/build");
     expect(screen.getByText("Escolha um herói para começar")).toBeInTheDocument();
-    expect(screen.getByText("Nenhum herói em foco")).toBeInTheDocument();
+    expect(screen.getByText("Nenhum herói selecionado")).toBeInTheDocument();
     expect(useBuilds).toHaveBeenCalledWith(null, "mythic", "");
   });
 

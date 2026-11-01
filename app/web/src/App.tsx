@@ -1,7 +1,6 @@
 import { useLocation } from "react-router-dom";
 import { Radar } from "lucide-react";
 import { TopNav } from "./app/TopNav";
-import { HeroFocus } from "./app/HeroFocus";
 import { filtersQuery, useFilters } from "./app/filters";
 import { LANES } from "./shared/api/queries/filters";
 import { ErrorBoundary } from "./app/ErrorBoundary";
@@ -17,7 +16,7 @@ function AppContent() {
     <div className="min-h-screen bg-abyss flex flex-col font-sans selection:bg-gold/30 selection:text-gold-light">
       {/* Top Application Bar */}
       <header className="sticky top-0 z-30 backdrop-blur-xl bg-surface/90 border-b border-line shadow-lg">
-        {/* Row 1: Brand, Status, Global Controls & Herói em foco */}
+        {/* Row 1: Brand, Status e controles globais */}
         <div className="max-w-7xl mx-auto px-4 py-2.5 flex items-center justify-between gap-4 flex-wrap">
           {/* Brand & System Status */}
           <div className="flex items-center gap-3">
@@ -43,9 +42,9 @@ function AppContent() {
             </div>
           </div>
 
-          {/* Cápsula de contexto global: elo, janela e rotas (multi-seleção) +
-              Herói em foco. Rota vive aqui (não na página) para o contexto
-              sobreviver à navegação e ficar ao lado dos outros filtros globais. */}
+          {/* Cápsula de contexto global: elo, janela e rotas (multi-seleção).
+              Rota vive aqui (não na página) para o contexto sobreviver à
+              navegação e ficar ao lado dos outros filtros globais. */}
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1.5 bg-panel/90 border border-line p-1 rounded-2xl shadow-inner flex-wrap">
               <div className="flex items-center gap-1 px-2 text-xs text-mist">
@@ -117,8 +116,6 @@ function AppContent() {
                 })}
               </div>
             </div>
-
-            <HeroFocus />
           </div>
         </div>
 

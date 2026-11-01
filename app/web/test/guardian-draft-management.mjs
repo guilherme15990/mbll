@@ -56,11 +56,7 @@ check(
 check("rota /draft", /<Route path="\/draft" element=\{<DraftManagement \/>\} \/>/.test(router));
 check(
   "menu horizontal tem Draft management (DMP) preservando filtros",
-  /getNavUrl\(t\.to\)/.test(nav) && nav.includes("/draft") && nav.includes("Draft management") && nav.includes("DMP"),
-);
-check(
-  "stream de draft continua único e nomeado",
-  nav.includes("Inteligência de Draft") && (nav.match(/Inteligência de Draft/g) ?? []).length === 1,
+  /getNavUrl\("\/draft"\)/.test(nav) && nav.includes("Draft management") && nav.includes("DMP"),
 );
 
 // 2. Reuso dos contratos oficiais, sem backend novo.
@@ -256,7 +252,6 @@ check(
   /const DraftScore = lazy\(\(\) => import\("\.\.\/features\/draft-management\/DraftScorePage"\)\)/.test(router),
 );
 check("rota /draft-score separada de /draft", /<Route path="\/draft-score" element=\{<DraftScore \/>\} \/>/.test(router));
-check("menu horizontal tem a entrada do Draft Score", nav.includes("/draft-score") && nav.includes("Draft Score"));
 check("tabela do Draft Score existe", exists(scoreTablePath), scoreTablePath);
 check(
   "página de teste consome o número pronto (hook de shared/api)",

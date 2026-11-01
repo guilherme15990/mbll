@@ -10,7 +10,7 @@
  * call sites importam daqui.
  *
  * Por que os hooks não foram para pastas `api/` dentro de cada feature (como a
- * auditoria sugeriu): `app/HeroFocus`, `shared/ui/patterns/HeroPicker` e `shared/ui/patterns/HeroDossier`
+ * auditoria sugeriu): `shared/ui/patterns/HeroPicker` e `shared/ui/patterns/HeroDossier`
  * consomem `useHero`, `useHeroes`, `useCatalog` e `useMeta`, e as seções de
  * `features/builds` consomem `useBuilds` de builds. Mover os hooks para
  * dentro das features violaria duas regras do `tools/check-boundaries.mjs`

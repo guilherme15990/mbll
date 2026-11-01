@@ -69,11 +69,11 @@ export default function BuildManager() {
           <SectionTitle
             kicker="Build Management"
             title="Escolha um herói para começar"
-            subtitle="A tela recebe o herói do cabeçalho (Herói em foco) ou da URL. Sem herói, nada de build é buscado."
+            subtitle="A tela recebe o herói da URL (ao abrir a partir de Heróis, Builds ou Confrontos) ou pelo seletor abaixo. Sem herói, nada de build é buscado."
           />
           <Empty
-            title="Nenhum herói em foco"
-            hint="Selecione um herói abaixo (ou use a busca do cabeçalho). Depois escolha a lane: o núcleo, as builds e as sugestões mudam com o recorte."
+            title="Nenhum herói selecionado"
+            hint="Selecione um herói abaixo. Depois escolha a lane: o núcleo, as builds e as sugestões mudam com o recorte."
           />
           <HeroPicker hero={null} onPick={editor.pickHero} />
         </>

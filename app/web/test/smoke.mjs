@@ -8,7 +8,6 @@ const must = [
   "src/app/filters.ts",
   "src/app/ErrorBoundary.tsx",
   "src/app/TopNav.tsx",
-  "src/app/HeroFocus.tsx",
   "src/shared/format.ts",
   "src/shared/ui/index.tsx",
   "src/shared/ui/primitives/Avatar.tsx",

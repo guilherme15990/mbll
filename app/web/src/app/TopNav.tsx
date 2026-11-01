@@ -1,6 +1,5 @@
-import { useRef } from "react";
 import { NavLink } from "react-router-dom";
-import { ChevronDown, Compass, FlaskConical, Hammer, LayoutDashboard, Swords, Users, Wrench } from "lucide-react";
+import { Compass, Hammer, LayoutDashboard, Users, Wrench } from "lucide-react";
 import { cx } from "../shared/api";
 
 /**
@@ -9,8 +8,8 @@ import { cx } from "../shared/api";
  * contexto global (elo/janela/rota/herói) via `getNavUrl`.
  *
  * Escopo: as cinco seções primárias (Dashboard, Heróis, Builds, Gerenciar build,
- * Draft management). Os contextos secundários de draft (Draft Score, Confrontos)
- * vivem num agrupador à direita da barra.
+ * Draft management). O agrupador "Inteligência de Draft" (Draft Score, Confrontos)
+ * saiu do menu (ADR-066); as rotas seguem existindo no router.
  */
 
 /** Classe de cada aba. Horizontal: sem `w-full`, com `whitespace-nowrap`. */
@@ -24,22 +23,11 @@ const tabClass = ({ isActive }: { isActive: boolean }) =>
 
 const badgeClass = "text-[9px] font-mono px-1 py-0.5 rounded bg-abyss/80 border border-line/60 text-mist group-hover:text-foam";
 
-/** Contextos secundários de draft, agrupados no menu da direita. */
-const DRAFT_CONTEXTS = [
-  { to: "/draft-score", label: "Draft Score", id: "DSV", icon: <FlaskConical size={13} />, subtitle: "Teste da métrica (0–100)" },
-  { to: "/confrontos", label: "Confrontos", id: "M6", icon: <Swords size={13} />, subtitle: "Matchups M6" },
-];
-
 export function TopNav({ getNavUrl }: { getNavUrl: (baseTo: string) => string }) {
-  const groupRef = useRef<HTMLDetailsElement>(null);
-  const closeGroup = () => {
-    if (groupRef.current) groupRef.current.open = false;
-  };
-
   return (
     <nav aria-label="Navegação do Radar" className="border-t border-line/60">
       <div className="max-w-7xl mx-auto px-4 flex items-center gap-1.5 py-1.5">
-        {/* Faixa rolável no mobile; o dropdown fica FORA dela para não ser cortado. */}
+        {/* Faixa rolável no mobile. */}
         <div className="flex items-center gap-1.5 overflow-x-auto min-w-0 flex-1">
           <NavLink
             to={getNavUrl("/dashboard")}
@@ -92,34 +80,6 @@ export function TopNav({ getNavUrl }: { getNavUrl: (baseTo: string) => string })
             <span className={badgeClass}>DMP</span>
           </NavLink>
         </div>
-
-        <details ref={groupRef} className="relative shrink-0">
-          <summary
-            className="list-none cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap text-mist hover:text-foam hover:bg-panel2/60 border border-transparent transition-all duration-200"
-            title="Draft Score e Confrontos"
-          >
-            <span>Inteligência de Draft</span>
-            <ChevronDown size={13} />
-          </summary>
-          <ul className="absolute right-0 mt-1 z-40 w-56 p-1 rounded-2xl border border-line/60 bg-surface shadow-2xl">
-            {DRAFT_CONTEXTS.map((t) => (
-              <li key={t.to}>
-                <NavLink
-                  to={getNavUrl(t.to)}
-                  end
-                  onClick={closeGroup}
-                  className={tabClass}
-                  title={`${t.label} · ${t.subtitle}`}
-                  aria-label={`${t.label}, ${t.subtitle}`}
-                >
-                  <span className="opacity-80 group-hover:opacity-100">{t.icon}</span>
-                  <span>{t.label}</span>
-                  <span className={cx(badgeClass, "ml-auto")}>{t.id}</span>
-                </NavLink>
-              </li>
-            ))}
-          </ul>
-        </details>
       </div>
     </nav>
   );

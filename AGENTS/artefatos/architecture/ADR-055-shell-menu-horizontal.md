@@ -1,5 +1,9 @@
 # ADR-055 — Shell com menu horizontal (sai a sidebar) e limpeza da página Heróis
 
+> **PARCIALMENTE SUPERADA pela ADR-066 (2026-11-01).** D1 (menu horizontal) e D4/D5
+> permanecem. **D2** (agrupador "Inteligência de Draft" à direita) e **D3**
+> ("Herói em foco" no cabeçalho) foram revertidas: os dois controles saíram.
+
 **Data:** 2026-10-30 · **Status:** aceito · **Contexto:** o usuário pediu para mover a
 navegação da sidebar para um **menu horizontal** no topo, com as seções Dashboard,
 Heróis, Builds, Gerenciar build e Draft management; e, em seguida, remover da
