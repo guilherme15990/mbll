@@ -2,7 +2,7 @@ import { useSearchParams } from "react-router-dom";
 import { Hammer } from "lucide-react";
 import { LANES, cx, num, pct, useBuilds, useHeroes } from "../../shared/api";
 import { BUILD_TAG_CLASS } from "../../shared/domain/buildLabel";
-import { getBuildTags } from "@radar/proprietary-engine";
+import { getBuildTags } from "@radar/engine";
 import BuildLoadout from "../../shared/ui/patterns/BuildLoadout";
 import {
   Avatar, CtxBar, Empty, ErrBox, Loading,

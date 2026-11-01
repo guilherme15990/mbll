@@ -1,131 +1,34 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import {
-  Crosshair, Hammer, LayoutDashboard, Swords, UserSearch,
-} from "lucide-react";
-import { LANES, num, pct, useBlind, useBuilds, useCatalog, useDistortion, useHero, useHeroLanes } from "../../shared/api";
-import { BUILD_TAG_CLASS } from "../../shared/domain/buildLabel";
+import { LANES, useBlind, useCatalog, useDistortion, useHero, useHeroLanes } from "../../shared/api";
 import { PickVerdictText } from "../../shared/ui/patterns/PickVerdict";
-import BuildLoadout from "../../shared/ui/patterns/BuildLoadout";
-import { getBuildTags, getDraftPatterns } from "@radar/proprietary-engine";
-import { classifyBlindPick, classifyFirstPick } from "@radar/proprietary-engine";
+import { getDraftPatterns } from "@radar/engine";
+import { classifyBlindPick, classifyFirstPick } from "@radar/engine";
 import { NeedsLane, NeedsRank } from "../../shared/ui/patterns/NeedsRankLane";
-import {
-  Avatar, Empty, ErrBox,
-} from "../../shared/ui";
-import { selectTopBuildsByLift } from "@radar/proprietary-engine";
+import { ErrBox } from "../../shared/ui";
 import { HeroDataCard } from "../../shared/ui/patterns/HeroDataCard";
 import ConfrontosSection from "./sections/ConfrontosSection";
 import ConfrontosPreview from "./sections/ConfrontosPreview";
 import DraftSection from "./sections/DraftSection";
 import BuildsSection from "./sections/BuildsSection";
-
-type HeroContextId = "M6" | "DRF" | "BPS" | "BDL";
-
-/**
- * Ordem de decisão: home → confrontos → draft (picks + pressão) → builds.
- * Cada aba tem um Contexto de Interface fixo, repetido em toda a ficha.
- */
-const HERO_TABS: { slug: string; label: string; contextId: HeroContextId; icon: ReactNode }[] = [
-  { slug: "home", label: "Visão geral", contextId: "M6", icon: <LayoutDashboard size={13} aria-hidden="true" /> },
-  { slug: "confrontos", label: "Confrontos", contextId: "M6", icon: <Swords size={13} aria-hidden="true" /> },
-  { slug: "draft", label: "Draft", contextId: "DRF", icon: <Crosshair size={13} aria-hidden="true" /> },
-  { slug: "builds", label: "Builds", contextId: "BDL", icon: <Hammer size={13} aria-hidden="true" /> },
-];
-
-const TAB_SLUGS = HERO_TABS.map((t) => t.slug);
-
-/** Frase interpretativa e L3 curta em `@radar/proprietary-engine` (fonte única). */
-
-/** Seção de builds de UMA lane: hook próprio (nº de lanes varia por herói). Mesma key da aba Builds → cache hit. */
-function LaneBuilds({ hero, rank, lane, heroName, to }: { hero: string; rank: string; lane: string; heroName: string; to: string }) {
-  const q = useBuilds(hero || null, rank, lane);
-  // Top-3 por lift em `@radar/proprietary-engine` (selectTopBuildsByLift).
-  const top = selectTopBuildsByLift([...(q.data?.data ?? [])], 3);
-  const refWin = q.data?.references?.mostUsed?.win;
-  return (
-    <Link
-      to={to}
-      aria-label={`Abrir Builds de ${heroName} na lane ${lane}`}
-      className="block rounded-2xl border border-line bg-panel p-4 hover:border-gold/40 transition-colors"
-    >
-      <div className="flex items-start justify-between gap-2 flex-wrap">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-wider text-foam">Builds · {lane}</p>
-          <p className="text-[11px] text-mist">
-            Top {top.length || 3} por lift · referência {pct(refWin)}
-          </p>
-        </div>
-        <span className="text-[11px] text-gold font-bold" aria-hidden="true">ver na aba →</span>
-      </div>
-
-      {q.isLoading ? (
-        <p className="text-[11px] text-mist mt-3" role="status">carregando builds…</p>
-      ) : q.isError || !top.length ? (
-        <div className="mt-3" onClick={(e) => e.preventDefault()}>
-          <ErrBox onRetry={() => q.refetch()} />
-        </div>
-      ) : (
-        <div className="mt-3 space-y-2.5">
-          {top.map((b, i) => {
-            const lift = b.lift_vs_most_used;
-            const liftOk = lift != null && Number.isFinite(lift);
-            return (
-              <div key={i} className="rounded-xl border border-line bg-abyss/30 p-3 space-y-2.5">
-                <div className="flex items-start justify-between gap-2 flex-wrap">
-                  <div className="flex items-center gap-3">
-                    <span className="grid h-6 w-6 place-items-center rounded-md border border-line bg-panel2 text-[10px] font-bold text-mist">
-                      {i + 1}
-                    </span>
-                    <div>
-                      <p className="text-[10px] text-mist">Win</p>
-                      <p className="num text-lg font-bold text-foam leading-none">{pct(b.win)}</p>
-                    </div>
-                    <div className="pl-3 border-l border-line">
-                      <p className="text-[10px] text-mist">Lift</p>
-                      <p
-                        className={`num text-xs font-bold ${
-                          !liftOk ? "text-mist" : (lift as number) >= 0 ? "text-emerald-300" : "text-rose-300"
-                        }`}
-                      >
-                        {liftOk ? `${(lift as number) >= 0 ? "+" : ""}${num(lift, 4)}` : "—"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {getBuildTags(b).map((t) => (
-                      <span
-                        key={t.key}
-                        title={t.title}
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full border inline-block ${BUILD_TAG_CLASS[t.tone]}`}
-                      >
-                        {t.label}
-                      </span>
-                    ))}
-                    <span className="text-[10px] text-mist font-mono">pick {pct(b.pick, 2)}</span>
-                  </div>
-                </div>
-                <BuildLoadout build={b} />
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </Link>
-  );
-}
+import HeroTabs, { HERO_TABS, TAB_SLUGS } from "./HeroTabs";
+import LaneBuilds from "./sections/LaneBuilds";
+import HeroEmptyState from "./HeroEmptyState";
 
 /**
  * Ficha isolada /hero/:id — responsabilidade única: listar os detalhes do herói.
  * Identidade + métricas vivem no MESMO card (sem banner de veredito separado).
  * Home = mesmos hooks/keys das abas (cache hit, custo marginal 0 ao navegar).
  * Sem ?tab= (ou inválida) cai na home, sem redirect. `tab` fora da chave de cache.
+ *
+ * O tablist vive em `HeroTabs.tsx`, o vazio orientado em `HeroEmptyState.tsx` e
+ * a seção de builds por lane em `sections/LaneBuilds.tsx` (ADR-041: teto de 300
+ * linhas). Aqui ficam as derivações do herói e a montagem das faixas da home.
  */
 export default function HeroDetail() {
   const params = useParams();
   const navigate = useNavigate();
   const [sp, setSp] = useSearchParams();
-  const tabRefs = useRef<(HTMLAnchorElement | null)[]>([]);
 
   const rank = sp.get("rank") ?? "mythic";
   const window = sp.get("window") ?? "7";
@@ -213,27 +116,6 @@ export default function HeroDetail() {
     return `/hero/${hero}?${p.toString()}`;
   };
 
-  const onTabKeyDown = (e: React.KeyboardEvent, idx: number) => {
-    let next: number | null = null;
-    if (e.key === "ArrowRight") next = (idx + 1) % HERO_TABS.length;
-    else if (e.key === "ArrowLeft") next = (idx - 1 + HERO_TABS.length) % HERO_TABS.length;
-    else if (e.key === "Home") next = 0;
-    else if (e.key === "End") next = HERO_TABS.length - 1;
-    if (next != null) {
-      e.preventDefault();
-      tabRefs.current[next]?.focus();
-    }
-  };
-
-  const shortcutHeroes = (() => {
-    if (!catalogMap) return [];
-    const all = Object.entries(catalogMap).map(([id, entry]) => ({ id, ...entry }));
-    return ["yve", "aulus", "franco"]
-      .map((n) => all.find((x) => x.name.toLowerCase().includes(n)))
-      .filter((x): x is { id: string; name: string; head: string | null } => Boolean(x))
-      .slice(0, 3);
-  })();
-
   return (
     <section className="space-y-5" aria-label="Ficha do herói">
       {hero && !heroValid && catalogReady && (
@@ -281,85 +163,12 @@ export default function HeroDetail() {
         ) : null}
 
         {/* Tablist das 4 abas + home (roving tabindex preservado) */}
-        <div
-          role="tablist"
-          aria-label="Seções da ficha do herói"
-          className="flex items-center gap-1 overflow-x-auto bg-surface/80 p-1 rounded-2xl border border-line/80 shadow-sm"
-        >
-          {HERO_TABS.map((t, idx) => {
-            const selected = hero !== "" && t.slug === activeSlug;
-            if (!hero || !heroValid) {
-              return (
-                <span
-                  key={t.slug}
-                  role="tab"
-                  aria-selected="false"
-                  aria-disabled="true"
-                  tabIndex={0}
-                  title="selecione um herói acima"
-                  aria-label={`${t.label} — selecione um herói acima`}
-                  className="px-3 py-1.5 rounded-xl text-xs font-semibold text-mist/50 border border-transparent whitespace-nowrap cursor-not-allowed inline-flex items-center gap-1.5"
-                >
-                  {t.icon}
-                  {t.label}
-                </span>
-              );
-            }
-            return (
-              <Link
-                key={t.slug}
-                ref={(el) => {
-                  tabRefs.current[idx] = el;
-                }}
-                role="tab"
-                aria-selected={selected}
-                aria-controls="hero-tabpanel"
-                tabIndex={selected ? 0 : -1}
-                to={tabUrl(t.slug)}
-                onKeyDown={(e) => onTabKeyDown(e, idx)}
-                aria-label={`Aba ${t.label} da ficha do herói`}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap min-h-[44px] inline-flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-gold/60 focus-visible:outline-none ${
-                  selected
-                    ? "bg-gold text-abyss font-bold shadow-sm"
-                    : "text-mist hover:text-foam hover:bg-panel2/60 border border-transparent"
-                }`}
-              >
-                {t.icon}
-                {t.label}
-              </Link>
-            );
-          })}
-        </div>
+        <HeroTabs hero={hero} heroValid={heroValid} activeSlug={activeSlug} tabUrl={tabUrl} />
       </div>
 
       {/* Conteúdo: home-capa (veredito executivo) ou 1 aba de detalhe */}
       {!hero || !heroValid ? (
-        <div className="space-y-4">
-          <Empty
-            title="Escolha um herói para abrir a ficha"
-            hint="nada foi buscado — detalhe exige herói válido. Selecione acima ou use um atalho."
-          />
-          {shortcutHeroes.length > 0 && (
-            <div className="card p-4 border-line bg-panel2/30 space-y-3">
-              <p className="text-xs font-bold text-foam flex items-center gap-2">
-                <UserSearch size={14} className="text-gold" aria-hidden="true" /> Atalhos para abrir a ficha:
-              </p>
-              <div className="flex items-center gap-2 flex-wrap">
-                {shortcutHeroes.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => pickHero(s.id)}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-abyss/60 hover:bg-panel2 border border-line hover:border-gold/40 text-xs text-mist hover:text-gold transition-colors min-h-[44px]"
-                    aria-label={`Abrir ficha de ${s.name}`}
-                  >
-                    <Avatar src={s.head} name={s.name} size={24} />
-                    <span className="font-semibold">{s.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+        <HeroEmptyState catalogMap={catalogMap} onPickHero={pickHero} />
       ) : activeSlug === "home" ? (
         <div id="hero-tabpanel" role="tabpanel" aria-label="Visão geral da ficha do herói" className="space-y-4 animate-fadeIn motion-reduce:animate-none">
           <div id="prova-home" className="space-y-3 scroll-mt-4">

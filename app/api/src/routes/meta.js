@@ -2,7 +2,7 @@
 // CNF/RNK/TMP saíram junto com as abas da ficha e as rotas planas (ADR-048).
 import { cacheStats } from "../infra/cacheStore.js";
 import { historyStats } from "../infra/snapshotHistory.js";
-import { C_REFERENCE, LANES } from "@radar/proprietary-engine";
+import { C_REFERENCE, LANES } from "@radar/engine";
 import { versions } from "../application/versions.js";
 import { startedAtIso, layerHealthState } from "../application/health.js";
 

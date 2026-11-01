@@ -1,13 +1,13 @@
-import type { BuildTag, BuildTagKey, BuildTagTone } from "@radar/proprietary-engine";
-import { getBuildTags } from "@radar/proprietary-engine";
+import type { BuildTag, BuildTagKey, BuildTagTone } from "@radar/engine";
+import { getBuildTags } from "@radar/engine";
 
 /**
- * Tags de build (PRD Build §10, Camada A) — cálculo em `@radar/proprietary-engine`.
+ * Tags de build (PRD Build §10, Camada A) — cálculo em `@radar/engine`.
  *
  * FICA aqui (presentacional): `BUILD_TAG_CLASS` (tom → classes CSS).
  */
 export type { BuildTag, BuildTagKey, BuildTagTone };
-export type { BuildTagsInput } from "@radar/proprietary-engine";
+export type { BuildTagsInput } from "@radar/engine";
 export { getBuildTags };
 
 export const BUILD_TAG_CLASS: Record<BuildTagTone, string> = {

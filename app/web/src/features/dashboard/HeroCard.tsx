@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { num, pct, useMatchups, useTrends, type Hero } from "../../shared/api";
-import { classOf, dominantProfileOf, trendOfDated } from "@radar/proprietary-engine";
+import { classOf, dominantProfileOf, trendOfDated } from "@radar/engine";
 import { withLanes } from "../../app/filters";
 import { Avatar, ClassSeal, DomainStateBadge, TierBadge } from "../../shared/ui";
 
@@ -128,7 +128,7 @@ function HeroProfileChip({ heroId, rank, days }: { heroId: number; rank: string;
   const profs = pairs
     .map((p) => p.profile)
     .filter((p): p is "snowball" | "scaling" | "uniforme" => p === "snowball" || p === "scaling" || p === "uniforme");
-  // Agregação do perfil dominante em `@radar/proprietary-engine` (dominantProfileOf).
+  // Agregação do perfil dominante em `@radar/engine` (dominantProfileOf).
   const dom = dominantProfileOf(profs);
   if (!dom) return <span ref={boxRef} />;
   const { top, n } = dom;

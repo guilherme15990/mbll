@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@radar/contracts": "file:../../packages/contracts",
-    "@radar/proprietary-engine": "file:../../packages/proprietary-engine",
+    "@radar/engine": "file:../../packages/engine",
     "@tanstack/react-query": "^5.59.0",
     "lucide-react": "^0.453.0",
     "react": "^18.3.1",

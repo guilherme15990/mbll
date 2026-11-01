@@ -223,6 +223,9 @@ cada commit. **F7 é opcional** — só vale se a API crescer além dos 20 endpo
    dependência; o barrel único de `shared/api` já resolve o que precisava.
 6. **Renomear `proprietary-engine`.** O nome não corresponde ao que o pacote é
    (ADR-039), mas o rename toca 64 imports e o gate. Registrado, não pago.
+   > **Pago em 2026-10-31 (ADR-059).** `@radar/proprietary-engine` →
+   > `@radar/engine`; pasta `packages/engine/`; 36 arquivos trocaram o `from` e o
+   > gate perdeu a regra que proibia o nome antigo. O item deixa de valer.
 7. **Microserviços por contexto.** Um consumidor, um deploy (ADR-033).
 
 ## Trade-off honesto

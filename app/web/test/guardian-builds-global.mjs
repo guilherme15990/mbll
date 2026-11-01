@@ -77,7 +77,10 @@ check("estado isolado por card", ["loading", "error", "empty", "ready"].every((k
 // 7 · decisão de localização do scoring registrada; a tela não usa itemsets
 // (trincas removidas a pedido do usuário), mas o motor segue disponível para
 // a página agregada e os testes.
-check("web sem dep @radar/engine (scoring em shared/domain/itemsets.ts)", !pkg.dependencies["@radar/engine"]);
+check(
+  "web consome o motor único @radar/engine (scoring via shared/domain/itemsets.ts)",
+  pkg.dependencies["@radar/engine"] === "file:../../packages/engine",
+);
 check("itemsets.ts preservado (página agregada/testes)", fs.existsSync(path.join(root, "src/shared/domain/itemsets.ts")));
 check("global sem trincas/itemsets (decisão do usuário)", !/trinc|scoreRouteItemsets|itemset-score-v1|HeroItemsetContext/i.test(code));
 

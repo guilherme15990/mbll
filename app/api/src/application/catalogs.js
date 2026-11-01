@@ -5,7 +5,7 @@
 import { getHeroesPage, getEquipmentPage, getEmblems } from "../providers/arena/index.js";
 import { cacheGet, cacheSet } from "../infra/cacheStore.js";
 import { createSingleFlight } from "./singleFlight.js";
-import { normalizeEmblemCatalog } from "@radar/proprietary-engine";
+import { normalizeEmblemCatalog } from "@radar/engine";
 
 // F3: catálogos e emblemas compartilham um único single-flight. Duas abas que
 // pedem o catálogo frio ao mesmo tempo fazem UMA chamada ao upstream, não duas.

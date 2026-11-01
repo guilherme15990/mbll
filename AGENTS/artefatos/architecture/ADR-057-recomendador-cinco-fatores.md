@@ -31,6 +31,7 @@ A ADR-053 D5 pontuava o candidato com dois fatores. O pedido agora é explícito
 - **Meta** é o percentil do θ̂ (rank dentro da lane), a resposta que o sistema já dá — não criamos um segundo número concorrente.
 - **Balanceamento** é o ajuste de arquétipo da ADR-053 D5 mantido: contrabalança o dominante inimigo, repete ou é neutro; herói/sem dado ou sem alvo saem do denominador. O peso `0,25` segue **declarado** (um degrau ≈ 25 pontos de bondade).
 - **Interpretação do 5º fator (registrado):** “ajuda a balancear o time” foi lido como **contrapeso de arquétipo** (janela de duração), não como sinergia positiva com os aliados. É o que o modelo já sabia medir sem inventar leitura. Se o pedido era sinergia positiva (`synergiesUp`), trocar a fonte é uma mudança de uma linha.
+  > **Resolvido em 2026-11-01 (produto).** Confirmado o **contrapeso de arquétipo** como 5º fator. Sinergia positiva fica descartada (exigiria dado par-a-par aliado↔aliado; registrado como fase 2/B7). A dúvida deixa de estar aberta — sem mudança de código.
 
 ### D2 · A lane alvo manda na lista
 O herói de **outra** lane não é candidato (`laneFitOf === false` → fora). O encaixe na lane é o **primeiro** critério de ordem (`laneFitRank`), antes do score: herói da lane sempre acima de quem não tem dado de lane.

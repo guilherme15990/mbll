@@ -7,7 +7,7 @@ import { getCounters, getCompatibility } from "../providers/arena/index.js";
 import { cacheGet, cacheSet } from "../infra/cacheStore.js";
 import {
   durationCurve, classifyDuration, makePairKey, evidenceQuality,
-} from "@radar/proprietary-engine";
+} from "@radar/engine";
 import { catalogMap } from "./catalogs.js";
 
 /**

@@ -1,13 +1,11 @@
 // Builds — visão de sistema (/builds/aggregate) e lifts por herói.
-import { getHeroBuilds, RANKS } from "../providers/arena/index.js";
-import { cacheGet, cacheSet } from "../infra/cacheStore.js";
-import { requireLane, buildLift, buildReferences } from "@radar/proprietary-engine";
-import { isRank, isWindow, WINDOWS } from "../application/validation.js";
-import {
-  AGG_TOP_ALL, AGG_TOP_VALUES, aggCacheKey, withAggCacheMeta,
-  aggBackgroundRevalidate, runBuildsAggregate,
-} from "../application/buildsAggregate.js";
-import { equipmentMap, emblemCatalog } from "../application/catalogs.js";
+// A rota é só borda HTTP: valida a entrada e delega. A orquestração e a
+// normalização vivem em `application/` (buildsAggregate/heroBuilds), ligadas
+// pelo composition root — a rota não toca cache nem upstream (Problemas 3 e 4).
+import { requireLane } from "@radar/engine";
+import { isRank, isWindow, RANKS, WINDOWS } from "../application/validation.js";
+import { AGG_TOP_ALL, AGG_TOP_VALUES } from "../application/buildsAggregate.js";
+import { buildsAggregate, heroBuilds } from "../composition.js";
 
 // GET /builds/aggregate — visão de sistema (B0–B5), 1 lane por carga.
 // `top=all` = profundidade máxima (todos os heróis com dados na lane).
@@ -36,90 +34,16 @@ export async function aggregateRoute(sp) {
     } };
   }
 
-  const params = { rank, lane, window, top, population };
-  const key = aggCacheKey(params);
-
-  // Quente: 0 requests. Stale: serve já e revalida em background (1 lane por ciclo).
-  const hit = cacheGet(key, "C");
-  if (hit.hit) {
-    if (hit.stale) aggBackgroundRevalidate(key, params);
-    return { status: 200, body: withAggCacheMeta(hit.body, hit) };
-  }
-
-  return runBuildsAggregate(params, key);
+  return buildsAggregate.serve({ rank, lane, window, top, population });
 }
 
 // GET /heroes/:id/builds — builds com win rate + ícones (lane OBRIGATÓRIA, API 422 sem lane)
 export async function heroBuildsRoute(sp, id) {
   const rank = sp.get("rank") ?? "mythic";
   if (!isRank(rank)) return { status: 400, body: { error: "rank_invalid", message: "Invalid rank", ranks: RANKS } };
-  const laneRaw = sp.get("lane");
-  const chk = requireLane(laneRaw);
-  if (chk.ok === false) return { status: 422, body: { error: "lane_required", message: "Lane query param is required", allowed: chk.allowed, hint: "use ?lane=exp|mid|roam|jungle|gold (no silent default)" } };
-  const lane = chk.lane;
-  const key = `builds:v5:${id}:${rank}:${lane}`;
-  const hit = cacheGet(key, "C");
-  if (hit.hit && !hit.stale) return { status: 200, body: { ...hit.body, stale: false } };
-  let raw = null;
-  let eqMap = {};
-  let emblemMap = {};
-  try {
-    [raw, eqMap, emblemMap] = await Promise.all([
-      getHeroBuilds({ id, lane, rank }),
-      equipmentMap(),
-      emblemCatalog(),
-    ]);
-  } catch (e) {
-    return { status: 502, body: { error: "upstream_unavailable", message: "Upstream unavailable", detail: String(e?.message ?? e).slice(0, 200) } };
+  const chk = requireLane(sp.get("lane"));
+  if (chk.ok === false) {
+    return { status: 422, body: { error: "lane_required", message: "Lane query param is required", allowed: chk.allowed, hint: "use ?lane=exp|mid|roam|jungle|gold (no silent default)" } };
   }
-  const recs = raw?.data?.records ?? [];
-  if (!recs.length) return { status: 502, body: { error: "upstream_unavailable", message: "Upstream unavailable, try again" } };
-  // Forma real da fonte: rec.data.build[] cada um com {build_win_rate, build_pick_rate, equipid[], emblem, battleskill}
-  const flat = recs.flatMap((r) => (r?.data?.build ?? []).map((b) => ({ b, heroName: r?.data?.hero_name ?? null })));
-  if (!flat.length) return { status: 502, body: { error: "no_builds_for_lane", message: "No builds for this lane" } };
-  const base = flat.map(({ b }) => ({ win: Number(b?.build_win_rate), pick: Number(b?.build_pick_rate) }));
-  const refs = buildReferences(base);
-  const refMost = Number(refs.mostUsed?.win), refMean = Number(refs.heroMean);
-  const data = flat.map(({ b }) => {
-    const win = Number(b?.build_win_rate), pick = Number(b?.build_pick_rate);
-    const liftMost = buildLift({ win, refWin: refMost, hasSupport: Number.isFinite(win) && Number.isFinite(refMost), refKind: "mais-usada" });
-    const liftMean = buildLift({ win, refWin: refMean, hasSupport: Number.isFinite(win) && Number.isFinite(refMean), refKind: "media-do-heroi" });
-    const eq = Array.isArray(b?.equipid) ? b.equipid : [];
-    const talentIds = (Array.isArray(b?.new_rune_skill) ? b.new_rune_skill : Array.isArray(b?.rune_skill) ? b.rune_skill : [])
-      .map((v) => Number(v))
-      .filter((v) => Number.isFinite(v));
-    const talents = talentIds.map((tid) => {
-      const t = emblemMap[tid];
-      return { id: tid, name: t?.name ?? null, tier: t?.tier ?? null, desc: t?.desc ?? null, icon: t?.icon ?? null };
-    });
-    const emblemData = b?.emblem?.data && typeof b.emblem.data === "object" ? b.emblem.data : {};
-    const emblemRawId = emblemData?.emblemid ?? b?.runeid;
-    const emblemId = emblemRawId != null && Number.isFinite(Number(emblemRawId)) ? Number(emblemRawId) : null;
-    const emblemName = emblemData?.emblemname ?? emblemData?.name ?? null;
-    const emblemIcon = emblemData?.attriicon ?? emblemData?.emblemicon ?? null;
-    // Feitiço: a fonte entrega ora plano (data.skillname), ora aninhado (data.__data.skillname).
-    const spellData = b?.battleskill?.data && typeof b.battleskill.data === "object" ? b.battleskill.data : {};
-    const spellInner = spellData.__data && typeof spellData.__data === "object" ? spellData.__data : {};
-    const spellName = spellData.skillname ?? spellInner.skillname ?? null;
-    const spellIcon = spellData.skillicon ?? spellInner.skillicon ?? null;
-    const spell = spellName || spellIcon ? { name: spellName, icon: spellIcon } : null;
-    return {
-      win: b?.build_win_rate ?? null, pick: b?.build_pick_rate ?? null,
-      lift_raw: liftMost.lift_raw, lift_vs_most_used: liftMost.lift_raw, lift_vs_mean: liftMean.lift_raw,
-      lift_adjusted: null, adjusted_association: null, causal_build_lift: null,
-      reference_win: Number.isFinite(refMost) ? refMost : null, reference_kind: "mais-usada",
-      references: { most_used_win: Number.isFinite(refMost) ? refMost : null, hero_mean_win: Number.isFinite(refMean) ? refMean : null },
-      uncertainty_method: null, causal_status: "nao-avaliado",
-      exposure_status: "unvalidated", classification_status: liftMost.classification_status,
-      spell,
-      emblem: emblemId == null && !emblemName
-        ? null
-        : { id: emblemId, name: emblemName, icon: emblemIcon },
-      talents,
-      items: eq.slice(0, 6).map((eid) => ({ id: eid, name: eqMap[eid]?.name ?? null, icon: eqMap[eid]?.icon ?? null })),
-    };
-  });
-  const body = { id: Number(id), rank, lane, data, references: refs, audit_status: "audit_pending", note: "L(b,h,c)=WR−WR_ref. Camada A (bruto) vs mais-usada e média; ajustado/causal NULL sem dados por partida" };
-  cacheSet(key, body);
-  return { status: 200, body: { ...body, stale: false } };
+  return heroBuilds.get(id, rank, chk.lane);
 }

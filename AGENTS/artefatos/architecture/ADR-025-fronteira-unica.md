@@ -1,5 +1,11 @@
 # ADR-025 — Fronteira única: `@radar/engine` removido, tudo em `@radar/proprietary-engine`
 
+> **Superada em 2026-10-31 pela ADR-059.** O nome `@radar/engine` voltou: o pacote
+> `@radar/proprietary-engine` foi **renomeado** para `@radar/engine` (pasta
+> `packages/engine/`), pagando a ADR-041 §"não faria" item 6. O resto desta ADR
+> continua válido — as primitivas seguem sob **um dono só**; o que muda é apenas
+> o **nome**, não a duplicata de fronteira. Corpo abaixo mantido como histórico.
+
 - Data: 2026-10-11 · Autor: arquiteto-implementador
 - Status: aceito e executado.
 

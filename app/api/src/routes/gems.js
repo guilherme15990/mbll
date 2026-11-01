@@ -1,5 +1,6 @@
 // GET /gems — heróis com sinal acima da mediana e pressão baixa de pick/ban.
-import { fetchRankAll } from "../application/rankLot.js";
+import { rankLot } from "../composition.js";
+const { fetchRankAll } = rankLot;
 import { score } from "../application/scoring.js";
 
 export async function gemsRoute(sp) {

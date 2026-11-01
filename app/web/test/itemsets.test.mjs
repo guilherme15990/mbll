@@ -7,8 +7,9 @@ import {
   scoreRouteItemsets,
 } from "../src/shared/domain/itemsets.ts";
 
-// DECISÃO REGISTRADA: web não depende de @radar/engine (ver package.json) —
-// por isso o smoke do scoring vive aqui (node com type-stripping), não em engine.test.js.
+// DECISÃO REGISTRADA: web consome o motor pela raiz `@radar/engine`
+// (ver package.json) — por isso o smoke do scoring vive aqui (node com
+// type-stripping), exercitando o reexport de `shared/domain/itemsets.ts`.
 
 // Fixture: build mínima no formato da ficha (ordem da fonte preservada).
 const B = (ids, win, pick, refMost, refMean) => ({

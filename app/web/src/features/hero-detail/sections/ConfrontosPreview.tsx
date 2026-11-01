@@ -5,7 +5,7 @@ import { Avatar } from "../../../shared/ui";
 import {
   hasFiniteDelta, selectTopCountersByDelta, selectTopSynergiesByDelta,
   sortPairsByDeltaAsc, sortPairsByDeltaDesc,
-} from "@radar/proprietary-engine";
+} from "@radar/engine";
 import {
   MATCHUP_TONE_BORDER, MATCHUP_TONE_SURFACE, MATCHUP_TONE_TEXT, fmtDelta,
   MatchupDeltaChip, MatchupPairRow, MatchupToneIcon, profileLabel, type MatchupTone,

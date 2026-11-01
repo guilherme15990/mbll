@@ -41,7 +41,7 @@ for (const dead of ["src/pages", "src/components", "src/shared/idd"]) {
   if (fs.existsSync(path.join(root, dead))) { console.error("estrutura antiga: " + dead); bad++; }
 }
 const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json")));
-for (const d of ["react", "recharts", "lucide-react", "@tanstack/react-query", "react-router-dom"]) {
+for (const d of ["react", "recharts", "lucide-react", "@tanstack/react-query", "react-router-dom", "@radar/engine", "@radar/contracts"]) {
   if (!pkg.dependencies[d]) { console.error("sem dep " + d); bad++; }
 }
 console.log(bad ? `SMOKE FAIL (${bad})` : "SMOKE OK");

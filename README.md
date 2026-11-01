@@ -14,10 +14,10 @@ evidência explícito (`provisional`, `inconclusivo`, `sem dado`) — ver
 |---|---|
 | Web (`app/web`) | React 18, TypeScript, TanStack Query, React Router, Recharts, lucide-react, Tailwind |
 | API (`app/api`) | Node 24, `node:http`, `node:sqlite`, `fetch` — **zero dependências externas** de runtime* |
-| Motor (`packages/proprietary-engine`) | JS puro, sem I/O: modelos, primitivas e agregados |
+| Motor (`packages/engine`) | JS puro, sem I/O: modelos, primitivas e agregados |
 | Persistência | SQLite **só cache** (TTL A=2h/B=6h/C=24h + SWR) e histórico append-only de snapshots |
 
-\* o único "pacote" de runtime da API é o workspace interno `@radar/proprietary-engine`.
+\* o único "pacote" de runtime da API é o workspace interno `@radar/engine`.
 Sem login/usuário (fora de escopo).
 
 ## Estrutura
@@ -44,7 +44,7 @@ app/web/src
                  · patterns/ (HeroPicker, HeroDossier, PrimaryAction,
                  SigmaBanCard, NeedsRankLane, PickVerdict, charts…)
 
-packages/proprietary-engine
+packages/engine
   src/index.js   barrel público (fronteira única)
   src/index.d.ts contrato de tipos consumido por web e API
 
@@ -154,5 +154,5 @@ Limites e semântica de cada indicador estão nos ADRs e nos docs de módulo em
 
 - ADRs: `AGENTS/artefatos/architecture/` (comece por `ADR-033` — arquitetura-alvo)
 - Contratos de tela e UX: `AGENTS/artefatos/`
-- Regras de negócio/evidência: `packages/proprietary-engine/src` (comentários de
+- Regras de negócio/evidência: `packages/engine/src` (comentários de
   módulo explicam a unidade de cada número)

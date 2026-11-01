@@ -12,13 +12,14 @@
 // fórmula nova serviria o corpo velho por até 24 h — bug observado ao pivotar a
 // escala de "100·WR ancorado em 50" para "min–max do lote"). A tabela `cache` é
 // reconstruível, então sobra só a entrada órfã da versão anterior até o TTL.
-import { scoreHeroDraftScore, HERO_DRAFT_SCORE_VERSION } from "@radar/proprietary-engine";
+import { scoreHeroDraftScore, HERO_DRAFT_SCORE_VERSION } from "@radar/engine";
 import { cacheGet, cacheSet } from "../infra/cacheStore.js";
-import { fetchRankAll } from "./rankLot.js";
+import { rankLot } from "../composition.js";
 import { createSingleFlight } from "./singleFlight.js";
 
 // F3: coleções concorrentes idênticas compartilham UMA execução.
 const flights = createSingleFlight();
+const { fetchRankAll } = rankLot;
 
 export function heroDraftScoreBody(rank, days) {
   const key = `draft-score:${HERO_DRAFT_SCORE_VERSION}:${rank}:${days}`;

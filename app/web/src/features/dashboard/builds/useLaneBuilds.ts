@@ -3,7 +3,7 @@ import {
   LANES, useBuilds, useHeroLanes, useHeroes,
   type Build, type Hero,
 } from "../../../shared/api";
-import { selectLaneTopHeroesDetailed } from "@radar/proprietary-engine";
+import { selectLaneTopHeroesDetailed } from "@radar/engine";
 
 /**
  * Dados da aba Builds do /dashboard (composição por rota, sem herói fixo).
@@ -60,7 +60,7 @@ export function useLaneBuilds({
   // que tela vazia com diagnóstico falso de "sem builds".
   const mapForSelection = lanesLoaded ? lanesMap : lanesQuery.isError ? EMPTY_LANES : undefined;
 
-  // Top-3 θ̂ da rota em `@radar/proprietary-engine` (ordem de R2 preservada).
+  // Top-3 θ̂ da rota em `@radar/engine` (ordem de R2 preservada).
   // `validated:false` só aparece quando o mapa não carregou/está vazio e a
   // seleção vira fallback — o cabeçalho acende "rota não validada".
   const selection = useMemo(() => {

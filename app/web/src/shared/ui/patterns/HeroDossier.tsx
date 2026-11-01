@@ -3,7 +3,7 @@ import { num, pct, useHero } from "../../api";
 import { Avatar } from "../primitives/Avatar";
 import { ClassSeal } from "../primitives/ClassSeal";
 import { TierBadge } from "../primitives/TierBadge";
-import { classOf } from "@radar/proprietary-engine";
+import { classOf } from "@radar/engine";
 import { Hammer, Radar, Swords, X } from "lucide-react";
 interface HeroDossierProps {
   heroId: string | null;

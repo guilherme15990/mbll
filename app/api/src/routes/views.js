@@ -1,6 +1,7 @@
 // GET /views/:view — visões agregadas (semana, elo, tier).
 import { mapConc, RANKS } from "../providers/arena/index.js";
-import { fetchRankAll } from "../application/rankLot.js";
+import { rankLot } from "../composition.js";
+const { fetchRankAll } = rankLot;
 import { score } from "../application/scoring.js";
 
 export async function viewsRoute(path, sp) {

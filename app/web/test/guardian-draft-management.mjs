@@ -97,7 +97,7 @@ check(
   "domínio só importa irmãos e o motor (sem app/api/shared de runtime)",
   [...domain.matchAll(/from\s+["']([^"']+)["']/g)]
     .map((match) => match[1])
-    .every((source) => source.startsWith("./") || source === "@radar/proprietary-engine"),
+    .every((source) => source.startsWith("./") || source === "@radar/engine"),
 );
 check("domínio sem endpoint literal", !/\/v1\//.test(domain));
 check(
@@ -158,7 +158,7 @@ check("par contestado não escolhe lado", /contested \+= 1/.test(domain));
 // 5b. Leituras da v2 (ADR-053).
 check(
   "perfil dominante vem do motor, nunca de tabela fixa",
-  /import \{ dominantProfileOf \} from "@radar\/proprietary-engine"/.test(domain) &&
+  /import \{ dominantProfileOf \} from "@radar\/engine"/.test(domain) &&
     /dominantProfileOf\(profiles\)/.test(domain),
 );
 check("arquétipo sem par é null, nunca uniforme", /if \(!dom \|\| !isArchetype\(dom\.top\)\) return null/.test(domain));

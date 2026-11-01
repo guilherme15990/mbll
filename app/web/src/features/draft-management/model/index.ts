@@ -19,5 +19,6 @@ export * from "./laneMeta.ts";
 export * from "./archetype.ts";
 export * from "./curve.ts";
 export * from "./matrix.ts";
+export * from "./suggestionFactors.ts";
 export * from "./suggestions.ts";
 export * from "./analyze.ts";

@@ -3,7 +3,7 @@
 // O livro de pares vive em `application/matchupBook.js` (fonte única, cache C).
 import { RANKS } from "../providers/arena/index.js";
 import { cacheGet } from "../infra/cacheStore.js";
-import { blindProxy } from "@radar/proprietary-engine";
+import { blindProxy } from "@radar/engine";
 import { isRank, isWindow, WINDOWS } from "../application/validation.js";
 import {
   matchupBook, matchupBookCacheKey, loadMatchupBook,

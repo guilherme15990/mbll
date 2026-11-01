@@ -11,7 +11,7 @@
     "test:coverage": "node --test --experimental-test-coverage --test-coverage-lines=90 --test-coverage-branches=60 --test-coverage-functions=85 --test-coverage-exclude=**/packages/** --test-coverage-exclude=**/test/** ./test/routes.test.js ./test/builds-aggregate.test.js ./test/contracts.test.js ./test/providers.test.js ./test/config.test.js ./test/rate-limit.test.js ./test/http.test.js ./test/db.test.js ./test/history.test.js ./test/history-retention.test.js ./test/single-flight.test.js"
   },
   "dependencies": {
-    "@radar/proprietary-engine": "file:../../packages/proprietary-engine",
+    "@radar/engine": "file:../../packages/engine",
     "@radar/contracts": "file:../../packages/contracts"
   },
   "devDependencies": {

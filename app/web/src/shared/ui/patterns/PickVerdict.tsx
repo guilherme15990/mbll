@@ -1,4 +1,4 @@
-import type { PickFavorability } from "@radar/proprietary-engine";
+import type { PickFavorability } from "@radar/engine";
 
 const TONE_CLASS: Record<PickFavorability["tone"], string> = {
   emerald: "text-emerald-300 border-emerald-400/30 bg-emerald-400/10",

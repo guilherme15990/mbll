@@ -6,7 +6,7 @@
  * função do motor (`dominantProfileOf`). Sem par com perfil → null, nunca
  * "uniforme" inventado.
  */
-import { dominantProfileOf } from "@radar/proprietary-engine";
+import { dominantProfileOf } from "@radar/engine";
 import type { MatchupBooks } from "./pairs.ts";
 
 export const ARCHETYPES = ["snowball", "scaling", "uniforme"] as const;

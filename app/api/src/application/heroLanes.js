@@ -5,12 +5,14 @@
 import { getHeroLane, mapConc } from "../providers/arena/index.js";
 import { getLogger, LOG_EVENTS } from "../providers/logging/index.js";
 import { cacheGet, cacheSet } from "../infra/cacheStore.js";
-import { fetchRankAll, lanesFromRoadsort } from "./rankLot.js";
+import { lanesFromRoadsort } from "./rankLot.js";
+import { rankLot } from "../composition.js";
 import { catalogMap } from "./catalogs.js";
 import { createSingleFlight } from "./singleFlight.js";
 
 // F3: uma coleta de lanes por rank, mesmo com várias abas (single-flight).
 const flights = createSingleFlight();
+const { fetchRankAll } = rankLot;
 
 export function heroLanesBody(rank) {
   return flights.run(`lanes:${rank}`, () => heroLanesBodyImpl(rank));

@@ -7,8 +7,9 @@ import { getTrends } from "../providers/arena/index.js";
 import { cacheGet, cacheSet } from "../infra/cacheStore.js";
 import {
   distortionResidual, medianPickOf, medianBanOf, classOf,
-} from "@radar/proprietary-engine";
-import { fetchRankAll } from "../application/rankLot.js";
+} from "@radar/engine";
+import { rankLot } from "../composition.js";
+const { fetchRankAll } = rankLot;
 import { scoreLot } from "../application/scoring.js";
 import { isRank, isWindow, isDays } from "../application/validation.js";
 

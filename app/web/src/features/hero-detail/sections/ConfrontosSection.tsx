@@ -6,7 +6,7 @@ import { DurationChart } from "../../../shared/ui/patterns/charts";
 import { NeedsRank } from "../../../shared/ui/patterns/NeedsRankLane";
 import {
   hasFiniteDelta, sortPairsByDeltaAsc, sortPairsByDeltaDesc,
-} from "@radar/proprietary-engine";
+} from "@radar/engine";
 import {
   MATCHUP_TONE_BORDER, MATCHUP_TONE_TEXT, MatchupPairRow,
   MatchupToneIcon, profileLabel, type MatchupTone,
@@ -177,7 +177,7 @@ export default function ConfrontosSection({
   }
 
   const m = q.data;
-  // Ordenação/seleção por δ em `@radar/proprietary-engine` (matchup-ordering).
+  // Ordenação/seleção por δ em `@radar/engine` (matchup-ordering).
   // Destaques só com δ finito: par sem sinal não vira "pior/melhor".
   const worst = sortPairsByDeltaAsc(m.countersDown ?? []).find(hasFiniteDelta);
   const bestSyn = sortPairsByDeltaDesc(m.synergiesUp ?? []).find(hasFiniteDelta);

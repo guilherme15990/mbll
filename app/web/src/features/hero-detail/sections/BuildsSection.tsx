@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { LANES, cx, pct, useBuilds, useHeroLanes, type Build } from "../../../shared/api";
 import { BUILD_TAG_CLASS } from "../../../shared/domain/buildLabel";
-import { getBuildTags, orderBuildsByLift, selectBuildsAboveMostUsed } from "@radar/proprietary-engine";
+import { getBuildTags, orderBuildsByLift, selectBuildsAboveMostUsed } from "@radar/engine";
 import { NeedsLane } from "../../../shared/ui/patterns/NeedsRankLane";
 import BuildLoadout from "../../../shared/ui/patterns/BuildLoadout";
 import { Empty, ErrBox, Loading } from "../../../shared/ui";
@@ -104,7 +104,7 @@ export default function BuildsSection({
 
   const rows = q.data?.data ?? [];
   const refs = q.data?.references;
-  // Ordenação client + seleção acima-da-ref em `@radar/proprietary-engine`.
+  // Ordenação client + seleção acima-da-ref em `@radar/engine`.
   const ordered = orderBuildsByLift(rows);
   const withLift = selectBuildsAboveMostUsed(ordered);
   const refWin = refs?.mostUsed?.win;

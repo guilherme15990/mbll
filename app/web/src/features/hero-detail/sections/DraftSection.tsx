@@ -5,7 +5,7 @@ import {
 } from "../../../shared/api";
 import {
   classifyBlindPick, classifyFirstPick, getDraftPatterns,
-} from "@radar/proprietary-engine";
+} from "@radar/engine";
 import { NeedsRank } from "../../../shared/ui/patterns/NeedsRankLane";
 import { PickVerdictCard, PickVerdictPill } from "../../../shared/ui/patterns/PickVerdict";
 import {

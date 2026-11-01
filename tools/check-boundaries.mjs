@@ -4,11 +4,11 @@
 // contrato do workspace do motor. Roda na raiz: `npm run check:boundaries`.
 //
 // Regras
-//  1. Engine — todo nome importado de `@radar/proprietary-engine` tem declaração
-//     em `packages/proprietary-engine/src/index.d.ts` (o d.ts sombreia o JS), e
+//  1. Engine — todo nome importado de `@radar/engine` tem declaração
+//     em `packages/engine/src/index.d.ts` (o d.ts sombreia o JS), e
 //     toda declaração de VALOR (função/classe/const) existe no runtime.
-//  2. Engine — ninguém importa o interior do pacote (`/src/`, `/test/`) nem o
-//     workspace removido `@radar/engine`.
+//  2. Engine — ninguém importa o interior do pacote (`/src/`, `/test/`);
+//     o motor entra pela raiz `@radar/engine` (ADR-059 substitui ADR-025).
 //  3. Apps — nenhum import relativo que escape da própria app (o motor entra
 //     pelo nome do workspace).
 //  4. Packages — não importam `app/` (dependência é sempre app → package).
@@ -107,7 +107,7 @@ const isInside = (child, parent) => {
 };
 
 // ── 1. contrato do motor ────────────────────────────────────────────────────
-const dts = fs.readFileSync(path.join(PACKAGES, "proprietary-engine/src/index.d.ts"), "utf8");
+const dts = fs.readFileSync(path.join(PACKAGES, "engine/src/index.d.ts"), "utf8");
 const declared = new Set();
 for (const m of dts.matchAll(/export\s+declare\s+(?:function|const|let|class)\s+([A-Za-z0-9_$]+)/g)) declared.add(m[1]);
 for (const m of dts.matchAll(/export\s+(?:type|interface)\s+([A-Za-z0-9_$]+)/g)) declared.add(m[1]);
@@ -116,7 +116,7 @@ const undeclared = [];
 let engineImports = 0;
 for (const file of files) {
   for (const { clause, spec } of importsOf(fs.readFileSync(file, "utf8"))) {
-    if (spec !== "@radar/proprietary-engine") continue;
+    if (spec !== "@radar/engine") continue;
     engineImports++;
     for (const name of namesOf(clause)) {
       if (!declared.has(name)) undeclared.push(`${rel(file)} importa "${name}" (sem declaração no index.d.ts)`);
@@ -129,19 +129,18 @@ check("engine: todo import tem contrato no index.d.ts", undeclared, `${declared.
 // export real é uma mentira que só aparece em runtime (`undefined`).
 const valueDecls = new Set();
 for (const m of dts.matchAll(/export\s+declare\s+(?:function|const|let|class)\s+([A-Za-z0-9_$]+)/g)) valueDecls.add(m[1]);
-const runtime = await import(pathToFileURL(path.join(PACKAGES, "proprietary-engine/src/index.js")).href);
+const runtime = await import(pathToFileURL(path.join(PACKAGES, "engine/src/index.js")).href);
 const phantom = [...valueDecls].filter((n) => !(n in runtime)).sort();
 check("engine: toda declaração de valor existe no runtime", phantom, `${valueDecls.size} valores declarados`);
 
-// ── 2. interior do pacote / workspace morto ─────────────────────────────────
+// ── 2. interior do pacote ───────────────────────────────────────────────────
 const deep = [];
 for (const file of files) {
   for (const { spec } of importsOf(fs.readFileSync(file, "utf8"))) {
-    if (/^@radar\/proprietary-engine\//.test(spec)) deep.push(`${rel(file)} → ${spec} (importe a raiz do pacote)`);
-    if (spec === "@radar/engine" || spec.startsWith("@radar/engine/")) deep.push(`${rel(file)} → ${spec} (workspace removido, ADR-025)`);
+    if (/^@radar\/engine\//.test(spec)) deep.push(`${rel(file)} → ${spec} (importe a raiz do pacote)`);
   }
 }
-check("engine: sem import do interior nem do workspace removido", deep);
+check("engine: sem import do interior do pacote", deep);
 
 // ── 3/4. apps não escapam; packages não dependem de app ─────────────────────
 const escapes = [];
@@ -199,10 +198,13 @@ for (const { rel: from, imports } of webImports) {
 check("web: features não importam outras features", crossFeature);
 check("web: app|shared não importam features (exceto app/router.tsx)", zoneToFeature);
 
-// ADR-043 / regra 12 da ADR-041: `shared/domain` é lógica pura — só o motor e
-// `shared/format`. Tipos podem vir de `shared/api` (`import type`): são apagados
-// no build e não criam dependência de runtime nem ciclo real.
-const DOMAIN_PKGS = new Set(["@radar/proprietary-engine"]);
+// ADR-043 / regra 12 da ADR-041: `shared/domain` é lógica pura — só o motor,
+// `shared/format` e os irmãos do próprio `shared/domain`. Tipos podem vir de
+// `shared/api` (`import type`): são apagados no build e não criam dependência de
+// runtime nem ciclo real. O domínio pode ter vários arquivos (ADR-041 §7, teto
+// de 300 linhas): um irmão de pasta é o MESMO módulo lógico e cada arquivo da
+// pasta é checado aqui, então a pureza vale por transitividade.
+const DOMAIN_PKGS = new Set(["@radar/engine"]);
 const domainImpure = [];
 for (const file of webFiles) {
   const from = webRel(file);
@@ -215,7 +217,9 @@ for (const file of webFiles) {
     }
     const target = resolveRel(file, spec);
     const targetRel = target ? webRel(target) : spec;
-    if (!/^shared\/format(\.ts)?$/.test(targetRel)) domainImpure.push(`${from} → ${targetRel}`);
+    const allowed =
+      /^shared\/format(\.ts)?$/.test(targetRel) || targetRel.startsWith("shared/domain/");
+    if (!allowed) domainImpure.push(`${from} → ${targetRel}`);
   }
 }
 check("web: shared/domain puro (motor + shared/format)", domainImpure);
@@ -361,7 +365,7 @@ check(
 // Workspace declarado nos três consumidores: sem isso o import funciona por
 // acaso (hoisting) e quebra num `npm ci` limpo.
 const contractDeps = [];
-for (const pkgPath of ["app/web/package.json", "app/api/package.json", "packages/proprietary-engine/package.json"]) {
+for (const pkgPath of ["app/web/package.json", "app/api/package.json", "packages/engine/package.json"]) {
   const abs = path.join(ROOT, pkgPath);
   if (!fs.existsSync(abs)) continue;
   const pkg = JSON.parse(fs.readFileSync(abs, "utf8"));
@@ -370,7 +374,7 @@ for (const pkgPath of ["app/web/package.json", "app/api/package.json", "packages
 check("contracts: declarado em web, api e motor", contractDeps);
 
 // ── 7. tamanho de arquivo (ADR-041, critério de aceite nº 1) ─────────────────
-// "Nenhum arquivo acima de 300 linhas fora de packages/proprietary-engine".
+// "Nenhum arquivo acima de 300 linhas fora de packages/engine".
 // A regra existia só no papel e por isso regrediu para 11 arquivos. A allowlist
 // é a dívida medida em 2026-10-27, com o tamanho de então: o arquivo pode
 // encolher, não crescer. Arquivo novo acima do limite falha.
@@ -380,10 +384,6 @@ check("contracts: declarado em web, api e motor", contractDeps);
 // comportamento — que é o que o critério da ADR-041 quer proteger.
 const LOC_LIMIT = 300;
 const LOC_BASELINE = new Map([
-  ["app/web/src/features/build-manager/BuildManager.tsx", 1008],
-  ["app/web/src/shared/ui/patterns/ItemComposer.tsx", 834],
-  ["app/web/src/shared/domain/buildManager.ts", 566],
-  ["app/web/src/features/hero-detail/HeroDetail.tsx", 500],
   ["app/web/src/features/build-manager/SlotPicker.tsx", 430],
   ["app/web/src/shared/domain/loadout.ts", 476],
   ["app/api/src/application/buildsAggregate.js", 394],

@@ -1,8 +1,8 @@
 /**
  * Scoring de itemsets — fórmula `itemset-score-v1`.
  *
- * Re-export da FONTE ÚNICA em `@radar/proprietary-engine` (workspace local).
- * A implementação vive em `packages/proprietary-engine/src/itemsets.js`;
+ * Re-export da FONTE ÚNICA em `@radar/engine` (workspace local).
+ * A implementação vive em `packages/engine/src/itemsets.js`;
  * este módulo é só o caminho estável de import da web + tipos.
  * (Antes: função pura local sem dependências; agora depende do workspace.)
  */
@@ -15,10 +15,10 @@ export {
   itemIdsOf,
   scoreAtomicItemset,
   scoreRouteItemsets,
-} from "@radar/proprietary-engine";
+} from "@radar/engine";
 export type {
   ItemsetStatus,
   HeroItemsetContext,
   ItemsetAtomic,
   RouteItemset,
-} from "@radar/proprietary-engine";
+} from "@radar/engine";

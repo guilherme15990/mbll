@@ -24,9 +24,32 @@ const check = (name, ok, detail = "") => {
 const router = read("src/app/router.tsx");
 const nav = read("src/app/TopNav.tsx");
 const screenPath = "src/features/build-manager/BuildManager.tsx";
-const domainPath = "src/shared/domain/buildManager.ts";
-const screen = exists(screenPath) ? read(screenPath) : "";
-const domain = exists(domainPath) ? read(domainPath) : "";
+// A tela também foi fatiada em hooks + apresentação (ADR-041 §7: teto de 300
+// linhas). Os invariantes abaixo valem para a CAMADA de tela da feature, não
+// para um arquivo só.
+const screenDir = "src/features/build-manager";
+const screenFiles = [
+  "BuildManager.tsx",
+  "BuildManagerAtoms.tsx",
+  "BuildManagerBaseCard.tsx",
+  "useBuildManagerUrl.ts",
+  "useBuildManagerData.ts",
+  "useBuildDerivations.ts",
+  "usePickerCatalogs.ts",
+  "useBuildEditor.ts",
+];
+// O domínio do Build Management tem mais de um arquivo (ADR-041 §7: teto de 300
+// linhas). Os invariantes abaixo valem para a PASTA, não para um arquivo só.
+const domainDir = "src/shared/domain";
+const domainFiles = ["buildManager.ts", "buildSlotEdit.ts", "buildRunes.ts", "buildCommon.ts"];
+const screen = screenFiles
+  .filter((name) => exists(`${screenDir}/${name}`))
+  .map((name) => read(`${screenDir}/${name}`))
+  .join("\n");
+const domain = domainFiles
+  .filter((name) => exists(`${domainDir}/${name}`))
+  .map((name) => read(`${domainDir}/${name}`))
+  .join("\n");
 
 // 1. Rota e navegação.
 check("tela existe", exists(screenPath), screenPath);
@@ -56,7 +79,13 @@ check(
 check("importa as funções puras", /coreItems/.test(screen) && /completionSuggestions/.test(screen) && /applyCandidate/.test(screen) && /pickFromObservedBuild/.test(screen));
 check("domínio não importa React", !/from\s+["']react/.test(domain) && !/\buse(State|Effect|Memo)\b/.test(domain));
 check("domínio não faz rede", !/\bfetch\s*\(/.test(domain) && !/getJSON/.test(domain));
-check("domínio só tem import type", !/^\s*import\s+(?!type\b)[^;]*from/m.test(domain));
+// De fora da pasta, o domínio só importa TIPO (nada de runtime de api/react/
+// engine). Irmãos do próprio domínio podem importar valor entre si — é o mesmo
+// módulo lógico, e o gate de fronteiras checa cada arquivo da pasta.
+const runtimeOutside = [...domain.matchAll(/^\s*import\s+(?!type\b)([^;]*?)\s+from\s+["']([^"']+)["']/gm)]
+  .map((match) => match[2])
+  .filter((spec) => !spec.startsWith("./"));
+check("domínio só importa type de fora do domínio", runtimeOutside.length === 0, runtimeOutside.join(", "));
 check(
   "domínio exporta as funções puras da tela",
   ["coreItems", "pickFromObservedBuild", "completionSuggestions", "applyCandidate", "removeSlot", "observedRuneCombos", "maxIndexPick"].every((fn) =>

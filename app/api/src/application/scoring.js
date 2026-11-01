@@ -1,7 +1,7 @@
-// Pontuação do lote: delega ao @radar/proprietary-engine (scoreBatch) e faz o
+// Pontuação do lote: delega ao @radar/engine (scoreBatch) e faz o
 // arredondamento NA BORDA (mesmos campos/casas do fio anterior). Sem cópia local
 // do modelo: a matemática vive no motor.
-import { scoreBatch, classOf } from "@radar/proprietary-engine";
+import { scoreBatch, classOf } from "@radar/engine";
 import { RANKS } from "../providers/arena/index.js";
 import { WINDOWS, isRank } from "./validation.js";
 
@@ -20,7 +20,7 @@ export function qHeroes(sp) {
   return { rank, window, sort, order, size, index, class: cls };
 }
 
-// ── Motor de heróis: delega ao @radar/proprietary-engine (scoreBatch). ──
+// ── Motor de heróis: delega ao @radar/engine (scoreBatch). ──
 // A cópia local de score() foi DELETADA; o fio é preservado por arredondamento NA BORDA
 // (exatamente os mesmos campos/casas de antes: wrAdj 4, z 2, q 4, B 3 — valores do fio idênticos;
 // posterior_mean/IC/prob passam crus, como antes).
@@ -33,7 +33,7 @@ export function scoreLot(rawRows, opts = {}) {
   const { heroes, meta } = scoreBatch(rawRows, opts);
   // V2 §5.3/EC-007: nulos do motor (smallSample → q/index null; sem-exposição →
   // wrAdj/z null) atravessam o fio como null — nunca 0, nunca crash (era TypeError).
-  /** @type {import("@radar/proprietary-engine").HeroScore[]} */
+  /** @type {import("@radar/engine").HeroScore[]} */
   const scored = heroes.map((h) => ({
     ...h,
     wrAdj: h.wrAdj == null ? null : +h.wrAdj.toFixed(4),
