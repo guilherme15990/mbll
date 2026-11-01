@@ -11,6 +11,13 @@
 
 ---
 
+## Screenshots
+
+![Texto Alternativo](docs/print1.png)
+![Texto Alternativo](docs/print2.png)
+
+---
+
 ## O que é o sistema
 
 **O Radar é um sistema que usa a Rone Arena API.** Essa API entrega os dados brutos
