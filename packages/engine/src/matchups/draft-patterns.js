@@ -11,16 +11,19 @@
 // Canônico = forma do painel (com `badgeColor`); casos e regras de ativação
 // idênticos. Puro, sem I/O.
 
+import { EvidenceStatus } from "../core/states.js";
+import { TrustClass } from "../heroes/trust.js";
+
 /** Padrões operacionais do PRD Draft §7. */
 export function getDraftPatterns(d) {
-  const strong = (d && d.strength_class) === "Forte" || (d && d.strength_class) === "Joia";
+  const strong = (d && d.strength_class) === TrustClass.FORTE || (d && d.strength_class) === TrustClass.JOIA;
   const modest = !strong;
   const pickHigh = ((d && d.pick && d.pick.residual) ?? 0) > 0;
   const pickLow = ((d && d.pick && d.pick.residual) ?? 0) < 0;
   const banHigh = ((d && d.ban && d.ban.residual) ?? 0) > 0;
   // V2 §10 (MEDIUM): padrões herdam o caráter experimental de strong/isGem (q não
   // validado) — `evidence_status` viaja junto para a UI declarar "candidato".
-  const evidence_status = (d && (d.inference_status ?? d.evidence_status ?? d.q_status)) ?? "unknown";
+  const evidence_status = (d && (d.inference_status ?? d.evidence_status ?? d.q_status)) ?? EvidenceStatus.UNKNOWN;
 
   return [
     {

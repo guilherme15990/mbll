@@ -3,6 +3,29 @@
 // Barrel público: src/index.js (nenhum nome público muda).
 
 import { POPULAR_PICK_MIN, PRACTICAL_DELTA } from "../core/thresholds.js";
+import { DeltaStatus } from "../core/states.js";
+
+/** Tipos de componente de build (chave canônica dos componentes). */
+const ComponentKind = Object.freeze({
+  ITEM: "item",
+  EMBLEM: "emblem",
+  TALENT: "talent",
+  SPELL: "spell",
+});
+
+/** Qualidade da evidência do contraste de componente. */
+const ContrastEvidence = Object.freeze({
+  OBSERVED: "observed",
+  ESTIMATED: "estimated",
+  DESCRIPTIVE: "descriptive",
+  NONE: "none",
+});
+
+/** Modo do contraste (troca pareada intra-contexto vs coorte). */
+const ContrastMode = Object.freeze({
+  PAIRED: "paired",
+  COHORT: "cohort",
+});
 
 // ── builds/build-quadrant.js ──
 // Quadrantes popularidade × desempenho — nomes fixos do autor, sem ML.
@@ -12,17 +35,24 @@ import { POPULAR_PICK_MIN, PRACTICAL_DELTA } from "../core/thresholds.js";
 
 
 
-export const BUILD_QUADRANT_VERSION = "build-quadrant-v1";
-export const BUILD_QUADRANT_POPULAR_PICK = POPULAR_PICK_MIN;
-export const BUILD_QUADRANT_HIGH_LIFT = PRACTICAL_DELTA;
+const BUILD_QUADRANT_POPULAR_PICK = POPULAR_PICK_MIN;
+const BUILD_QUADRANT_HIGH_LIFT = PRACTICAL_DELTA;
+
+// Struct das chaves canônicas dos quadrantes popularidade × desempenho.
+const BuildQuadrant = Object.freeze({
+  POPULAR_ALTA: "popular-alta",
+  IMPOPULAR_ALTA: "impopular-alta",
+  POPULAR_BAIXA: "popular-baixa",
+  IMPOPULAR_BAIXA: "impopular-baixa",
+});
 
 /**
  * @param b {pick, lift_vs_most_used}
  * @returns { key, label, leitura } | null (null = sem leitura)
- *   "popular-alta"        → "popular + alta"      (candidata principal, se atual+comparável)
- *   "impopular-alta"      → "pouco popular + alta" (descoberta; exige amostra)
- *   "popular-baixa"       → "popular + baixa"      (investigar contexto de uso)
- *   "impopular-baixa"     → "pouco popular + baixa" (prioridade menor, sem concluir que é ruim)
+ *   BuildQuadrant.POPULAR_ALTA    → "popular + alta"      (candidata principal, se atual+comparável)
+ *   BuildQuadrant.IMPOPULAR_ALTA  → "pouco popular + alta" (descoberta; exige amostra)
+ *   BuildQuadrant.POPULAR_BAIXA   → "popular + baixa"      (investigar contexto de uso)
+ *   BuildQuadrant.IMPOPULAR_BAIXA → "pouco popular + baixa" (prioridade menor, sem concluir que é ruim)
  */
 export function buildQuadrant(b) {
   const pick = b?.pick;
@@ -31,15 +61,15 @@ export function buildQuadrant(b) {
   const popular = pick >= BUILD_QUADRANT_POPULAR_PICK;
   const alta = lift > BUILD_QUADRANT_HIGH_LIFT;
   if (popular && alta) {
-    return { key: "popular-alta", label: "popular + alta", leitura: "Candidata a recomendação principal, se os dados forem atuais e comparáveis." };
+    return { key: BuildQuadrant.POPULAR_ALTA, label: "popular + alta", leitura: "Candidata a recomendação principal, se os dados forem atuais e comparáveis." };
   }
   if (!popular && alta) {
-    return { key: "impopular-alta", label: "pouco popular + alta", leitura: "Candidata a descoberta promissora; precisa de validação de amostra." };
+    return { key: BuildQuadrant.IMPOPULAR_ALTA, label: "pouco popular + alta", leitura: "Candidata a descoberta promissora; precisa de validação de amostra." };
   }
   if (popular && !alta) {
-    return { key: "popular-baixa", label: "popular + baixa", leitura: "Vale investigar se está sendo usada fora do contexto adequado." };
+    return { key: BuildQuadrant.POPULAR_BAIXA, label: "popular + baixa", leitura: "Vale investigar se está sendo usada fora do contexto adequado." };
   }
-  return { key: "impopular-baixa", label: "pouco popular + baixa", leitura: "Prioridade menor, sem concluir que seja uma configuração ruim." };
+  return { key: BuildQuadrant.IMPOPULAR_BAIXA, label: "pouco popular + baixa", leitura: "Prioridade menor, sem concluir que seja uma configuração ruim." };
 }
 
 // ── builds/component-contrast.js ──
@@ -142,27 +172,27 @@ function sameItems(a, b) {
 export function componentsOfBuild(build) {
   const out = [];
   for (const id of build.item_ids ?? []) {
-    out.push({ key: `i:${id}`, kind: "item", id, slot: null });
+    out.push({ key: `i:${id}`, kind: ComponentKind.ITEM, id, slot: null });
   }
   if (build.emblem?.id != null) {
-    out.push({ key: `e:${build.emblem.id}`, kind: "emblem", id: build.emblem.id, slot: null });
+    out.push({ key: `e:${build.emblem.id}`, kind: ComponentKind.EMBLEM, id: build.emblem.id, slot: null });
   }
   for (const { slot, id } of talentSlots(build)) {
     if (id == null) continue;
-    out.push({ key: `t:${slot}:${id}`, kind: "talent", id, slot });
+    out.push({ key: `t:${slot}:${id}`, kind: ComponentKind.TALENT, id, slot });
   }
   const spellKey = normalizeName(build.spell?.name);
-  if (spellKey) out.push({ key: `s:${spellKey}`, kind: "spell", id: spellKey, slot: null });
+  if (spellKey) out.push({ key: `s:${spellKey}`, kind: ComponentKind.SPELL, id: spellKey, slot: null });
   return out;
 }
 
 function hasComponent(build, comp) {
-  if (comp.kind === "item") return itemIdsOf(build).has(comp.id);
-  if (comp.kind === "emblem") return build.emblem?.id === comp.id;
-  if (comp.kind === "talent") {
+  if (comp.kind === ComponentKind.ITEM) return itemIdsOf(build).has(comp.id);
+  if (comp.kind === ComponentKind.EMBLEM) return build.emblem?.id === comp.id;
+  if (comp.kind === ComponentKind.TALENT) {
     return talentSlots(build).some((t) => t.slot === comp.slot && t.id === comp.id);
   }
-  if (comp.kind === "spell") return normalizeName(build.spell?.name) === comp.id;
+  if (comp.kind === ComponentKind.SPELL) return normalizeName(build.spell?.name) === comp.id;
   return false;
 }
 
@@ -174,11 +204,11 @@ function hasComponent(build, comp) {
  */
 function cleanSwap(a, b, comp) {
   if ((a.emblem?.id ?? null) !== (b.emblem?.id ?? null)) return false;
-  // O feitiço é o próprio componente quando kind === "spell": não exigir igualdade.
-  if (comp.kind !== "spell"
+  // O feitiço é o próprio componente quando kind === ComponentKind.SPELL: não exigir igualdade.
+  if (comp.kind !== ComponentKind.SPELL
     && (normalizeName(a.spell?.name) ?? null) !== (normalizeName(b.spell?.name) ?? null)) return false;
 
-  if (comp.kind === "item") {
+  if (comp.kind === ComponentKind.ITEM) {
     const sa = itemIdsOf(a);
     const sb = itemIdsOf(b);
     if (!sa.has(comp.id) || sb.has(comp.id)) return false;
@@ -190,7 +220,7 @@ function cleanSwap(a, b, comp) {
 
   if (!sameItems(a, b)) return false;
 
-  if (comp.kind === "talent") {
+  if (comp.kind === ComponentKind.TALENT) {
     const ta = new Map(talentSlots(a).map((t) => [t.slot, t.id]));
     const tb = new Map(talentSlots(b).map((t) => [t.slot, t.id]));
     if (ta.get(comp.slot) !== comp.id) return false;
@@ -248,7 +278,7 @@ export function contextContrasts(ctx) {
       delta_pp: round4((wWith - wWithout) * 100),
       pairs: cleanPairs,
       paired: cleanPairs > 0,
-      mode: cleanPairs > 0 ? "paired" : "cohort",
+      mode: cleanPairs > 0 ? ContrastMode.PAIRED : ContrastMode.COHORT,
       win_with: wWith,
       builds_with: withBuilds.length,
       builds_without: withoutBuilds.length,
@@ -308,23 +338,23 @@ export function contrastEstimates(contexts) {
     const enough = s.contexts_contrast >= min.contexts
       && s.contexts_paired >= min.paired
       && s.pairs >= min.paired;
-    const evidence = s.kind === "emblem"
-      ? "descriptive"
+    const evidence = s.kind === ComponentKind.EMBLEM
+      ? ContrastEvidence.DESCRIPTIVE
       : enough
-        ? "observed"
-        : "estimated";
+        ? ContrastEvidence.OBSERVED
+        : ContrastEvidence.ESTIMATED;
     const value = pooled == null ? null : round4(pooled * shrink);
     const practicalPp = PRACTICAL_DELTA * 100;
     const status = value == null
-      ? "insufficient"
-      : Math.abs(value) < practicalPp ? "no_practical_difference" : value > 0 ? "positive" : "negative";
+      ? DeltaStatus.INSUFFICIENT
+      : Math.abs(value) < practicalPp ? DeltaStatus.NO_PRACTICAL_DIFFERENCE : value > 0 ? DeltaStatus.POSITIVE : DeltaStatus.NEGATIVE;
 
     s.pooled_pp = round4(pooled);
     s.shrink = round4(shrink);
-    s.value = s.kind === "emblem" ? null : value;
+    s.value = s.kind === ComponentKind.EMBLEM ? null : value;
     s.evidence = evidence;
     s.status = status;
-    s.mode = s.modes.has("paired") ? "paired" : "cohort";
+    s.mode = s.modes.has(ContrastMode.PAIRED) ? ContrastMode.PAIRED : ContrastMode.COHORT;
     delete s.modes;
   }
 
@@ -336,13 +366,13 @@ export function contrastEstimates(contexts) {
  * recebe o valor encolhido quando é `estimated`. Emblema nunca recebe valor.
  */
 export function valueFieldsOf(stat) {
-  const observed = stat?.evidence === "observed" && isFiniteNum(stat.value) ? stat.value : null;
-  const estimated = stat?.evidence === "estimated" && isFiniteNum(stat.value) ? stat.value : null;
+  const observed = stat?.evidence === ContrastEvidence.OBSERVED && isFiniteNum(stat.value) ? stat.value : null;
+  const estimated = stat?.evidence === ContrastEvidence.ESTIMATED && isFiniteNum(stat.value) ? stat.value : null;
   const value = observed ?? estimated;
   return {
     value_pp: observed,
     value_pp_est: estimated,
-    value_pp_source: stat?.evidence ?? "none",
+    value_pp_source: stat?.evidence ?? ContrastEvidence.NONE,
     power: value == null ? null : round4(100 + 10 * value),
     contrast: stat
       ? {
@@ -361,7 +391,7 @@ export function valueFieldsOf(stat) {
           pooled_pp: null,
           shrink: 0,
           mode: null,
-          status: "insufficient",
+          status: DeltaStatus.INSUFFICIENT,
         },
   };
 }

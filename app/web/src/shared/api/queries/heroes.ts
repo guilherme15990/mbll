@@ -33,7 +33,6 @@ export type LotMeta = {
   n?: number; n_dropped?: number; c?: number;
   fdr_alpha?: number; gem_quantile?: number; small_sample?: boolean;
   prior?: string; version_break?: boolean;
-  strength_index_version?: string; tier_version?: string;
   counts?: { strong: number; weak: number; gem: number; degenerate: number };
 };
 
@@ -43,8 +42,8 @@ export type HeroesResponse = {
   pickSumCheck?: { sum: number; ok: boolean };
   // ADR-023 walk-forward: "walk-forward v{H}" | "flat" (só leitura).
   prior?: string;
-  // ADR-024: base do índice ({method, n do lote}).
-  index_basis?: { method: string; n: number };
+  // ADR-024: base do índice ({n do lote}).
+  index_basis?: { n: number };
   // Meta do lote (era repetida por herói): μ, τ + carimbos.
   meta?: LotMeta;
 };

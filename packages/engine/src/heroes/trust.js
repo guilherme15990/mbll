@@ -4,6 +4,7 @@
 
 import { C_REFERENCE, DELTA_DEFAULT } from "../core/config.js";
 import { makeExposure } from "../matchups/counters.js";
+import { CalibrationStatus, UncertaintyStatus } from "../core/states.js";
 
 // ── hero/trust.js ──
 // Rótulos de confiança — FONTE ÚNICA. Puros, sem I/O.
@@ -13,11 +14,20 @@ import { makeExposure } from "../matchups/counters.js";
 // Escasso = smallSample, degenerate ou B abaixo do piso → número encolhido.
 const B_FLOOR = 0.25;
 
+/** Taxonomia descritiva do herói (rótulos canônicos da UI). */
+export const TrustClass = Object.freeze({
+  AMOSTRA_PEQUENA: "Amostra pequena",
+  JOIA: "Joia",
+  FORTE: "Forte",
+  FRACO: "Fraco",
+  NA_MEDIA: "Na media",
+});
+
 /**
  * Política de confiança do herói (V2 §8, sem selo público confirmatório).
  * Sem estado — reutilizável.
  */
-export class HeroTrustPolicy {
+class HeroTrustPolicy {
   /** Leitura puxada à média: amostra pequena, taxa degenerada ou B abaixo do piso. */
   isScarce(h) {
     return Boolean(h == null ? false : h.smallSample || h.degenerate || (h.B ?? 1) < B_FLOOR);
@@ -26,13 +36,13 @@ export class HeroTrustPolicy {
   /** Taxonomia descritiva (rótulos da UI) derivada das flags de significância. */
   classOf(h) {
     if (!h) return null;
-    if (h.smallSample) return "Amostra pequena";
+    if (h.smallSample) return TrustClass.AMOSTRA_PEQUENA;
     // MOTIVO: Joia ANTES de Forte. isGem ⊂ strong, então na ordem antiga ("Forte" primeiro) o
     // ramo "Joia" era inalcançável.
-    if (h.isGem) return "Joia";
-    if (h.strong) return "Forte";
-    if (h.weak) return "Fraco";
-    return "Na media";
+    if (h.isGem) return TrustClass.JOIA;
+    if (h.strong) return TrustClass.FORTE;
+    if (h.weak) return TrustClass.FRACO;
+    return TrustClass.NA_MEDIA;
   }
 
   /** L3 curta para o H1 da capa (HeroDetails §1.1). */
@@ -65,7 +75,7 @@ export function verdictShort(h) {
 export function interpretProbBand(p) {
   // V2 §8.3 (MEDIUM): 0,95/0,80 são pontos de partida, NÃO calibração — cada faixa
   // carrega `calibration_status` para a UI declarar o caráter model-based.
-  const CAL = "uncalibrated_model_based";
+  const CAL = CalibrationStatus.UNCALIBRATED_MODEL_BASED;
   if (p == null || !Number.isFinite(p)) return { label: "Indisponível", color: "text-mist", desc: "Sem dados suficientes para calcular posterior.", calibration_status: CAL };
   if (p >= 0.95) return { label: "Evidência posterior forte a favor", color: "text-emerald-300", desc: "95% a 100% de probabilidade posterior condicional ao modelo.", calibration_status: CAL };
   if (p >= 0.8) return { label: "Sinal favorável, ainda incerto", color: "text-cyan-200", desc: "80% a 95% de probabilidade posterior condicional.", calibration_status: CAL };
@@ -89,7 +99,7 @@ export function interpretProbBand(p) {
 /** CNF: trio provisório — posterior/IC/prob separados, com c_reference declarado. */
 export function confidenceTrio({ wrAdj, med, se = 0.02, c = C_REFERENCE, delta = DELTA_DEFAULT } = {}) {
   if (![wrAdj, med, se].every(Number.isFinite) || se <= 0) {
-    return { posterior_mean: null, credible_interval_95: null, posterior_prob_above_threshold: null, c_reference: c, uncertainty_status: "unavailable", exposure: makeExposure(NaN) };
+    return { posterior_mean: null, credible_interval_95: null, posterior_prob_above_threshold: null, c_reference: c, uncertainty_status: UncertaintyStatus.UNAVAILABLE, exposure: makeExposure(NaN) };
   }
   const mean = wrAdj;
   const half = 1.96 * se;
@@ -101,7 +111,7 @@ export function confidenceTrio({ wrAdj, med, se = 0.02, c = C_REFERENCE, delta =
     posterior_mean: +mean.toFixed(4), credible_interval_95: [+lo.toFixed(4), +hi.toFixed(4)],
     posterior_prob_above_threshold: +prob.toFixed(4), delta_threshold: delta,
     c_reference: c,
-    uncertainty_status: "provisional",
+    uncertainty_status: UncertaintyStatus.PROVISIONAL,
     exposure: makeExposure(NaN),
   };
 }

@@ -5,6 +5,53 @@
 import { DURATION_BANDS } from "../core/config.js";
 import { MIN_LIFT_SIGNAL, MIN_SUPPORT_N } from "../core/thresholds.js";
 import { median } from "../core/math.js";
+import {
+  CausalStatus,
+  ClassificationStatus,
+  Coverage,
+  ExposureStatus,
+  ExposureUnit,
+  UnitStatus,
+} from "../core/states.js";
+
+/** Veredito do comparador de counters (declaração × observação). */
+const CounterVerdict = Object.freeze({
+  CONFIRMADO: "confirmado",
+  CONTESTADO: "contestado",
+  SO_OBSERVADO: "so-observado",
+  DESCONHECIDO: "desconhecido",
+});
+
+/** Qualidade descritiva da evidência do par (M6). */
+const EvidenceQuality = Object.freeze({
+  CONSISTENTE: "consistente",
+  LIMITADO: "limitado",
+  DEPENDENTE_DE_CONTEXTO: "dependente-de-contexto",
+});
+
+/** Perfil de duração da partida (S7). */
+const DurationProfile = Object.freeze({
+  SNOWBALL: "snowball",
+  SCALING: "scaling",
+  UNIFORME: "uniforme",
+  INSUFFICIENT_DATA: "insufficient_data",
+});
+
+/** Estado de disponibilidade do intervalo de confiança. */
+const IntervalStatus = Object.freeze({
+  INDISPONIVEL: "indisponivel",
+});
+
+/** Tipo de par M6 (D-MTCH-01). */
+const PairType = Object.freeze({
+  COUNTER: "counter",
+  TEAMMATE: "teammate",
+});
+
+/** Unidade declarada do δ de par (não validada). */
+const PairUnit = Object.freeze({
+  FRACTION_0_1_ASSUMED: "fraction_0_1_assumed",
+});
 
 // ── governance/exposure.js ──
 // governance/exposure — envelope de exposição + validação do denominador
@@ -13,7 +60,7 @@ import { median } from "../core/math.js";
 /** EXP: envelope de exposição — pick é slot_share, nunca contagem (INV-101/D-EXP-01..03). */
 export function makeExposure(pick) {
   void pick;
-  return { unit: "slot_share", status: "unvalidated" };
+  return { unit: ExposureUnit.SLOT_SHARE, status: ExposureStatus.UNVALIDATED };
 }
 /** EXP: soma pick_rate por snapshot deve ≈1 (±0.005, RF-EXP-04). Retorna {sum, ok}. */
 export function checkPickSum(picks) {
@@ -29,11 +76,11 @@ export function checkPickSum(picks) {
 export function makePairKey(a, b, type) {
   const x = Number(a), y = Number(b);
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-  if (type === "teammate") {
+  if (type === PairType.TEAMMATE) {
     const [lo, hi] = x <= y ? [x, y] : [y, x];
-    return `${lo}-${hi}:teammate`;
+    return `${lo}-${hi}:${PairType.TEAMMATE}`;
   }
-  return `${x}-${y}:counter`;
+  return `${x}-${y}:${PairType.COUNTER}`;
 }
 
 // ── counters/evidence.js ──
@@ -41,19 +88,19 @@ export function makePairKey(a, b, type) {
 // D-MTCH-06). Descritiva, sem IC de pseudo-contagem.
 // Puro, sem I/O, zero dependências.
 /** M6: qualidade da evidência descritiva (sem IC de pseudo-contagem, D-MTCH-06). */
-export function evidenceQuality({ coverage = "unknown", stable = null, hetero = null } = {}) {
+export function evidenceQuality({ coverage = Coverage.UNKNOWN, stable = null, hetero = null } = {}) {
   const reasons = [];
-  if (coverage !== "full") reasons.push("coverage:" + coverage);
+  if (coverage !== Coverage.FULL) reasons.push("coverage:" + coverage);
   if (stable === false) reasons.push("unstable-temporal");
   if (hetero === true) reasons.push("rank-heterogeneous");
   if (!reasons.length) reasons.push("consistent");
   // LOW (V2 §1/§8.2): valor era "robusto" — colidia com o selo de confiança.
   // Qualidade descritiva de pares passa a "consistente"; reasons preservados.
-  let quality = "limitado";
-  if (coverage === "full" && stable === true && hetero === false) quality = "consistente";
-  else if (coverage === "extremes" || stable === false) quality = "limitado";
-  else quality = "dependente-de-contexto";
-  return { quality, reasons, exposure_status: "unvalidated", interval_status: "indisponivel", uncertainty_method: null, causal_status: "nao-avaliado" };
+  let quality = EvidenceQuality.LIMITADO;
+  if (coverage === Coverage.FULL && stable === true && hetero === false) quality = EvidenceQuality.CONSISTENTE;
+  else if (coverage === Coverage.EXTREMES || stable === false) quality = EvidenceQuality.LIMITADO;
+  else quality = EvidenceQuality.DEPENDENTE_DE_CONTEXTO;
+  return { quality, reasons, exposure_status: ExposureStatus.UNVALIDATED, interval_status: IntervalStatus.INDISPONIVEL, uncertainty_method: null, causal_status: CausalStatus.NAO_AVALIADO };
 }
 
 // ── counters/counter.js ──
@@ -65,8 +112,6 @@ export function evidenceQuality({ coverage = "unknown", stable = null, hetero = 
 
 
 
-export const COUNTER_VERDICT_VERSION = "counter-verdict-v1";
-
 // Limiar de materialidade do δ (pp): abaixo disso, sinal = neutro.
 // Canônico em ./thresholds.js (MIN_LIFT_SIGNAL — mesmo conceito do "emergente").
 export const COUNTER_MIN_ABS_DELTA = MIN_LIFT_SIGNAL;
@@ -75,7 +120,7 @@ export const COUNTER_MIN_ABS_DELTA = MIN_LIFT_SIGNAL;
 export const COUNTER_MIN_PAIRS = MIN_SUPPORT_N;
 
 // Unidade assumida do δ (LOW, V2 §5.2): declarada na saída, nunca adivinhada na entrada.
-const UNIT = "fraction_0_1_assumed";
+const UNIT = PairUnit.FRACTION_0_1_ASSUMED;
 
 /**
  * @param expected -1 (declarado counter/weak) | +1 (declarado favorável/strong) | 0 | null (não declarado)
@@ -86,7 +131,7 @@ const UNIT = "fraction_0_1_assumed";
  * @param coverage "extremes" | "full" | "unknown"
  * @returns { verdict: "confirmado"|"contestado"|"so-observado"|"desconhecido", reasons: string[], unit: string }
  */
-export function compareCounterRelation({ expected = null, delta = null, nPairs = 0, coverage = "unknown", minAbs = COUNTER_MIN_ABS_DELTA } = {}) {
+export function compareCounterRelation({ expected = null, delta = null, nPairs = 0, coverage = Coverage.UNKNOWN, minAbs = COUNTER_MIN_ABS_DELTA } = {}) {
   const reasons = [];
   const exp = expected === -1 || expected === 1 ? expected : null;
   const hasDelta = typeof delta === "number" && Number.isFinite(delta);
@@ -94,23 +139,23 @@ export function compareCounterRelation({ expected = null, delta = null, nPairs =
   const sign = !hasDelta || mag < minAbs ? 0 : Math.sign(delta);
   const weak = !Number.isFinite(nPairs) || nPairs < COUNTER_MIN_PAIRS;
   if (weak) reasons.push(nPairs === 1 ? "n=1" : `n=${Number.isFinite(nPairs) ? nPairs : 0}<${COUNTER_MIN_PAIRS}`);
-  if (coverage !== "extremes" && coverage !== "full") reasons.push("cobertura-nao-informada");
+  if (coverage !== Coverage.EXTREMES && coverage !== Coverage.FULL) reasons.push("cobertura-nao-informada");
 
   if (!hasDelta) {
-    if (exp == null) return { verdict: "desconhecido", reasons: [...reasons, "sem-declaracao-sem-observado"], unit: UNIT };
-    return { verdict: "contestado", reasons: [...reasons, "declarado-sem-observado"], unit: UNIT };
+    if (exp == null) return { verdict: CounterVerdict.DESCONHECIDO, reasons: [...reasons, "sem-declaracao-sem-observado"], unit: UNIT };
+    return { verdict: CounterVerdict.CONTESTADO, reasons: [...reasons, "declarado-sem-observado"], unit: UNIT };
   }
   if (exp == null) {
-    if (sign === 0) return { verdict: "desconhecido", reasons: [...reasons, "abaixo-do-limiar-sem-declaracao"], unit: UNIT };
-    return { verdict: "so-observado", reasons: [...reasons, "observado-sem-declaracao"], unit: UNIT };
+    if (sign === 0) return { verdict: CounterVerdict.DESCONHECIDO, reasons: [...reasons, "abaixo-do-limiar-sem-declaracao"], unit: UNIT };
+    return { verdict: CounterVerdict.SO_OBSERVADO, reasons: [...reasons, "observado-sem-declaracao"], unit: UNIT };
   }
   if (sign === exp) {
-    return { verdict: "confirmado", reasons: [...reasons, "acordo-declarado-observado"], unit: UNIT };
+    return { verdict: CounterVerdict.CONFIRMADO, reasons: [...reasons, "acordo-declarado-observado"], unit: UNIT };
   }
   if (sign === 0) {
-    return { verdict: "contestado", reasons: [...reasons, "declarado-abaixo-do-limiar"], unit: UNIT };
+    return { verdict: CounterVerdict.CONTESTADO, reasons: [...reasons, "declarado-abaixo-do-limiar"], unit: UNIT };
   }
-  return { verdict: "contestado", reasons: [...reasons, "direcao-divergente"], unit: UNIT };
+  return { verdict: CounterVerdict.CONTESTADO, reasons: [...reasons, "direcao-divergente"], unit: UNIT };
 }
 
 // ── counters/relations-agreement.js ──
@@ -122,8 +167,6 @@ export function compareCounterRelation({ expected = null, delta = null, nPairs =
 // Pura, sem I/O, zero dependências além de ./counter.js e ./thresholds.js.
 
 
-
-export const RELATIONS_AGREEMENT_VERSION = "relations-agreement-v1";
 
 function idsOf(bucket) {
   const v = bucket?.target_hero_id;
@@ -159,11 +202,11 @@ export function expectedForTarget(relations, targetId) {
  * @param opts {targetId, delta: δ observado orientado p/ o par | null,
  *   nPairs: nº de pares elegíveis, coverage: "extremes"|"full"|"unknown"}
  * @returns { expected, verdict: gramática de compareCounterRelation,
- *   reasons: mapeamento + veredito, version }
+ *   reasons: mapeamento + veredito }
  */
 export function agreementForPair(
   relations,
-  { targetId, delta = null, nPairs = 0, coverage = "unknown" } = {},
+  { targetId, delta = null, nPairs = 0, coverage = Coverage.UNKNOWN } = {},
 ) {
   const { expected, reasons: mapReasons } = expectedForTarget(relations, targetId);
   const r = compareCounterRelation({ expected, delta, nPairs, coverage });
@@ -173,7 +216,6 @@ export function agreementForPair(
     reasons: [...mapReasons, ...r.reasons],
     minAbs: COUNTER_MIN_ABS_DELTA,
     minPairs: COUNTER_MIN_PAIRS,
-    version: RELATIONS_AGREEMENT_VERSION,
   };
 }
 
@@ -184,9 +226,9 @@ export function agreementForPair(
 /** DRF: resíduos pick/ban separados, nunca somados (D-DIST-01..03). */
 export function distortionResidual({ observed, expected, kind = "pick" } = {}) {
   if (![observed, expected].every(Number.isFinite)) {
-    return { kind, observed: observed ?? null, expected: expected ?? null, residual: null, unit_status: "unvalidated", classification_status: "inconclusive", exposure_status: "unvalidated" };
+    return { kind, observed: observed ?? null, expected: expected ?? null, residual: null, unit_status: UnitStatus.UNVALIDATED, classification_status: ClassificationStatus.INCONCLUSIVE, exposure_status: ExposureStatus.UNVALIDATED };
   }
-  return { kind, observed, expected, residual: +(observed - expected).toFixed(4), unit_status: "unvalidated", classification_status: "provisional", exposure_status: "unvalidated" };
+  return { kind, observed, expected, residual: +(observed - expected).toFixed(4), unit_status: UnitStatus.UNVALIDATED, classification_status: ClassificationStatus.PROVISIONAL, exposure_status: ExposureStatus.UNVALIDATED };
 }
 
 // ── counters/matchup-ordering.js ──
@@ -261,7 +303,7 @@ export function durationCurve(src) {
 }
 
 /** V2: curva + quarentena serializável (HIGH: prop em Array some no JSON). */
-export function durationCurveDetailed(src) {
+function durationCurveDetailed(src) {
   const curve = [];
   const quarantined = [];
   for (let i = 0; i < DURATION_KEYS.length; i++) {
@@ -284,13 +326,13 @@ export function durationCurveDetailed(src) {
 /** Classifica perfil S7: snowball (cai com o tempo), scaling (sobe) ou uniforme. */
 export function classifyDuration(curve) {
   // V2 §13/EC-011: <3 pontos válidos = sem cobertura → insufficient_data (nunca "uniforme").
-  if (!Array.isArray(curve) || curve.length < 3) return "insufficient_data";
+  if (!Array.isArray(curve) || curve.length < 3) return DurationProfile.INSUFFICIENT_DATA;
   const xs = curve.map((p) => p.mid), ys = curve.map((p) => p.win);
   const slopes = [];
   for (let i = 0; i < xs.length; i++)
     for (let j = i + 1; j < xs.length; j++) slopes.push((ys[j] - ys[i]) / (xs[j] - xs[i]));
   const s = median(slopes);
-  if (s > 0.005) return "scaling";
-  if (s < -0.005) return "snowball";
-  return "uniforme";
+  if (s > 0.005) return DurationProfile.SCALING;
+  if (s < -0.005) return DurationProfile.SNOWBALL;
+  return DurationProfile.UNIFORME;
 }

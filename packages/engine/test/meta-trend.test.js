@@ -1,21 +1,17 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
-  META_TREND_VERSION,
   META_TREND_MIN_POINTS,
   detectMetaTrend,
 } from "../src/heroes/trends.js";
-import { detectMetaTrend as viaIndex } from "../src/index.js";
 
 const P = (win, i) => ({ date: `2026-09-${String(i + 1).padStart(2, "0")}`, win, pick: 0.05, ban: 0.1 });
 const wins = (arr) => arr.map(P);
 
 // Detector único: MA + regressão + ruptura + projeção honesta.
-describe("meta-trend-v1", () => {
-  it("versão e piso congelados", () => {
-    assert.equal(META_TREND_VERSION, "meta-trend-v1");
+describe("meta-trend", () => {
+  it("piso congelado", () => {
     assert.equal(META_TREND_MIN_POINTS, 7);
-    assert.equal(viaIndex, detectMetaTrend);
   });
   it("sem-dado com série curta (nunca chute)", () => {
     const r = detectMetaTrend(wins([0.5, 0.51, 0.52]));

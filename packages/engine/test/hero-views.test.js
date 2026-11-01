@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { scoreHeroes, classOf } from "../src/index.js";
+import { classOf } from "../src/index.js";
+import { scoreHeroes } from "../src/heroes/scoring.js";
 import { tierOf } from "../src/heroes/ranking.js";
 
 // Contrato das vistas de θ̂ (tier-v2 + strength-index-v1): tier e strength_index são funções

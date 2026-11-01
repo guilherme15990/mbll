@@ -55,6 +55,7 @@ const files = [
   ...walk(path.join(API, "src")),
   ...walk(path.join(API, "test")),
   ...walk(path.join(WEB, "src")),
+  ...walk(path.join(WEB, "test")),
   ...walk(PACKAGES),
 ];
 

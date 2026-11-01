@@ -5,28 +5,27 @@
 import * as config from "../core/config.js";
 import { C_REFERENCE } from "../core/config.js";
 import { HeroResultAssembler, HeroRowValidator } from "./assembler.js";
-import { LotRanking, STRENGTH_INDEX_VERSION, TIER_VERSION } from "./ranking.js";
+import { LotRanking } from "./ranking.js";
 import { WalkForwardPrior } from "./trends.js";
 import { benjaminiHochberg, ebShrink, obsVariance, pFromZ } from "../core/statistics.js";
 import { confidenceTrio } from "./trust.js";
 import { mad, median } from "../core/math.js";
+import { InferenceStatus, QStatus } from "../core/states.js";
 
 // ── hero/constants.js ──
 // hero/scoring/constants — constantes do pipeline de pontuação de heróis.
 // Dono único; as classes recebem estes valores por padrão e aceitam override por injeção.
 
 /** Nível BH (FDR) do lote — spec §16. */
-export const FDR_ALPHA = 0.05;
+const FDR_ALPHA = 0.05;
 /** Joia = quartil inferior de pick E de ban — spec §16. */
-export const GEM_QUANTILE = 0.25;
+const GEM_QUANTILE = 0.25;
 /** EC-004: abaixo deste nº de heróis válidos MAD/BH/tiers não se sustentam. */
-export const MIN_LOT = 10;
+const MIN_LOT = 10;
 /** Piso/teto numérico de μ (V2 §6.1). */
-export const EPS = 1e-6;
-/** Carimbos de versão do contrato de saída (V2 §19/§24). v3: sem banda-C, sem tiers de B, sem Robusto. */
-export const MODEL_VERSION = "hero-engine-v2.1.0";
-export const STRENGTH_MODEL = "eb_rate_proxy_v1";
-export const NULL_MODEL_VERSION = "unvalidated_eb_z_v1";
+const EPS = 1e-6;
+/** Identificador do modelo de força (nome do estimador, não versão de build). */
+const STRENGTH_MODEL = "eb_rate_proxy_v1";
 
 // ── hero/baseline-estimator.js ──
 // hero/scoring/baseline-estimator — estimadores de μ (baseline) e τ (dispersão entre heróis).
@@ -60,7 +59,7 @@ export const NULL_MODEL_VERSION = "unvalidated_eb_z_v1";
  * a dispersão real e o shrinkage fica mais fraco do que deveria. `tau2Moment` é exposto como
  * diagnóstico para calibrar uma troca futura, SEM mudar o estimador nesta versão.
  */
-export class MadBaselineEstimator {
+class MadBaselineEstimator {
   /**
    * @param {object[]} heroes  Linhas válidas e expostas (`win`, `pick`).
    * @param {number} c         Premissa de tamanho efetivo (proxy), usada só no diagnóstico.
@@ -106,7 +105,7 @@ export class MadBaselineEstimator {
  * @property {number} se          Erro-padrão final.
  * @property {number} B           Peso do dado τ²/(τ²+s²).
  * @property {number} z           (θ̂ − μ)/se.
- * @property {number} p           p-valor bicaudal de z (NÃO validado — ver `null_model_version`).
+ * @property {number} p           p-valor bicaudal de z (NÃO validado — o nulo não foi validado).
  * @property {number} wrAdjBatch  Média posterior do lote (sem prior).
  * @property {number} seBatch     Erro-padrão do lote (sem prior).
  * @property {object} trioBatch   confidenceTrio do LOTE (status/banda nunca mascarados pelo prior).
@@ -121,7 +120,7 @@ export class MadBaselineEstimator {
  * Responsabilidade única: transformar a taxa observada de um herói em posterior.
  * Não conhece lote, ranking nem significância. `c` é PREMISSA (proxy), não contagem.
  */
-export class EmpiricalBayesShrinkage {
+class EmpiricalBayesShrinkage {
   #c;
   #mu;
   #tau2;
@@ -164,7 +163,7 @@ export class EmpiricalBayesShrinkage {
  * IMPORTANTE (P1 auditoria, V2 §9): os p-valores vêm de um z após shrinkage e o nulo NÃO foi
  * validado; portanto strong/weak/isGem são candidatos experimentais (`inference_status`).
  */
-export class SignificanceTester {
+class SignificanceTester {
   #alpha;
   #gemQuantile;
 
@@ -224,7 +223,7 @@ export class SignificanceTester {
  * fica fora (nunca misturar escalas). `meta` é mutável só durante a construção, dentro de
  * {@link HeroScorer}; depois é entregue ao chamador.
  */
-export class BatchMetaBuilder {
+class BatchMetaBuilder {
   /**
    * Metadados conhecidos ANTES de qualquer estatística.
    * @param {object} p
@@ -272,19 +271,14 @@ export class BatchMetaBuilder {
       small_sample: smallSample,
       prior: prior.stamp,
       version_break: prior.versionBroken,
-      strength_index_version: STRENGTH_INDEX_VERSION,
-      tier_version: TIER_VERSION,
-      // V2 §19/§24: contrato de saída — nunca número nu sem proveniência.
-      model_version: MODEL_VERSION,
       strength_model: STRENGTH_MODEL,
       sample_size_method: "not_provided_by_api",
       cohort_key,
       cohort_enforced: false, // L2 registrada: validação de mistura vive em cohorts/cohort-key.js (ingestão)
       quality_flags: qualityFlags,
       // V2 §9 + P1: q/strong/weak/isGem são CANDIDATOS experimentais.
-      q_status: "experimental_unvalidated_null",
-      inference_status: "experimental_candidates_only",
-      null_model_version: NULL_MODEL_VERSION,
+      q_status: QStatus.EXPERIMENTAL_UNVALIDATED_NULL,
+      inference_status: InferenceStatus.EXPERIMENTAL_CANDIDATES_ONLY,
       test_family: null,
       allow_confirmatory_q_values: false,
       counts: { strong: 0, weak: 0, gem: 0, degenerate: 0 },
@@ -355,7 +349,7 @@ export class BatchMetaBuilder {
  * Puro, sem I/O, determinístico: nada depende da ordem de entrada nem de `Map`. Sem estado
  * entre chamadas — uma instância pode ser reutilizada.
  */
-export class HeroScorer {
+class HeroScorer {
   #validator;
   #baselineEstimator;
   #tester;
@@ -441,6 +435,13 @@ export class HeroScorer {
 // a lógica vive nas classes (SRP/OCP/DIP), este módulo só preserva o contrato público.
 // Modelo preservado: y_i | θ_i ~ N(θ_i, s_i²), s_i² = μ(1−μ)/(c·pick_i), θ_i ~ N(μ, τ²).
 
+/** Categorias de campo do contrato por herói (famílias de escala). */
+const HeroContractCategory = Object.freeze({
+  VISTA: "vista",
+  INCERTEZA: "incerteza",
+  SIGNIFICANCIA: "significancia",
+  GUARDA: "guarda",
+});
 
 /**
  * CONTRATO DE SAÍDA POR HERÓI v3 (19 campos do motor + eco do input).
@@ -454,28 +455,28 @@ export class HeroScorer {
  * Metadados de lote (μ, τ, c, versões, prior, contagens) vivem em `meta`, nunca por herói.
  */
 export const HERO_CONTRACT = Object.freeze({
-  wrAdj: "vista", //                    θ̂: média posterior (única grandeza absoluta)
-  tier: "vista", //                     S/A/B/C/D por posição de θ̂ no lote ("?" = amostra pequena)
-  strength_index: "vista", //           0–100 pela MESMA posição de θ̂ (100 = mais forte)
-  se: "incerteza", //                   erro-padrão posterior (se* sob walk-forward)
-  B: "incerteza", //                    peso do dado τ²/(τ²+s²) do lote; 1 − B = encolhimento
-  credible_interval_95: "incerteza", // IC 95% de θ (trio)
-  posterior_prob_above_threshold: "incerteza", // P(θ > limiar prático) (trio)
-  uncertainty_status: "incerteza", //   rótulo de incerteza (trio do LOTE, nunca mascarado pelo prior)
-  q: "significancia", //                q-valor BH experimental (FDR)
-  strong: "significancia", //           candidato experimental: q ≤ α, θ̂ > μ, sem guarda
-  weak: "significancia", //             candidato experimental: q ≤ α, θ̂ < μ, sem guarda
-  isGem: "significancia", //            strong ∧ pick e ban no quartil inferior (⊂ strong)
-  degenerate: "guarda", //              win 0/1 (ruído)
-  smallSample: "guarda", //             lote < MIN_LOT
-  data_status: "guarda", //             ok | insufficient_exposure (pick≤0) — V2 §6.1/EC-002
-  sample_size_method: "guarda", //     not_provided_by_api — ativa o teto proxy do trust (§8.2)
-  inference_status: "guarda", //        experimental_candidates_only até validar o nulo (P1)
+  wrAdj: HeroContractCategory.VISTA, //                    θ̂: média posterior (única grandeza absoluta)
+  tier: HeroContractCategory.VISTA, //                     S/A/B/C/D por posição de θ̂ no lote ("?" = amostra pequena)
+  strength_index: HeroContractCategory.VISTA, //           0–100 pela MESMA posição de θ̂ (100 = mais forte)
+  se: HeroContractCategory.INCERTEZA, //                   erro-padrão posterior (se* sob walk-forward)
+  B: HeroContractCategory.INCERTEZA, //                    peso do dado τ²/(τ²+s²) do lote; 1 − B = encolhimento
+  credible_interval_95: HeroContractCategory.INCERTEZA, // IC 95% de θ (trio)
+  posterior_prob_above_threshold: HeroContractCategory.INCERTEZA, // P(θ > limiar prático) (trio)
+  uncertainty_status: HeroContractCategory.INCERTEZA, //   rótulo de incerteza (trio do LOTE, nunca mascarado pelo prior)
+  q: HeroContractCategory.SIGNIFICANCIA, //                q-valor BH experimental (FDR)
+  strong: HeroContractCategory.SIGNIFICANCIA, //           candidato experimental: q ≤ α, θ̂ > μ, sem guarda
+  weak: HeroContractCategory.SIGNIFICANCIA, //             candidato experimental: q ≤ α, θ̂ < μ, sem guarda
+  isGem: HeroContractCategory.SIGNIFICANCIA, //            strong ∧ pick e ban no quartil inferior (⊂ strong)
+  degenerate: HeroContractCategory.GUARDA, //              win 0/1 (ruído)
+  smallSample: HeroContractCategory.GUARDA, //             lote < MIN_LOT
+  data_status: HeroContractCategory.GUARDA, //             ok | insufficient_exposure (pick≤0) — V2 §6.1/EC-002
+  sample_size_method: HeroContractCategory.GUARDA, //     not_provided_by_api — ativa o teto proxy do trust (§8.2)
+  inference_status: HeroContractCategory.GUARDA, //        experimental_candidates_only até validar o nulo (P1)
   // DESVIO (a): posterior_mean PERMANECE no topo (o CONTRATO manda p/ debug, mas a
   // ConfiancaSection EXIBE posterior+trio por exigência do PRD — sem ele a aba quebra).
-  posterior_mean: "incerteza", //       média posterior do trio (m*; = θ̂ sem prior)
+  posterior_mean: HeroContractCategory.INCERTEZA, //       média posterior do trio (m*; = θ̂ sem prior)
   // DESVIO (b): z PERMANECE no topo (computado de graça p/ q; views/semana ordenam por ele).
-  z: "significancia", //                (θ̂ − μ)/se — estatística por trás de q
+  z: HeroContractCategory.SIGNIFICANCIA, //                (θ̂ − μ)/se — estatística por trás de q
 });
 
 const scorer = new HeroScorer();

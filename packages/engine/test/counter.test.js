@@ -1,21 +1,17 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
-  COUNTER_VERDICT_VERSION,
   COUNTER_MIN_ABS_DELTA,
   COUNTER_MIN_PAIRS,
   compareCounterRelation,
 } from "../src/matchups/counters.js";
-import { compareCounterRelation as viaIndex } from "../src/index.js";
 
 // Modelo (a): relations declarado × δ observado. Fixtures: (a) acordo real,
 // (b) ruído/divergência → contestado, (c) extremes-only insuficiente.
 describe("counter-verdict-v1", () => {
-  it("versão e limiares congelados", () => {
-    assert.equal(COUNTER_VERDICT_VERSION, "counter-verdict-v1");
+  it("limiares congelados", () => {
     assert.equal(COUNTER_MIN_ABS_DELTA, 0.015);
     assert.equal(COUNTER_MIN_PAIRS, 5);
-    assert.equal(viaIndex, compareCounterRelation);
   });
   it("confirmado: declarado + δ concorda", () => {
     const r = compareCounterRelation({ expected: -1, delta: -0.042, nPairs: 10, coverage: "extremes" });

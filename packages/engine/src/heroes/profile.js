@@ -4,6 +4,23 @@
 
 import { MIN_SUPPORT_N } from "../core/thresholds.js";
 
+/** Veredito da calibração próprio × global. */
+const CalibrationVerdict = Object.freeze({
+  ACIMA_DO_GLOBAL: "acima-do-global",
+  ABAIXO_DO_GLOBAL: "abaixo-do-global",
+  NA_FAIXA: "na-faixa",
+  INCERTEZA_DOMINANTE: "incerteza-dominante",
+  SEM_DADO: "sem-dado",
+});
+
+/** Chaves canônicas dos perfis de playstyle (quadrante op × tfr). */
+const PlaystyleKey = Object.freeze({
+  TEAMFIGHT: "teamfight",
+  PICKOFF: "pickoff",
+  FRONTLINE: "frontline",
+  TRANSICAO: "transicao",
+});
+
 // ── hero/hero-profile.js ──
 // Perfil dominante do herói (snowball/scaling/uniforme) — FONTE ÚNICA. Puro, sem I/O.
 // Agregado honesto dos pares listados em confrontos; perfil existe por PAR, nunca na lista.
@@ -15,12 +32,12 @@ import { MIN_SUPPORT_N } from "../core/thresholds.js";
 
 // MOTIVO: a ordem desta lista É a regra de desempate (antes: quem aparecesse primeiro no input,
 // ou seja, dependia da ordem de iteração).
-const VALID_PROFILES = ["snowball", "scaling", "uniforme"];
+const VALID_PROFILES = Object.freeze(["snowball", "scaling", "uniforme"]);
 
 /**
  * Agregador de perfis por par. Sem estado — reutilizável.
  */
-export class HeroProfile {
+class HeroProfile {
   /**
    * @param profiles (readonly string[]) perfis por par (brutos, podem vir misturados)
    * @returns {{ top: string, n: number, total: number } | null}
@@ -60,7 +77,6 @@ export function dominantProfileOf(profiles) {
 
 
 
-export const PLAYSTYLE_VERSION = "playstyle-v1";
 export const PLAYSTYLE_MIN_MATCHES = MIN_SUPPORT_N;
 
 const clamp01 = (v) => (typeof v !== "number" || !Number.isFinite(v) ? null : Math.min(1, Math.max(0, v)));
@@ -82,16 +98,16 @@ function dist2(a, b) {
 function labelOf(c, medOp, medTfr) {
   const hiD = c.op >= medOp;
   const hiF = c.tfr >= medTfr;
-  if (hiD && hiF) return { key: "teamfight", label: "teamfight", desc: "dano alto em lutas — decide teamfight" };
-  if (hiD && !hiF) return { key: "pickoff", label: "pickoff", desc: "dano alto fora de lutas — split, pickoff, farm lateral" };
-  if (!hiD && hiF) return { key: "frontline", label: "frontline", desc: "muita luta, pouco dano — engage, front, utilidade" };
-  return { key: "transicao", label: "transição", desc: "baixo dano e pouca luta — rotação, farm ou amostra ruim" };
+  if (hiD && hiF) return { key: PlaystyleKey.TEAMFIGHT, label: PlaystyleKey.TEAMFIGHT, desc: "dano alto em lutas — decide teamfight" };
+  if (hiD && !hiF) return { key: PlaystyleKey.PICKOFF, label: PlaystyleKey.PICKOFF, desc: "dano alto fora de lutas — split, pickoff, farm lateral" };
+  if (!hiD && hiF) return { key: PlaystyleKey.FRONTLINE, label: PlaystyleKey.FRONTLINE, desc: "muita luta, pouco dano — engage, front, utilidade" };
+  return { key: PlaystyleKey.TRANSICAO, label: "transição", desc: "baixo dano e pouca luta — rotação, farm ou amostra ruim" };
 }
 
 /**
  * @param matches [{op, tfr}] partidas do jogador (ideal: mesmo herói+lane)
  * @param k nº de estilos (default 4)
- * @returns null (n < 5) ou {clusters: [{centroid, n, ...label}], assignments, version}
+ * @returns null (n < 5) ou {clusters: [{centroid, n, ...label}], assignments, n}
  */
 export function clusterPlaystyle(matches, k = 4) {
   const pts = (matches ?? [])
@@ -137,7 +153,7 @@ export function clusterPlaystyle(matches, k = 4) {
     n: assign.filter((a) => a === i).length,
     ...labelOf(c, medOp, medTfr),
   }));
-  return { clusters, assignments: assign, n: pts.length, version: PLAYSTYLE_VERSION };
+  return { clusters, assignments: assign, n: pts.length };
 }
 
 /**
@@ -156,7 +172,6 @@ export function compareToPattern(vec, pattern) {
     distance: +distance.toFixed(4),
     patternLabel: pattern.label ?? "padrão",
     origin: pattern.origin,
-    version: PLAYSTYLE_VERSION,
   };
 }
 
@@ -176,8 +191,6 @@ export function compareToPattern(vec, pattern) {
 
 
 
-export const PERSONAL_CALIBRATION_VERSION = "personal-calibration-v1";
-
 // Piso de partidas próprias p/ veredito direcional (menos = incerteza-dominante).
 export const PERSONAL_MIN_N = MIN_SUPPORT_N;
 // Largura da faixa em desvios (mesmo ±2·se da projeção honesta do meta-trend).
@@ -187,14 +200,14 @@ export const PERSONAL_Z = 2;
  * @param own {win: proporção 0–1 | null, n: partidas | null}
  * @param global {theta: win global 0–1 | null, se: erro-padrão ≥0 | null}
  * @returns { verdict: "acima-do-global"|"na-faixa"|"abaixo-do-global"|
- *   "incerteza-dominante"|"sem-dado", diff, band, n, win, theta, reasons[], version }
+ *   "incerteza-dominante"|"sem-dado", diff, band, n, win, theta, reasons[] }
  */
 export function calibrateOwnVsGlobal({ own = {}, global = {} } = {}) {
   const win = own?.win;
   const n = own?.n;
   const theta = global?.theta;
   const se = global?.se;
-  const base = { diff: null, band: null, n: null, win: null, theta: null, version: PERSONAL_CALIBRATION_VERSION,
+  const base = { diff: null, band: null, n: null, win: null, theta: null,
     // LOW (V2 §16): banda normal ±2·se com n real — aproximação honesta, não posterior Beta.
     method: "normal_band_n_observed" };
 
@@ -209,7 +222,7 @@ export function calibrateOwnVsGlobal({ own = {}, global = {} } = {}) {
       !thetaOk ? "theta-global" : null,
       !seOk ? "se-global" : null,
     ].filter(Boolean);
-    return { ...base, verdict: "sem-dado", reasons: [`sem-dado:${missing.join("+")}`] };
+    return { ...base, verdict: CalibrationVerdict.SEM_DADO, reasons: [`sem-dado:${missing.join("+")}`] };
   }
 
   const nn = Math.floor(n);
@@ -227,7 +240,7 @@ export function calibrateOwnVsGlobal({ own = {}, global = {} } = {}) {
   if (nn < PERSONAL_MIN_N) {
     return {
       ...out,
-      verdict: "incerteza-dominante",
+      verdict: CalibrationVerdict.INCERTEZA_DOMINANTE,
       reasons: [
         nn === 1 ? "n=1" : `n=${nn}<${PERSONAL_MIN_N}`,
         "incerteza-amostral-domina",
@@ -236,12 +249,12 @@ export function calibrateOwnVsGlobal({ own = {}, global = {} } = {}) {
     };
   }
   if (diff > band) {
-    return { ...out, verdict: "acima-do-global", reasons: [`diff=+${diff.toFixed(4)}>faixa=±${band.toFixed(4)}`] };
+    return { ...out, verdict: CalibrationVerdict.ACIMA_DO_GLOBAL, reasons: [`diff=+${diff.toFixed(4)}>faixa=±${band.toFixed(4)}`] };
   }
   if (diff < -band) {
-    return { ...out, verdict: "abaixo-do-global", reasons: [`diff=${diff.toFixed(4)}<faixa=-${band.toFixed(4)}`] };
+    return { ...out, verdict: CalibrationVerdict.ABAIXO_DO_GLOBAL, reasons: [`diff=${diff.toFixed(4)}<faixa=-${band.toFixed(4)}`] };
   }
-  return { ...out, verdict: "na-faixa", reasons: [`|diff|=${Math.abs(diff).toFixed(4)}≤faixa=±${band.toFixed(4)}`] };
+  return { ...out, verdict: CalibrationVerdict.NA_FAIXA, reasons: [`|diff|=${Math.abs(diff).toFixed(4)}≤faixa=±${band.toFixed(4)}`] };
 }
 
 function hidOf(e) {
@@ -263,7 +276,7 @@ function tcWcOf(e) {
  * @param frequent [{hid|hero_id, tc|n (partidas), wc|win (vitórias), role?}] (campos tolerantes)
  * @param roleOf fn(hid)=>papel | mapa {hid: papel} | null (origem do papel)
  * @returns null (lista vazia) ou { nHeroes, totalMatches, totalWins, winRate,
- *   perRole: [{role, heroes, matches, share}], mainRole, topShare, version }
+ *   perRole: [{role, heroes, matches, share}], mainRole, topShare }
  *   share/topShare em proporção 0–1, nunca %.
  */
 export function poolProfile(frequent, roleOf = null) {
@@ -302,6 +315,5 @@ export function poolProfile(frequent, roleOf = null) {
     perRole,
     mainRole: perRole[0]?.role ?? null,
     topShare: totalMatches > 0 ? +(topMatches / totalMatches).toFixed(4) : null,
-    version: PERSONAL_CALIBRATION_VERSION,
   };
 }

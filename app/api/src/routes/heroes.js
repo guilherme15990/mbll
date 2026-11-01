@@ -1,6 +1,6 @@
 // GET /heroes — lote pontuado com paginação/ordenação no servidor.
 import { cacheGet } from "../infra/cacheStore.js";
-import { checkPickSum, walkPriorStamp, STRENGTH_INDEX_VERSION } from "@radar/engine";
+import { checkPickSum, walkPriorStamp } from "@radar/engine";
 import { rankLot } from "../composition.js";
 const { fetchRankAll, lastVerifiedPosterior } = rankLot;
 import { qHeroes, scoreLot, paginate } from "../application/scoring.js";
@@ -18,7 +18,7 @@ export async function heroesRoute(sp) {
     const pickSum = checkPickSum(fetched.rows.map((h) => h.pick));
     const page = paginate(scored, q);
     const vers = await versions();
-    return { status: 200, body: { data: page.data, total: page.total, rank: q.rank, window: q.window, collectedAgoMs: fetched.ageMs, stale: fetched.stale, truncated: !!fetched.truncated, totalFonte: fetched.totalFonte ?? page.total, pickSumCheck: pickSum, exposure: { unit: "slot_share", status: "unvalidated" }, meta, prior: walkPriorStamp(fetched.prior ?? null), index_basis: { method: STRENGTH_INDEX_VERSION, n: page.total }, ...patchFlag(vers) } };
+    return { status: 200, body: { data: page.data, total: page.total, rank: q.rank, window: q.window, collectedAgoMs: fetched.ageMs, stale: fetched.stale, truncated: !!fetched.truncated, totalFonte: fetched.totalFonte ?? page.total, pickSumCheck: pickSum, exposure: { unit: "slot_share", status: "unvalidated" }, meta, prior: walkPriorStamp(fetched.prior ?? null), index_basis: { n: page.total }, ...patchFlag(vers) } };
   } catch (e) {
     markLayerError(e);
     const hit = cacheGet(`rank:${q.rank}:${q.window}`, "A");
@@ -28,7 +28,7 @@ export async function heroesRoute(sp) {
       const fbGv = currentGameVersion();
       const fb = scoreLot(hit.body, { prior: fbPrior, gameVersion: fbGv });
       const page = paginate(fb.scored, q);
-      return { status: 200, body: { data: page.data, total: page.total, stale: true, fallback: true, collectedAgoMs: hit.ageMs, rank: q.rank, window: q.window, pickSumCheck: checkPickSum((hit.body ?? []).map((h) => h.pick)), exposure: { unit: "slot_share", status: "unvalidated" }, meta: fb.meta, prior: walkPriorStamp(fbPrior), index_basis: { method: STRENGTH_INDEX_VERSION, n: page.total } } };
+      return { status: 200, body: { data: page.data, total: page.total, stale: true, fallback: true, collectedAgoMs: hit.ageMs, rank: q.rank, window: q.window, pickSumCheck: checkPickSum((hit.body ?? []).map((h) => h.pick)), exposure: { unit: "slot_share", status: "unvalidated" }, meta: fb.meta, prior: walkPriorStamp(fbPrior), index_basis: { n: page.total } } };
     }
     return { status: 502, body: { error: "upstream_unavailable", message: "Upstream unavailable, try again" } };
   }

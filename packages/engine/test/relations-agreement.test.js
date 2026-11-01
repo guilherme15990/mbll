@@ -1,19 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
-  RELATIONS_AGREEMENT_VERSION,
   expectedForTarget,
   agreementForPair,
 } from "../src/matchups/counters.js";
-import { agreementForPair as viaIndex, expectedForTarget as viaIndexMap } from "../src/index.js";
 
 // relations → expected → compareCounterRelation. Assist nunca entra.
-describe("relations-agreement-v1: mapeamento", () => {
-  it("versão congelada + reexport", () => {
-    assert.equal(RELATIONS_AGREEMENT_VERSION, "relations-agreement-v1");
-    assert.equal(viaIndex, agreementForPair);
-    assert.equal(viaIndexMap, expectedForTarget);
-  });
+describe("relations-agreement: mapeamento", () => {
   it("weak → -1, strong → +1", () => {
     const rel = { weak: { target_hero_id: [7] }, strong: { target_hero_id: [9] }, assist: { target_hero_id: [] } };
     assert.deepEqual(expectedForTarget(rel, 7), { expected: -1, reasons: ["declarado-weak"] });

@@ -1,15 +1,17 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
-  classifyEquipmentItem,
   normalizeEquipmentCatalog,
   normalizeEmblemCatalog,
   normalizeSpellCatalog,
+  buildAggregate,
+} from "../src/index.js";
+import {
+  classifyEquipmentItem,
   parseBuild,
   detectPackages,
-  buildAggregate,
   PRACTICAL_DELTA_PP,
-} from "../src/index.js";
+} from "../src/builds/aggregate.js";
 
 // Catálogo sintético: 1001+1002 sempre juntos (pacote), 2001 ocasional,
 // 2002 raro (suporte insuficiente), 3002+3003 para pacote provisório.

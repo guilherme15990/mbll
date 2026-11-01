@@ -1,22 +1,17 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
-  PERSONAL_CALIBRATION_VERSION,
   PERSONAL_MIN_N,
   PERSONAL_Z,
   calibrateOwnVsGlobal,
   poolProfile,
 } from "../src/heroes/profile.js";
-import { calibrateOwnVsGlobal as viaIndex, poolProfile as viaIndexPool } from "../src/index.js";
 
 // Próprio × global: só o modelo, sem auth. n pequeno = honestidade.
-describe("personal-calibration-v1: calibrateOwnVsGlobal", () => {
-  it("versão, piso e reexport", () => {
-    assert.equal(PERSONAL_CALIBRATION_VERSION, "personal-calibration-v1");
+describe("personal-calibration: calibrateOwnVsGlobal", () => {
+  it("pisos congelados", () => {
     assert.equal(PERSONAL_MIN_N, 5);
     assert.equal(PERSONAL_Z, 2);
-    assert.equal(viaIndex, calibrateOwnVsGlobal);
-    assert.equal(viaIndexPool, poolProfile);
   });
   it("acima do global: diff além da faixa", () => {
     const r = calibrateOwnVsGlobal({ own: { win: 0.7, n: 40 }, global: { theta: 0.5, se: 0.01 } });

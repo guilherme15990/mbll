@@ -1,20 +1,16 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
-  LANE_TIMING_VERSION,
   LANE_TIMING_MIN_WINDOWS,
   LANE_TIMING_DELTA,
   laneTimingCurve,
 } from "../src/heroes/trends.js";
-import { laneTimingCurve as viaIndex } from "../src/index.js";
 
 // time_win_rate[] → curva por rota, gramática do meta-trend.
 describe("lane-timing-v1", () => {
-  it("versão, pisos e reexport", () => {
-    assert.equal(LANE_TIMING_VERSION, "lane-timing-v1");
+  it("pisos congelados", () => {
     assert.equal(LANE_TIMING_MIN_WINDOWS, 3);
     assert.equal(LANE_TIMING_DELTA, 0.02);
-    assert.equal(viaIndex, laneTimingCurve);
   });
   const W = (wins) => wins.map((win_rate, i) => ({ time_min: 8 + i * 2, time_max: 10 + i * 2, win_rate }));
   it("sobe: rampa limpa (voto + rampa concordam)", () => {

@@ -8,16 +8,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   scoreHeroDraftScore,
-  HERO_DRAFT_SCORE_VERSION,
 } from "../src/index.js";
 
 const hero = (id, over = {}) => ({ id, name: `H${id}`, win: 0.5, ...over });
 const scoreOf = (out, id) => out.rows.find((r) => r.id === id).draft_score;
 
-test("contrato: versão, meta e ausência de parâmetros declarados", () => {
+test("contrato: meta e ausência de parâmetros declarados", () => {
   const out = scoreHeroDraftScore({ heroes: [hero(1, { win: 0.4 }), hero(2, { win: 0.6 })] });
-  assert.equal(out.version, HERO_DRAFT_SCORE_VERSION);
-  assert.equal(out.version, "hero-draft-score-v1");
   assert.equal(out.meta.calibrated, false);
   assert.equal(out.meta.n_heroes, 2);
   assert.equal(out.meta.with_data, 2);

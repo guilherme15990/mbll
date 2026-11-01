@@ -37,17 +37,16 @@ describe("contratos internos Fase 1 (zero-dep)", () => {
   });
   it("meta do lote vem do scoreBatch (substitui o lotMeta local)", () => {
     const { meta } = scoreLot(rows, {});
-    for (const k of ["n", "mu", "tau", "c_reference", "prior", "tier_version", "strength_index_version", "counts"]) {
+    for (const k of ["n", "mu", "tau", "c_reference", "prior", "counts"]) {
       assert.ok(k in meta, `falta ${k} na meta`);
     }
-    assert.equal(meta.tier_version, "tier-v2");
     assert.equal(meta.n, rows.length);
   });
   it("strength-index-v1 ADR-024 em cada herói (0..100, topo=100, empates iguais)", () => {
     const out = score(rows);
     for (const h of out) {
       assert.ok(typeof h.strength_index === "number" && h.strength_index >= 0 && h.strength_index <= 100, `idx fora em ${h.id}`);
-      assert.ok(!("strength_index_version" in h), "versão mora em index_basis, não por herói");
+      assert.ok(!("strength_index_version" in h), "sem carimbo de versão por herói");
     }
     const top = out.reduce((a, b) => (a.strength_index >= b.strength_index ? a : b));
     assert.equal(top.id, 14, "maior índice = maior θ̂ (Rafaela)");

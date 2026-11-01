@@ -1,11 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  BUILD_ADJUSTED_VERSION,
-  adjustedLiftByAttr,
-  BUILD_QUADRANT_VERSION,
-  buildQuadrant,
-} from "../src/index.js";
+import { adjustedLiftByAttr } from "../src/builds/lift.js";
+import { buildQuadrant } from "../src/builds/contrast.js";
 
 // Lift ajustado intra-contexto + quadrantes (nomes do autor).
 describe("build-adjusted-v1 (FE implícito, sem causal)", () => {
@@ -16,9 +12,6 @@ describe("build-adjusted-v1 (FE implícito, sem causal)", () => {
     B(0.5, 0.1, [2, 3]),
     B(0.52, 0.1, [4]),
   ];
-  it("versão congelada", () => {
-    assert.equal(BUILD_ADJUSTED_VERSION, "build-adjusted-v1");
-  });
   it("contraste com/sem: lift positivo p/ item dos vencedores", () => {
     const out = adjustedLiftByAttr(builds, (b) => b.attrs);
     const i1 = out.find((r) => r.attr === 1);
@@ -38,9 +31,6 @@ describe("build-adjusted-v1 (FE implícito, sem causal)", () => {
 });
 
 describe("build-quadrant-v1 (nomes do autor)", () => {
-  it("versão congelada", () => {
-    assert.equal(BUILD_QUADRANT_VERSION, "build-quadrant-v1");
-  });
   it("4 quadrantes com nomes exatos", () => {
     assert.equal(buildQuadrant({ pick: 0.1, lift_vs_most_used: 0.05 }).key, "popular-alta");
     assert.equal(buildQuadrant({ pick: 0.1, lift_vs_most_used: 0.05 }).label, "popular + alta");

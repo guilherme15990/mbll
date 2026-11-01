@@ -150,7 +150,7 @@ test("debug opcional não altera os campos do contrato", () => {
 
 test("meta traz o que saiu do herói", () => {
   const { meta } = scoreBatch(makeLot(11, 132), { prior: PRIOR_SAME, gameVersion: "9.9.9" });
-  for (const k of ["mu", "tau", "c", "c_reference", "c_grade", "prior", "version_break", "strength_index_version", "tier_version", "counts"]) {
+  for (const k of ["mu", "tau", "c", "c_reference", "c_grade", "prior", "version_break", "counts"]) {
     assert.ok(k in meta, k);
   }
   assert.equal(meta.version_break, true);

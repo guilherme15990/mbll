@@ -87,3 +87,24 @@ barrel por disciplina de escopo, embora seja candidato em P2.
 
 **Contrato mínimo possível (P2, não feito):** ~52 (app) + 21 (testado via barrel)
 = **73 nomes** públicos. Requer reescrever 12 testes para caminho profundo e nova ADR.
+
+---
+
+## Atualização — sem versão e structs de estado (2026-11-01, ADR-063)
+
+Continuação da limpeza (ADR-063), sem mudar comportamento observável:
+
+- **Carimbo de versão removido.** Apagadas as constantes `*_VERSION` do motor e os
+  campos `version`/`formula`/`tier_version`/`model_version`; `index_basis.method` saiu
+  do contrato; cache do hero-draft-score sem versão. JSDoc que anunciava `version` em
+  `clusterPlaystyle`/`poolProfile`/`seriesDated`/`laneTimingCurve` foi corrigido.
+  Mantidos por serem **domínio/config**: `game_version`, `version_break`/`versionBroken`,
+  `WF_VERSION_BREAK_VARIANCE_FACTOR`, `STRENGTH_MODEL` (e `LOADOUT_VERSION`, web, fora do escopo).
+- **Structs de estado.** 62 objetos congelados com os nomes canônicos; **transversais**
+  em `core/states.js` (13) e **específicos** co-localizados no módulo dono (49). O
+  `DeltaStatus` foi deduplicado para `core/states.js`. Structs **não** entram no barrel
+  (evita exigir decl no `index.d.ts`; mantém a paridade do `check:boundaries`).
+- Barrel do motor: **154 → 141** export. `index.d.ts` continua sem qualquer carimbo de
+  versão (só `game_version`/`version_break` de domínio).
+- Gates: engine **253/253**, api **154/154**, web **40/40**, `check:boundaries` OK,
+  `check:api`/`check:web` OK, `build` OK, 0 BOM.

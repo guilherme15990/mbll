@@ -6,6 +6,7 @@ import { C_REFERENCE, DELTA_DEFAULT } from "../core/config.js";
 import { MIN_SUPPORT_N } from "../core/thresholds.js";
 import { ebShrink } from "../core/statistics.js";
 import { medianNull } from "../core/math.js";
+import { EvidenceStatus } from "../core/states.js";
 
 // ── draft/pair-effect.js ──
 // draft/pair-effect — primitivas de PAR compartilhadas pelos modelos de draft.
@@ -28,34 +29,34 @@ import { medianNull } from "../core/math.js";
 
 
 
-export const EMPTY_BOOK = { countersUp: [], countersDown: [], synergiesUp: [], synergiesDown: [] };
-export const VAR_UNIT = 0.25; // teto Bernoulli p(1-p)
+const EMPTY_BOOK = { countersUp: [], countersDown: [], synergiesUp: [], synergiesDown: [] };
+const VAR_UNIT = 0.25; // teto Bernoulli p(1-p)
 
 // Exposição (pick) de fallback quando o `pick` de um parceiro/candidato é
 // DESCONHECIDO (vem só como id, ou ausente). Evita descartar um par OBSERVADO
 // por falta de exposição. Declarado, não calibrado (≈ RARE_PICK_MAX).
 // `pick = 0` NÃO usa fallback: ausência de pick é `null`/`undefined`, não zero.
-export const PAIR_FALLBACK_PICK = 0.02;
+const PAIR_FALLBACK_PICK = 0.02;
 
 /** Normaliza um herói de contexto: aceita `{id,...}` ou um id cru. */
-export function asHero(x) {
+function asHero(x) {
   if (x == null) return null;
   if (typeof x === "number") return { id: x };
   if (typeof x === "object" && Number.isFinite(Number(x.id))) return x;
   return null;
 }
 
-export const idOf = (x) => Number(x?.id);
+const idOf = (x) => Number(x?.id);
 
 /** Número finito ou `null` quando ausente/vazio/não numérico (null NÃO vira 0). */
-export function numOrNull(v) {
+function numOrNull(v) {
   if (v == null || v === "") return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
 
 /** |δ| observado de um par numa lista de livro, ou null quando ausente/inválido. */
-export function absDelta(list, otherId) {
+function absDelta(list, otherId) {
   const row = (list ?? []).find((p) => Number(p?.id) === otherId);
   const d = row ? numOrNull(row.delta) : null;
   return d == null ? null : Math.abs(d);
@@ -98,13 +99,13 @@ export function pairMatchup(hero, enemy) {
 }
 
 /** pick informado; ausente (null/undefined/""/NaN) => fallback; 0 permanece 0. */
-export function exposurePick(p) {
+function exposurePick(p) {
   const n = numOrNull(p);
   return n == null ? PAIR_FALLBACK_PICK : n;
 }
 
 /** n proxy do par = C_REFERENCE · pick_herói · pick_outro (0 => não exposto). */
-export function pairExposure(pA, pB) {
+function pairExposure(pA, pB) {
   return C_REFERENCE * exposurePick(pA) * exposurePick(pB);
 }
 
@@ -114,7 +115,7 @@ export function pairExposure(pA, pB) {
  * Par não observado (ou sem exposição): efeito 0 e variância = priorVar
  * (desconhecido, não zero).
  */
-export function shrinkEffect(obs, n, priorVar) {
+function shrinkEffect(obs, n, priorVar) {
   const hasExposure = n > 0;
   if (!obs.present || !hasExposure) {
     // Sem observação OU sem exposição: efeito 0 e variância do prior.
@@ -156,22 +157,24 @@ export function shrinkEffect(obs, n, priorVar) {
 
 
 
-export const DRAFT_SCORE_VERSION = "draft-score-v1";
-
 // ── parâmetros DECLARADOS (não calibrados; ver ADR-054) ──────────────────────
 // Penalidade do limite inferior aplicada ao termo de incerteza. k=1 => "1 desvio".
-export const DS_K = 1;
+const DS_K = 1;
 // Variância do prior (efeito típico de par / desvio de WR). Reutiliza DELTA_DEFAULT.
 export const DS_PRIOR_VAR = DELTA_DEFAULT * DELTA_DEFAULT;
 // Fator de amortecimento das somas de par (pares do mesmo time não são
 // independentes). 1 = soma plena; <1 reduz sobreposição. Declarado.
-export const DS_PAIR_DAMPING = 1;
+const DS_PAIR_DAMPING = 1;
 // Penalidade (pp) de limite inferior quando a lane pedida não está nas lanes
 // conhecidas do candidato. Nunca entra em `expected_pp`.
 export const DS_OFFLANE_PENALTY_PP = 3;
 // Unidade do efeito de par — hipótese, não medida (a semântica de
 // `increase_win_rate` não é documentada pela fonte; ver relatório de suporte).
-export const DS_UNIT_STATUS = "pp_hypothesis_strong";
+// Struct da unidade declarada (fonte única do nome; `DS_UNIT_STATUS` = alias compat).
+const DsUnitStatus = Object.freeze({
+  PP_HYPOTHESIS_STRONG: "pp_hypothesis_strong",
+});
+export const DS_UNIT_STATUS = DsUnitStatus.PP_HYPOTHESIS_STRONG;
 
 /** Parâmetro válido dentro de [min,max]; senão o default (evita NaN a jusante). */
 function numParam(v, def, min, max) {
@@ -197,7 +200,7 @@ const paramPenalty = (v) => numParam(v, DS_OFFLANE_PENALTY_PP, 0, 100);
  *   lane?: string|null,
  *   params?: { k?: number, priorVar?: number, damping?: number, offLanePenaltyPp?: number },
  * }} input
- * @returns {{ version: string, lane: string|null, k: number, priorVar: number, damping: number,
+ * @returns {{ lane: string|null, k: number, priorVar: number, damping: number,
  *   unit_status: string, rows: Array<object>, meta: object }}
  */
 export function scoreDraftCandidates(input = {}) {
@@ -295,8 +298,8 @@ export function scoreDraftCandidates(input = {}) {
         terms: [...synTerms, ...matTerms],
       },
       reasons: buildReasons({ basePp, synTerms, matTerms, laneFit, lane }),
-      evidence_status: !base.observed && !observedPairs ? "sem-dado"
-        : observedPairs >= MIN_SUPPORT_N ? "provisional" : "inconclusive",
+      evidence_status: !base.observed && !observedPairs ? EvidenceStatus.SEM_DADO
+        : observedPairs >= MIN_SUPPORT_N ? EvidenceStatus.PROVISIONAL : EvidenceStatus.INCONCLUSIVE,
       score: null,
       dominated: false,
       frontier: false,
@@ -316,7 +319,6 @@ export function scoreDraftCandidates(input = {}) {
   const allObserved = rows.reduce((s, r) => s + r.breakdown.coverage.observed, 0);
   const anyUnobserved = rows.some((r) => r.breakdown.coverage.observed < r.breakdown.coverage.total);
   return {
-    version: DRAFT_SCORE_VERSION,
     lane,
     k,
     priorVar,
@@ -434,8 +436,6 @@ const round3 = (v) => Math.round(v * 1000) / 1000;
 // e desconto de confusão por elo — a fonte atual não expõe nem uma nem outra.
 // Zero I/O. Puro.
 
-export const HERO_DRAFT_SCORE_VERSION = "hero-draft-score-v1";
-
 /** Número finito ou null (ausente/vazio/NaN nunca vira 0). [local: hero-draft-score] */
 function hdsNumOrNull(v) {
   if (v == null || v === "") return null;
@@ -451,7 +451,7 @@ const round4 = (v) => Math.round(v * 10000) / 10000;
  *
  * @param {{ heroes?: Array<{ id: number|string, name?: string|null, head?: string|null, win?: number|null }> }} [input]
  *   `heroes`: uma entrada por herói do recorte. `win` é a WR em fração 0–1.
- * @returns {{ version: string, rows: Array<{ id: number, name: string|null, head: string|null, draft_score: number|null }>, meta: object }}
+ * @returns {{ rows: Array<{ id: number, name: string|null, head: string|null, draft_score: number|null }>, meta: object }}
  */
 export function scoreHeroDraftScore(input = {}) {
   const src = input ?? {};
@@ -484,7 +484,6 @@ export function scoreHeroDraftScore(input = {}) {
 
   const withData = rows.reduce((n, r) => n + (r.draft_score == null ? 0 : 1), 0);
   return {
-    version: HERO_DRAFT_SCORE_VERSION,
     rows,
     meta: {
       n_heroes: rows.length,

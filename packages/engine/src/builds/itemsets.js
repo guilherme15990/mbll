@@ -6,8 +6,7 @@ import { MIN_LIFT_SIGNAL, RARE_PICK_MAX } from "../core/thresholds.js";
 import { mean, medianNull } from "../core/math.js";
 
 // ── builds/itemsets.js ──
-// Scoring de itemsets — fórmula `itemset-score-v1`.
-// Movido de app/web/src/shared/domain/itemsets.ts (semântica idêntica): unidade honesta =
+// Scoring de itemsets. Movido de app/web/src/shared/domain/itemsets.ts (semântica idêntica): unidade honesta =
 // itemset DENTRO do mesmo herói+lane, coocorrência INTRA-build; entre contextos
 // só se CONTA (k/m); destaque por rota ordenado por cobertura desc(k, m) — nunca
 // por win poolado — corte `k ≥ 2 ∨ m ≥ 3`, teto de 5 linhas. Puro, sem I/O.
@@ -16,11 +15,19 @@ import { mean, medianNull } from "../core/math.js";
 
 
 
-export const ITEMSET_SCORE_VERSION = "itemset-score-v1";
 export const ITEMSET_M_MIN = 2;
 export const ITEMSET_CUT_K = 2;
 export const ITEMSET_CUT_M = 3;
 export const ITEMSET_MAX_ROWS = 5;
+
+// Struct dos estados possíveis do itemset atômico (`status`). Fonte única dos
+// nomes canônicos — nenhum literal de estado solto no módulo.
+export const ItemsetStatus = Object.freeze({
+  OK: "ok",
+  SEM_SUPORTE: "sem_suporte",
+  SEM_REFERENCIA: "sem_referencia",
+  CONTEXTO_MISTO: "contexto_misto",
+});
 
 function isFiniteNum(v) {
   return typeof v === "number" && Number.isFinite(v);
@@ -46,13 +53,12 @@ function trincasOf(ids) {
 }
 
 function itemsetKey(u, rank, lane, heroId) {
-  return `${ITEMSET_SCORE_VERSION}:${rank}:${lane}:${heroId}:${u.join("+")}`;
+  return `itemset:${rank}:${lane}:${heroId}:${u.join("+")}`;
 }
 
 function baseAtomic(u, ctx, nBuilds, names) {
   return {
     key: itemsetKey(u, ctx.rank, ctx.lane, ctx.heroId),
-    formula: ITEMSET_SCORE_VERSION,
     itemIds: [...u],
     itemNames: [...names],
     heroId: ctx.heroId,
@@ -88,7 +94,7 @@ export function scoreAtomicItemset(u, ctx) {
   if (containing.length === 0) {
     return {
       ...base,
-      status: "sem_suporte",
+      status: ItemsetStatus.SEM_SUPORTE,
       motive: "não observado neste herói+lane (trinca exige coocorrência na mesma build)",
       winDesc: null, pickMed: null, liftMost: null, liftMean: null,
     };
@@ -100,7 +106,7 @@ export function scoreAtomicItemset(u, ctx) {
   if (!refMostOk && !refMeanOk) {
     return {
       ...base,
-      status: "sem_referencia",
+      status: ItemsetStatus.SEM_REFERENCIA,
       motive: "sem referência finita neste herói+lane (mais-usada e média ausentes)",
       winDesc, pickMed, liftMost: null, liftMean: null,
     };
@@ -108,7 +114,7 @@ export function scoreAtomicItemset(u, ctx) {
   if (winDesc == null) {
     return {
       ...base,
-      status: "sem_suporte",
+      status: ItemsetStatus.SEM_SUPORTE,
       motive: "sem win finito nas builds amostradas com a trinca",
       winDesc, pickMed, liftMost: null, liftMean: null,
     };
@@ -118,14 +124,14 @@ export function scoreAtomicItemset(u, ctx) {
   if (containing.length < ITEMSET_M_MIN) {
     return {
       ...base,
-      status: "sem_suporte",
+      status: ItemsetStatus.SEM_SUPORTE,
       motive: `suporte mínimo: ${containing.length} build amostrada (mínimo ${ITEMSET_M_MIN}) — sem leitura`,
       winDesc: +winDesc.toFixed(4), pickMed, liftMost, liftMean,
     };
   }
   return {
     ...base,
-    status: "ok",
+    status: ItemsetStatus.OK,
     motive: "associação descritiva no contexto comparável (Camada A)",
     winDesc: +winDesc.toFixed(4), pickMed, liftMost, liftMean,
   };

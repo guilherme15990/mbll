@@ -4,6 +4,60 @@
 
 import { MIN_SUPPORT_N, PRACTICAL_DELTA, SEVERE_COUNTER_DELTA } from "../core/thresholds.js";
 import { quantile } from "../core/math.js";
+import { ClassificationStatus, ExposureStatus } from "../core/states.js";
+
+/** Estado de segurança derivado do proxy blind. */
+const SafetyStatus = Object.freeze({
+  PROXY: "proxy",
+  INCONCLUSIVE: "inconclusive",
+});
+
+/** Robustez da cauda adversa do proxy blind. */
+const RobustnessStatus = Object.freeze({
+  INCONCLUSIVE: "inconclusive",
+  ROBUSTO: "robusto",
+  SENSIVEL_A_COUNTER: "sensivel-a-counter",
+});
+
+/** Rótulos oficiais de segurança (PRD Blind §10). */
+const SafetyLabel = Object.freeze({
+  INCONCLUSIVA: "Segurança Inconclusiva",
+  SEGURO_SITUACIONAL: "Seguro, mas Situacional",
+  SEGURO: "Blind Pick Seguro",
+  COUNTERAVEL: "Counterável",
+});
+
+/** Guia fixo de segurança (mapeamento §1.3). */
+const SafetyGuide = Object.freeze({
+  SIM: "SIM",
+  CUIDADO: "CUIDADO",
+  NAO: "NÃO",
+  SEM_DADO: "SEM DADO",
+});
+
+/** Chave canônica de favorabilidade do pick. */
+const PickFavorabilityKey = Object.freeze({
+  FAVORAVEL: "favoravel",
+  SITUACIONAL: "situacional",
+  DESFAVORAVEL: "desfavoravel",
+  SEM_DADO: "sem_dado",
+});
+
+/** Rótulo canônico de favorabilidade do pick. */
+const PickFavorabilityLabel = Object.freeze({
+  FAVORAVEL: "Favorável",
+  SITUACIONAL: "Situacional",
+  DESFAVORAVEL: "Desfavorável",
+  SEM_DADO: "Sem dado",
+});
+
+/** Tom (cor) do veredito de favorabilidade. */
+const PickFavorabilityTone = Object.freeze({
+  EMERALD: "emerald",
+  AMBER: "amber",
+  ROSE: "rose",
+  SLATE: "slate",
+});
 
 // ── counters/blind-proxy.js ──
 // counters/blind-proxy — proxy de blind pick (corpo idêntico ao ex-engine,
@@ -16,16 +70,16 @@ export function blindProxy(deltas = []) {
   const xs = (deltas ?? []).filter(Number.isFinite).sort((a, b) => a - b);
   // P0 EC-V2-02 fix: n<5 não sustenta p10/robusto — inconclusivo
   if (xs.length < 5) {
-    return { safety_status: "inconclusive", robustness_status: "inconclusive", adverse_p10: null, worst_counter: null, worst_observed: xs.length ? +xs[0].toFixed(4) : null, n_pairs: xs.length, classification_status: "inconclusive", exposure_status: "unvalidated", note: "proxy — n<5, inconclusivo; não é probabilidade" };
+    return { safety_status: SafetyStatus.INCONCLUSIVE, robustness_status: RobustnessStatus.INCONCLUSIVE, adverse_p10: null, worst_counter: null, worst_observed: xs.length ? +xs[0].toFixed(4) : null, n_pairs: xs.length, classification_status: ClassificationStatus.INCONCLUSIVE, exposure_status: ExposureStatus.UNVALIDATED, note: "proxy — n<5, inconclusivo; não é probabilidade" };
   }
   const p10 = quantile(xs, 0.1);
   const worst = xs[0];
   const spread = xs[xs.length - 1] - xs[0];
   const robust = spread < 0.04 && p10 > -0.02;
   return {
-    safety_status: "proxy", robustness_status: robust ? "robusto" : "sensivel-a-counter",
+    safety_status: SafetyStatus.PROXY, robustness_status: robust ? RobustnessStatus.ROBUSTO : RobustnessStatus.SENSIVEL_A_COUNTER,
     adverse_p10: +p10.toFixed(4), worst_observed: +worst.toFixed(4), spread: +spread.toFixed(4),
-    n_pairs: xs.length, classification_status: "provisional", exposure_status: "unvalidated",
+    n_pairs: xs.length, classification_status: ClassificationStatus.PROVISIONAL, exposure_status: ExposureStatus.UNVALIDATED,
     note: "proxy — não é probabilidade de vitória",
   };
 }
@@ -43,28 +97,28 @@ export function blindProxy(deltas = []) {
 
 /** Rótulos oficiais PRD Blind §10. */
 export function getSafetyClassification(b) {
-  if (!b || b.classification_status === "inconclusive" || (b.n_pairs ?? 0) < MIN_SUPPORT_N) {
+  if (!b || b.classification_status === ClassificationStatus.INCONCLUSIVE || (b.n_pairs ?? 0) < MIN_SUPPORT_N) {
     return {
-      label: "Segurança Inconclusiva",
+      label: SafetyLabel.INCONCLUSIVA,
       motive: "Matriz incompleta na fonte (extremes-only) ou pares elegíveis insuficientes (n < 5) — RF-BLND-06.",
       color: "text-mist border-line bg-abyss",
     };
   }
 
-  if (b.robustness_status === "robusto") {
+  if (b.robustness_status === RobustnessStatus.ROBUSTO) {
     // V2 §8.2 + §12 (HIGH): distribuição resiliente sem denominador validado tem
     // teto Situacional — nunca "Seguro"/SIM público. Compat: só capa quando a
     // exposição vem declarada (blindProxy sempre declara "unvalidated").
     const exposed = b.exposure_status ?? b.exposureStatus;
-    if (exposed != null && exposed !== "observed" && exposed !== "validated") {
+    if (exposed != null && exposed !== ExposureStatus.OBSERVED && exposed !== ExposureStatus.VALIDATED) {
       return {
-        label: "Seguro, mas Situacional",
+        label: SafetyLabel.SEGURO_SITUACIONAL,
         motive: "Distribuição resiliente entre pares, mas sem contagens validadas — teto situacional (proxy, não probabilidade).",
         color: "text-amber-300 border-amber-400/30 bg-amber-400/10",
       };
     }
     return {
-      label: "Blind Pick Seguro",
+      label: SafetyLabel.SEGURO,
       motive: "Força defensável + cauda adversa resiliente sob a distribuição de adversários deste elo.",
       color: "text-emerald-300 border-emerald-400/30 bg-emerald-400/10",
     };
@@ -72,14 +126,14 @@ export function getSafetyClassification(b) {
 
   if ((b.worst_observed ?? 0) <= SEVERE_COUNTER_DELTA && (b.n_pairs ?? 0) >= 10) {
     return {
-      label: "Counterável",
+      label: SafetyLabel.COUNTERAVEL,
       motive: "Counters desfavoráveis replicados na matriz de pares; vulnerabilidade tática identificada.",
       color: "text-rose-300 border-rose-400/30 bg-rose-400/10",
     };
   }
 
   return {
-    label: "Seguro, mas Situacional",
+    label: SafetyLabel.SEGURO_SITUACIONAL,
     motive: "Defensável no elo, mas com vulnerabilidades específicas que recomendam aguardar informação do draft.",
     color: "text-amber-300 border-amber-400/30 bg-amber-400/10",
   };
@@ -87,10 +141,10 @@ export function getSafetyClassification(b) {
 
 /** Mapeamento fixo §1.3 (sem sinônimo inventado). */
 export function safetyToGuide(label) {
-  if (label === "Blind Pick Seguro") return "SIM";
-  if (label === "Seguro, mas Situacional") return "CUIDADO";
-  if (label === "Counterável") return "NÃO";
-  return "SEM DADO";
+  if (label === SafetyLabel.SEGURO) return SafetyGuide.SIM;
+  if (label === SafetyLabel.SEGURO_SITUACIONAL) return SafetyGuide.CUIDADO;
+  if (label === SafetyLabel.COUNTERAVEL) return SafetyGuide.NAO;
+  return SafetyGuide.SEM_DADO;
 }
 
 // ── picks/pick-favorability.js ──
@@ -109,10 +163,8 @@ export function safetyToGuide(label) {
 
 
 
-export const PICK_FAVORABILITY_VERSION = "pick-favorability-v1";
-
 /** Baseline neutro de win rate quando a meta do lote não está disponível. */
-export const PICK_BASELINE_WR = 0.5;
+const PICK_BASELINE_WR = 0.5;
 
 const finite = (v) => typeof v === "number" && Number.isFinite(v);
 const fmt = (v) => (finite(v) ? v.toFixed(4) : "—");
@@ -127,11 +179,11 @@ function evidenceOf(hero, blind) {
 }
 
 function verdictOf(key, label, motive, tone, evidence) {
-  return { key, label, motive, tone, evidence, formula: PICK_FAVORABILITY_VERSION };
+  return { key, label, motive, tone, evidence };
 }
 
 function insufficient(evidence, detail) {
-  return verdictOf("sem_dado", "Sem dado", `Sem base para decidir: ${detail}`, "slate", evidence);
+  return verdictOf(PickFavorabilityKey.SEM_DADO, PickFavorabilityLabel.SEM_DADO, `Sem base para decidir: ${detail}`, PickFavorabilityTone.SLATE, evidence);
 }
 
 /**
@@ -143,35 +195,35 @@ function insufficient(evidence, detail) {
 export function classifyBlindPick({ blind } = {}) {
   const ev = evidenceOf(null, blind);
   const n = ev.nPairs;
-  if (!blind || blind.classification_status === "inconclusive" || n < MIN_SUPPORT_N) {
+  if (!blind || blind.classification_status === ClassificationStatus.INCONCLUSIVE || n < MIN_SUPPORT_N) {
     return insufficient(ev, `pares elegíveis insuficientes (n=${n} < ${MIN_SUPPORT_N}) — matriz extremes-only não sustenta veredito.`);
   }
   const robust =
-    blind.robustness_status === "robusto" ||
+    blind.robustness_status === RobustnessStatus.ROBUSTO ||
     (ev.adverseP10 != null && ev.adverseP10 > -PRACTICAL_DELTA && ev.worstCounter != null && ev.worstCounter > SEVERE_COUNTER_DELTA);
   if (robust) {
     return verdictOf(
-      "favoravel",
-      "Favorável",
+      PickFavorabilityKey.FAVORAVEL,
+      PickFavorabilityLabel.FAVORAVEL,
       `Cauda adversa resiliente (p10 ${fmt(ev.adverseP10)}; pior δ ${fmt(ev.worstCounter)} em n=${n}) — dá para lockar cego. Proxy, não probabilidade.`,
-      "emerald",
+      PickFavorabilityTone.EMERALD,
       ev,
     );
   }
   if (ev.worstCounter != null && ev.worstCounter <= SEVERE_COUNTER_DELTA && n >= 10) {
     return verdictOf(
-      "desfavoravel",
-      "Desfavorável",
+      PickFavorabilityKey.DESFAVORAVEL,
+      PickFavorabilityLabel.DESFAVORAVEL,
       `Counter replicado (pior δ ${fmt(ev.worstCounter)} em n=${n}) — lockar cego entrega o pior par ao inimigo.`,
-      "rose",
+      PickFavorabilityTone.ROSE,
       ev,
     );
   }
   return verdictOf(
-    "situacional",
-    "Situacional",
+    PickFavorabilityKey.SITUACIONAL,
+    PickFavorabilityLabel.SITUACIONAL,
     `Defensável no elo, mas a cauda não é resiliente (p10 ${fmt(ev.adverseP10)}; pior δ ${fmt(ev.worstCounter)}) — lockar cego pede plano B.`,
-    "amber",
+    PickFavorabilityTone.AMBER,
     ev,
   );
 }
@@ -185,7 +237,7 @@ export function classifyBlindPick({ blind } = {}) {
 export function classifyFirstPick({ hero, blind, baseline } = {}) {
   const ev = evidenceOf(hero, blind);
   const n = ev.nPairs;
-  if (!blind || blind.classification_status === "inconclusive" || n < MIN_SUPPORT_N) {
+  if (!blind || blind.classification_status === ClassificationStatus.INCONCLUSIVE || n < MIN_SUPPORT_N) {
     return insufficient(ev, `matriz de counters insuficiente (n=${n} < ${MIN_SUPPORT_N}).`);
   }
   if (ev.strength == null) {
@@ -198,38 +250,38 @@ export function classifyFirstPick({ hero, blind, baseline } = {}) {
 
   if (hardCountered) {
     return verdictOf(
-      "desfavoravel",
-      "Desfavorável",
+      PickFavorabilityKey.DESFAVORAVEL,
+      PickFavorabilityLabel.DESFAVORAVEL,
       `First pick exposto: pior counter ${fmt(ev.worstCounter)} replicado em n=${n} — o inimigo responde depois de ver o lock.`,
-      "rose",
+      PickFavorabilityTone.ROSE,
       ev,
     );
   }
   if (strong && !fragileTail) {
     return verdictOf(
-      "favoravel",
-      "Favorável",
+      PickFavorabilityKey.FAVORAVEL,
+      PickFavorabilityLabel.FAVORAVEL,
       `Força θ̂ ${fmt(ev.strength)} ≥ referência ${fmt(ref)} e sem counter duro replicado — bom primeiro lock. Proxy, não probabilidade.`,
-      "emerald",
+      PickFavorabilityTone.EMERALD,
       ev,
     );
   }
   if (!strong && fragileTail) {
     return verdictOf(
-      "desfavoravel",
-      "Desfavorável",
+      PickFavorabilityKey.DESFAVORAVEL,
+      PickFavorabilityLabel.DESFAVORAVEL,
       `Força θ̂ ${fmt(ev.strength)} abaixo da referência ${fmt(ref)} e cauda frágil (p10 ${fmt(ev.adverseP10)}) — revelar primeiro sem vantagem.`,
-      "rose",
+      PickFavorabilityTone.ROSE,
       ev,
     );
   }
   return verdictOf(
-    "situacional",
-    "Situacional",
+    PickFavorabilityKey.SITUACIONAL,
+    PickFavorabilityLabel.SITUACIONAL,
     strong
       ? `Força θ̂ ${fmt(ev.strength)} sustenta o lock, mas a cauda pede cuidado (p10 ${fmt(ev.adverseP10)}).`
       : `Sem vantagem de força (θ̂ ${fmt(ev.strength)} vs ${fmt(ref)}), mas sem counter duro replicado — first pick neutro.`,
-    "amber",
+    PickFavorabilityTone.AMBER,
     ev,
   );
 }

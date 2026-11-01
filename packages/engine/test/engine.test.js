@@ -1,15 +1,14 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
-  scoreHeroes,
   blindProxy,
   buildLift,
   summarizeWalkPosterior,
-  strengthIndexByRank,
-  STRENGTH_INDEX_VERSION,
   C_REFERENCE,
   LANES,
 } from "../src/index.js";
+import { scoreHeroes } from "../src/heroes/scoring.js";
+import { strengthIndexByRank } from "../src/heroes/ranking.js";
 
 // Guarda de fronteira: a porta proprietária resolve e se comporta.
 describe("engine: fronteira e fumaça", () => {
@@ -24,7 +23,6 @@ describe("engine: fronteira e fumaça", () => {
     assert.equal(buildLift({ win: 0.6, refWin: 0.5, hasSupport: true }).lift_raw != null, true);
     const post = summarizeWalkPosterior({ muBatch: 0.55, tau2Batch: 0.001, nBatch: 100 });
     assert.ok(post.mu > 0 && post.n === 100);
-    assert.equal(STRENGTH_INDEX_VERSION, "strength-index-v1");
     assert.equal(strengthIndexByRank(1, 12), 100);
     assert.deepEqual(C_REFERENCE, 1e5);
     assert.deepEqual(LANES, ["exp", "mid", "roam", "jungle", "gold"]);

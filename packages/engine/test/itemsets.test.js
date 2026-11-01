@@ -1,11 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
-  ITEMSET_SCORE_VERSION, ITEMSET_M_MIN, ITEMSET_CUT_K, ITEMSET_CUT_M, ITEMSET_MAX_ROWS,
+  ITEMSET_M_MIN, ITEMSET_CUT_K, ITEMSET_CUT_M, ITEMSET_MAX_ROWS,
   itemIdsOf, scoreAtomicItemset, scoreRouteItemsets,
 } from "../src/builds/itemsets.js";
 
-// Paridade com app/web/src/shared/domain/itemsets.ts (itemset-score-v1).
+// Paridade com app/web/src/shared/domain/itemsets.ts (itemset-score).
 const B = (ids, win, pick, refMost, refMean) => ({
   win, pick,
   items: ids.map((id) => ({ id, name: `Item${id}`, icon: null })),
@@ -14,9 +14,8 @@ const ctx = (heroId, builds, refMost, refMean, lane = "gold") => ({
   heroId, heroName: `H${heroId}`, builds, refMostWin: refMost, refMeanWin: refMean, rank: "mythic", lane,
 });
 
-describe("itemsets: paridade itemset-score-v1", () => {
-  it("constantes versionadas", () => {
-    assert.equal(ITEMSET_SCORE_VERSION, "itemset-score-v1");
+describe("itemsets: paridade itemset-score", () => {
+  it("constantes congeladas", () => {
     assert.equal(ITEMSET_M_MIN, 2);
     assert.equal(ITEMSET_CUT_K, 2);
     assert.equal(ITEMSET_CUT_M, 3);

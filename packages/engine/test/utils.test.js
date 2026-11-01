@@ -1,11 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { mean, median, C_REFERENCE } from "../src/index.js";
+import { medianNull, mad, quantile } from "../src/core/math.js";
 import {
-  mean,
-  medianNull,
-  median,
-  mad,
-  quantile,
   percentileRank,
   benjaminiHochberg,
   ebShrink,
@@ -13,8 +10,7 @@ import {
   logit,
   invLogit,
   pFromZ,
-  C_REFERENCE,
-} from "../src/index.js";
+} from "../src/core/statistics.js";
 
 // Primitivas (dono: utils/math.js + utils/statistics.js).
 // Portado da suite do engine removido (ADR-025: QA aritmética + G6);

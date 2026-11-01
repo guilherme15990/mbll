@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
-  DRAFT_SCORE_VERSION,
   DS_UNIT_STATUS,
   DS_OFFLANE_PENALTY_PP,
   DS_PRIOR_VAR,
@@ -13,9 +12,8 @@ const pair = (id, delta) => ({ id, delta });
 const book = (o = {}) => ({ countersUp: [], countersDown: [], synergiesUp: [], synergiesDown: [], ...o });
 
 describe("draft-score: contrato e honestidade básica", () => {
-  it("versiona e marca unidade como hipótese", () => {
+  it("marca unidade como hipótese", () => {
     const out = scoreDraftCandidates({ candidates: [hero({ id: 1, win: 0.5 })] });
-    assert.equal(out.version, DRAFT_SCORE_VERSION);
     assert.equal(out.unit_status, DS_UNIT_STATUS);
     assert.equal(out.meta.calibrated, false);
     assert.equal(out.rows.length, 1);

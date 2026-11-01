@@ -1,19 +1,15 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
-  PLAYSTYLE_VERSION,
   PLAYSTYLE_MIN_MATCHES,
   clusterPlaystyle,
   compareToPattern,
 } from "../src/heroes/profile.js";
-import { clusterPlaystyle as viaIndex } from "../src/index.js";
 
 // Playstyle (op, tfr): dados user/matches (JWT). Sem auth, sem fiação — só modelo.
-describe("playstyle-v1", () => {
-  it("versão e piso congelados", () => {
-    assert.equal(PLAYSTYLE_VERSION, "playstyle-v1");
+describe("playstyle", () => {
+  it("piso congelado", () => {
     assert.equal(PLAYSTYLE_MIN_MATCHES, 5);
-    assert.equal(viaIndex, clusterPlaystyle);
   });
   const quad = (op, tfr, n, jitter) => {
     const out = [];

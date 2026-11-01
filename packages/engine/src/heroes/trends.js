@@ -5,6 +5,74 @@
 import { PRACTICAL_DELTA } from "../core/thresholds.js";
 import { mean } from "../core/math.js";
 
+// Structs dos estados possíveis (fonte única dos nomes canônicos; sem literal solto).
+/** Direção de tendência (legado, acentuado — `trendOf`). */
+const TrendDir = Object.freeze({
+  SUBINDO: "subindo",
+  CAINDO: "caindo",
+  ESTAVEL: "estável",
+  SEM_DADO: "sem-dado",
+});
+/** Direção de série datada (`seriesDated`/`radarOfDated`). */
+const DatedDirection = Object.freeze({
+  RISING: "rising",
+  FALLING: "falling",
+  STABLE: "stable",
+  INSUFFICIENT_DATA: "insufficient_data",
+});
+/** Robustez/cobertura de uma série (nunca prova estatística). */
+const Robustness = Object.freeze({
+  HIGH: "high",
+  MEDIUM: "medium",
+  LOW: "low",
+});
+/** Veredito do detector de meta-trend (gramática única). */
+const MetaTrendVerdict = Object.freeze({
+  SUBINDO: "subindo",
+  CAINDO: "caindo",
+  ESTAVEL: "estavel",
+  RUPTURA: "ruptura",
+  SEM_DADO: "sem-dado",
+});
+/** Veredito do timing por rota (mesma gramática do meta-trend). */
+const LaneTimingVerdict = Object.freeze({
+  SUBINDO: "subindo",
+  CAINDO: "caindo",
+  ESTAVEL: "estavel",
+  RUPTURA: "ruptura",
+  SEM_DADO: "sem-dado",
+});
+/** Movimento de um segmento da curva de timing. */
+const SegmentMove = Object.freeze({
+  REF: "ref",
+  SOBE: "sobe",
+  DESCE: "desce",
+  ESTAVEL: "estavel",
+});
+/** Palavra de direção (`trendDirectionOf`, acentuada). */
+const TrendWord = Object.freeze({
+  SUBINDO: "subindo",
+  CAINDO: "caindo",
+  ESTAVEL: "estável",
+  SEM_DIRECAO: "sem direção",
+});
+/** Estados do sinal temporal (PRD Temporal §6). */
+const SignalState = Object.freeze({
+  PERSISTENT: "persistent",
+  REVERTED: "reverted",
+  INITIAL: "initial",
+});
+/** Estado da avaliação de série (BC-TEMPO / INV4-015). */
+const SeriesAssessmentStatus = Object.freeze({
+  SERIE_CURTA: "serie_curta",
+  INCONCLUSIVO: "inconclusivo",
+  AVALIAVEL: "avaliavel",
+});
+/** Estado de um snapshot no histórico. */
+const SnapshotStatus = Object.freeze({
+  VIOLADO: "violado",
+});
+
 // ── walkforward/walkforward.js ──
 // walkforward/walkforward — ADR-023 walk-forward: posterior de ontem = prior
 // de hoje (corpo idêntico ao ex-engine, L2-WF-01..05).
@@ -18,7 +86,7 @@ import { mean } from "../core/math.js";
 // a ~2 halvings exponenciais — conservador p/ patches, onde win rates deslocam vários pp.
 // É o ÚNICO número novo do módulo; todo o resto reaproveita o M1 (ebShrink/obsVariance).
 // Puro, sem I/O, zero dependências.
-export const WF_VERSION_BREAK_VARIANCE_FACTOR = 4;
+const WF_VERSION_BREAK_VARIANCE_FACTOR = 4;
 
 /** Validação na mão (JS puro, sem `any`): prior {mu, tau2, n, game_version}. */
 export function isValidWalkPrior(p) {
@@ -143,12 +211,11 @@ export const TREND_N = 5;
 // Dimensão distinta por decisão: sensibilidade de fáscia em série curta (5 pts) — limiar
 // prático de classificação usa PRACTICAL_DELTA; este decide só a seta.
 export const TREND_DELTA = 0.005;
-export const TREND_VERSION = "theil-sen-date-v2";
 // P1 auditoria (L2 registrada): limiares por métrica — popularidade e eficácia têm
 // escalas e ruído distintos. Valores iniciais = ponto de partida, NÃO calibração.
-export const TREND_DELTA_WIN = 0.005;
-export const TREND_DELTA_PICK = 0.01;
-export const TREND_DELTA_BAN = 0.01;
+const TREND_DELTA_WIN = 0.005;
+const TREND_DELTA_PICK = 0.01;
+const TREND_DELTA_BAN = 0.01;
 
 // MOTIVO: Theil–Sen (mediana das inclinações par-a-par) no lugar de último − primeiro.
 // Com 5 pontos, um único ponto atípico no extremo decidia sozinho a seta. Sem dependências;
@@ -175,7 +242,7 @@ function toDay(date) {
  * Tendência de série temporal por herói (V2 §11). Limiares por métrica injetáveis
  * (OCP); o legado uniforme `trendOf` é preservado como shim deprecated.
  */
-export class HeroTrendAnalyzer {
+class HeroTrendAnalyzer {
   #deltaWin;
   #deltaPick;
   #deltaBan;
@@ -199,17 +266,17 @@ export class HeroTrendAnalyzer {
    */
   trendOf(points, n = TREND_N) {
     const ys = (points ?? []).map((p) => p && p.win).filter(Number.isFinite).slice(-n);
-    if (ys.length < 2) return { dir: "sem-dado", delta: null, n: ys.length };
+    if (ys.length < 2) return { dir: TrendDir.SEM_DADO, delta: null, n: ys.length };
     const delta = theilSenDelta(ys);
-    if (delta > TREND_DELTA) return { dir: "subindo", delta, n: ys.length };
-    if (delta < -TREND_DELTA) return { dir: "caindo", delta, n: ys.length };
-    return { dir: "estável", delta, n: ys.length };
+    if (delta > TREND_DELTA) return { dir: TrendDir.SUBINDO, delta, n: ys.length };
+    if (delta < -TREND_DELTA) return { dir: TrendDir.CAINDO, delta, n: ys.length };
+    return { dir: TrendDir.ESTAVEL, delta, n: ys.length };
   }
 
   /**
    * Theil–Sen datado sobre uma série: points [{date, value}].
    * Retorna {direction, delta_pp_window, slope_pp_per_day, n_points, window_days,
-   *  robustness, coverage_quality, statistical_evidence: null, version}.
+   *  robustness, coverage_quality, statistical_evidence: null}.
    */
   seriesDated(points, { valueKey = "win", deltaThreshold = TREND_DELTA } = {}) {
     const byDate = new Map();
@@ -226,7 +293,7 @@ export class HeroTrendAnalyzer {
     const days = [...byDate.keys()].sort((a, b) => a - b);
     const n_points = days.length;
     if (n_points < 2) {
-      return { direction: "insufficient_data", delta_pp_window: null, slope_pp_per_day: null, n_points, window_days: 0, robustness: "low", coverage_quality: "low", duplicate_dates_dropped: duplicates, version: TREND_VERSION };
+      return { direction: DatedDirection.INSUFFICIENT_DATA, delta_pp_window: null, slope_pp_per_day: null, n_points, window_days: 0, robustness: Robustness.LOW, coverage_quality: Robustness.LOW, duplicate_dates_dropped: duplicates };
     }
     const slopes = [];
     for (let i = 0; i < days.length - 1; i++) {
@@ -237,23 +304,23 @@ export class HeroTrendAnalyzer {
       }
     }
     if (!slopes.length) {
-      return { direction: "insufficient_data", delta_pp_window: null, slope_pp_per_day: null, n_points, window_days: 0, robustness: "low", coverage_quality: "low", duplicate_dates_dropped: duplicates, version: TREND_VERSION };
+      return { direction: DatedDirection.INSUFFICIENT_DATA, delta_pp_window: null, slope_pp_per_day: null, n_points, window_days: 0, robustness: Robustness.LOW, coverage_quality: Robustness.LOW, duplicate_dates_dropped: duplicates };
     }
     slopes.sort((a, b) => a - b);
     const mid = slopes.length >> 1;
     const slope = slopes.length % 2 ? slopes[mid] : (slopes[mid - 1] + slopes[mid]) / 2;
     const window_days = days[days.length - 1] - days[0];
     const delta = slope * window_days;
-    const direction = delta > deltaThreshold ? "rising" : delta < -deltaThreshold ? "falling" : "stable";
+    const direction = delta > deltaThreshold ? DatedDirection.RISING : delta < -deltaThreshold ? DatedDirection.FALLING : DatedDirection.STABLE;
     // robustness = cobertura + lacunas (V2 §11.2), nunca prova estatística.
     const expectedSpan = n_points - 1;
     const gaps = window_days > 0 ? window_days / Math.max(1, expectedSpan) : 1;
-    const robustness = n_points >= 5 && gaps <= 1.5 ? "high" : n_points >= 3 && gaps <= 3 ? "medium" : "low";
+    const robustness = n_points >= 5 && gaps <= 1.5 ? Robustness.HIGH : n_points >= 3 && gaps <= 3 ? Robustness.MEDIUM : Robustness.LOW;
     return {
       direction, delta_pp_window: +(delta * 100).toFixed(3), slope_pp_per_day: +(slope * 100).toFixed(4),
       n_points, window_days: +window_days.toFixed(2), robustness,
       coverage_quality: robustness, // alias explícito: cobertura, não prova estatística
-      statistical_evidence: null, duplicate_dates_dropped: duplicates, version: TREND_VERSION,
+      statistical_evidence: null, duplicate_dates_dropped: duplicates,
     };
   }
 
@@ -267,7 +334,7 @@ export class HeroTrendAnalyzer {
     const win = this.seriesDated(norm.map((p) => ({ date: p.date, value: p.win })), { valueKey: "value", ...opts, deltaThreshold: opts.deltaWin ?? base ?? this.#deltaWin });
     const pick = this.seriesDated(norm.map((p) => ({ date: p.date, value: p.pick })), { valueKey: "value", ...opts, deltaThreshold: opts.deltaPick ?? base ?? this.#deltaPick });
     const ban = this.seriesDated(norm.map((p) => ({ date: p.date, value: p.ban })), { valueKey: "value", ...opts, deltaThreshold: opts.deltaBan ?? base ?? this.#deltaBan });
-    return { win_rate: win, pick_rate: pick, ban_rate: ban, version: TREND_VERSION };
+    return { win_rate: win, pick_rate: pick, ban_rate: ban };
   }
 }
 
@@ -288,8 +355,6 @@ export function trendOfDated(points, opts = {}) {
 // tempo×métrica e detecção de ruptura CUSUM. Saída: um veredito + motivos.
 // Projeção curta ("semana seguinte") com intervalo do resíduo — nunca promessa.
 // Pura, sem I/O, zero dependências.
-
-export const META_TREND_VERSION = "meta-trend-v1";
 
 // Mínimo de pontos p/ veredito (menos = sem-dado, nunca chute).
 export const META_TREND_MIN_POINTS = 7;
@@ -363,7 +428,7 @@ function cusumBreak(ys) {
  *   slopePerDay, r2, corr, changeDate, forecastNext: {value, lo, hi} | null, reasons[] }
  */
 export function detectMetaTrend(points, metric = "win") {
-  const base = { verdict: "sem-dado", slopePerDay: null, r2: null, corr: null, changeDate: null, forecastNext: null, reasons: [], version: META_TREND_VERSION };
+  const base = { verdict: MetaTrendVerdict.SEM_DADO, slopePerDay: null, r2: null, corr: null, changeDate: null, forecastNext: null, reasons: [] };
   const ys = (points ?? []).map((p) => p?.[metric]).filter((v) => typeof v === "number" && Number.isFinite(v));
   const n = ys.length;
   if (n < META_TREND_MIN_POINTS) return { ...base, reasons: [`n=${n}<${META_TREND_MIN_POINTS}`] };
@@ -386,23 +451,22 @@ export function detectMetaTrend(points, metric = "win") {
     const after = mean(ys.slice(at + 1));
     return {
       ...base,
-      verdict: "ruptura",
+      verdict: MetaTrendVerdict.RUPTURA,
       slopePerDay: reg.slope,
       r2: +reg.r2.toFixed(4),
       corr: +corr.toFixed(4),
       changeDate: dates[at + 1] ?? null,
       forecastNext: null,
       reasons: [`ruptura-cusum@${dates[at + 1] ?? at + 1}`, `salto ${(after >= before ? "+" : "")}${((after - before) * 100).toFixed(1)}pp`, "projecao-suspensa-apos-ruptura"],
-      version: META_TREND_VERSION,
     };
   }
   // Votos: inclinação com força (R²≥0.35) + cruzamento + variação concordam.
   const up = reg.slope > 0;
   const strong = reg.r2 >= 0.35;
   const agree = (up && cross >= 0 && pctVar >= 0) || (!up && cross <= 0 && pctVar <= 0);
-  let verdict = "estavel";
+  let verdict = MetaTrendVerdict.ESTAVEL;
   const reasons = [`r2=${reg.r2.toFixed(2)}`, `inclinacao=${up ? "+" : ""}${reg.slope.toExponential(1)}/dia`, `cruzamento-ma=${cross >= 0 ? "+" : ""}${(cross / scale * 100).toFixed(1)}%`, `variacao=${(pctVar * 100).toFixed(1)}%`];
-  if (strong && agree) verdict = up ? "subindo" : "caindo";
+  if (strong && agree) verdict = up ? MetaTrendVerdict.SUBINDO : MetaTrendVerdict.CAINDO;
   // Projeção curta honesta: extrapola 7d com ±2·se (nunca promessa).
   const last = ys[n - 1];
   const proj = last + reg.slope * 7;
@@ -416,7 +480,6 @@ export function detectMetaTrend(points, metric = "win") {
     changeDate: null,
     forecastNext: { value: +proj.toFixed(4), lo: +(proj - band).toFixed(4), hi: +(proj + band).toFixed(4) },
     reasons,
-    version: META_TREND_VERSION,
   };
 }
 
@@ -438,21 +501,21 @@ const DAY_MS = 86400e3;
 /** Mapeamento formal dos estados do sinal (PRD Temporal §6). */
 export function getSignalStateBadge(status) {
   const s = (status || "").toLowerCase();
-  if (s === "persistent") {
+  if (s === SignalState.PERSISTENT) {
     return {
       label: "Sinal Persistente",
       desc: "A mudança de força continua em snapshots posteriores e resiste a variações de janela. Qualificado como Alerta competitivo.",
       color: "text-emerald-300 border-emerald-400/30 bg-emerald-400/10",
     };
   }
-  if (s === "reverted") {
+  if (s === SignalState.REVERTED) {
     return {
       label: "Sinal Revertido",
       desc: "A estimativa voltou à linha de base ou inverteu a direção. Reação passageira ou ruído inicial descartado.",
       color: "text-amber-300 border-amber-400/30 bg-amber-400/10",
     };
   }
-  if (s === "initial") {
+  if (s === SignalState.INITIAL) {
     return {
       label: "Sinal Inicial",
       desc: "A estimativa mudou na primeira janela pós-patch, sem confirmação temporal independente. Não anunciado como definitivo.",
@@ -497,10 +560,10 @@ export function resolveTemporalSignal(status, points) {
 /** Direção por Δ em logit (limiar ±PRACTICAL_DELTA canônico; nulo/não-finito = sem direção). */
 export function trendDirectionOf(view) {
   const delta = (view && (view.delta ?? view.delta_logit)) ?? null;
-  if (delta == null || !Number.isFinite(delta)) return { word: "sem direção", delta };
-  if (delta > PRACTICAL_DELTA) return { word: "subindo", delta };
-  if (delta < -PRACTICAL_DELTA) return { word: "caindo", delta };
-  return { word: "estável", delta };
+  if (delta == null || !Number.isFinite(delta)) return { word: TrendWord.SEM_DIRECAO, delta };
+  if (delta > PRACTICAL_DELTA) return { word: TrendWord.SUBINDO, delta };
+  if (delta < -PRACTICAL_DELTA) return { word: TrendWord.CAINDO, delta };
+  return { word: TrendWord.ESTAVEL, delta };
 }
 
 // ── meta/lane-timing.js ──
@@ -519,18 +582,16 @@ export function trendDirectionOf(view) {
 
 
 
-export const LANE_TIMING_VERSION = "lane-timing-v1";
-
 // Janelas mínimas p/ veredito (menos = sem-dado, nunca chute).
 export const LANE_TIMING_MIN_WINDOWS = 3;
 // Movimento mínimo entre janelas (mesmo conceito de relevância prática).
 export const LANE_TIMING_DELTA = PRACTICAL_DELTA;
 
 function moveOf(delta) {
-  if (delta == null || !Number.isFinite(delta)) return "estavel";
-  if (delta > LANE_TIMING_DELTA) return "sobe";
-  if (delta < -LANE_TIMING_DELTA) return "desce";
-  return "estavel";
+  if (delta == null || !Number.isFinite(delta)) return SegmentMove.ESTAVEL;
+  if (delta > LANE_TIMING_DELTA) return SegmentMove.SOBE;
+  if (delta < -LANE_TIMING_DELTA) return SegmentMove.DESCE;
+  return SegmentMove.ESTAVEL;
 }
 
 function cleanWindows(windows) {
@@ -553,25 +614,25 @@ function cleanWindows(windows) {
  * @param lane "exp"|"mid"|"roam"|"jungle"|"gold"|null (só rotulagem)
  * @returns { verdict, lane, n, peak: {time_min,time_max,win_rate}|null,
  *   segments: [{time_min,time_max,win_rate,move}], slopePerWindow: number|null,
- *   reasons[], version }
+ *   reasons[] }
  */
 export function laneTimingCurve(windows, lane = null) {
   const rows = cleanWindows(windows);
   const n = rows.length;
   const segments = rows.map((w, i) => ({
     ...w,
-    move: i === 0 ? "ref" : moveOf(w.win_rate - rows[i - 1].win_rate),
+    move: i === 0 ? SegmentMove.REF : moveOf(w.win_rate - rows[i - 1].win_rate),
   }));
   const peak =
     n > 0
       ? { ...rows.reduce((a, b) => (b.win_rate > a.win_rate ? b : a)) }
       : null;
-  const base = { lane, n, peak, segments, version: LANE_TIMING_VERSION };
+  const base = { lane, n, peak, segments };
 
   if (n < LANE_TIMING_MIN_WINDOWS) {
     return {
       ...base,
-      verdict: "sem-dado",
+      verdict: LaneTimingVerdict.SEM_DADO,
       slopePerWindow: null,
       reasons: [`janelas=${n}<${LANE_TIMING_MIN_WINDOWS}`, "serie-curta-sem-veredito"],
     };
@@ -604,13 +665,13 @@ export function laneTimingCurve(windows, lane = null) {
 
   // Piso próprio (3–6 janelas): voto majoritário dos movimentos + rampa ponta-a-ponta.
   const moves = segments.slice(1).map((s) => s.move);
-  const up = moves.filter((m) => m === "sobe").length;
-  const down = moves.filter((m) => m === "desce").length;
-  const flat = moves.filter((m) => m === "estavel").length;
+  const up = moves.filter((m) => m === SegmentMove.SOBE).length;
+  const down = moves.filter((m) => m === SegmentMove.DESCE).length;
+  const flat = moves.filter((m) => m === SegmentMove.ESTAVEL).length;
   const slopePerWindow = (rows[n - 1].win_rate - rows[0].win_rate) / Math.max(1, n - 1);
-  let verdict = "estavel";
-  if (up > down && up > 0) verdict = "subindo";
-  else if (down > up && down > 0) verdict = "caindo";
+  let verdict = LaneTimingVerdict.ESTAVEL;
+  if (up > down && up > 0) verdict = LaneTimingVerdict.SUBINDO;
+  else if (down > up && down > 0) verdict = LaneTimingVerdict.CAINDO;
   return {
     ...base,
     verdict,
@@ -637,9 +698,9 @@ export function laneTimingCurve(windows, lane = null) {
  * @param snaps [{coletado_em, janela, payload_hash, status}]
  */
 export function assessSeries(snaps = []) {
-  const base = { n_snapshots: 0, n_distintos: 0, span_dias: 0, nao_sobrepostos: false, lacunas: 0, status: "serie_curta", motivo: "sem snapshots verificados" };
+  const base = { n_snapshots: 0, n_distintos: 0, span_dias: 0, nao_sobrepostos: false, lacunas: 0, status: SeriesAssessmentStatus.SERIE_CURTA, motivo: "sem snapshots verificados" };
   const ver = (snaps ?? [])
-    .filter((s) => s && s.status !== "violado")
+    .filter((s) => s && s.status !== SnapshotStatus.VIOLADO)
     .map((s) => ({ ts: Number(s.coletado_em ?? s.ts), janela: Number(s.janela ?? 7) || 7, hash: String(s.payload_hash ?? s.hash ?? "") }))
     .filter((s) => Number.isFinite(s.ts) && s.ts > 0)
     .sort((a, b) => a.ts - b.ts);
@@ -648,14 +709,14 @@ export function assessSeries(snaps = []) {
   if (!n) return base;
   const span = (distintos[n - 1].ts - distintos[0].ts) / 86400e3;
   const head = { n_snapshots: ver.length, n_distintos: n, span_dias: +span.toFixed(2) };
-  if (n < 2) return { ...head, nao_sobrepostos: false, lacunas: 0, status: "serie_curta", motivo: "1 snapshot verificado — sem replicação (INV4-015)" };
-  if (span < 14) return { ...head, nao_sobrepostos: false, lacunas: 0, status: "serie_curta", motivo: `span ${head.span_dias}d < 14d (INV4-015)` };
+  if (n < 2) return { ...head, nao_sobrepostos: false, lacunas: 0, status: SeriesAssessmentStatus.SERIE_CURTA, motivo: "1 snapshot verificado — sem replicação (INV4-015)" };
+  if (span < 14) return { ...head, nao_sobrepostos: false, lacunas: 0, status: SeriesAssessmentStatus.SERIE_CURTA, motivo: `span ${head.span_dias}d < 14d (INV4-015)` };
   let nao = false, lac = 0;
   for (let j = 1; j < n; j++) {
     const gap = distintos[j].ts - distintos[j - 1].ts;
     if (gap >= distintos[j].janela * 86400e3) nao = true;
     if (gap > 2 * Math.max(distintos[j].janela, distintos[j - 1].janela) * 86400e3) lac++;
   }
-  if (!nao) return { ...head, nao_sobrepostos: false, lacunas: lac, status: "inconclusivo", motivo: "só janelas sobrepostas — sem replicação independente" };
-  return { ...head, nao_sobrepostos: true, lacunas: lac, status: "avaliavel", motivo: "≥2 verificados não-sobrepostos, span ≥14d" };
+  if (!nao) return { ...head, nao_sobrepostos: false, lacunas: lac, status: SeriesAssessmentStatus.INCONCLUSIVO, motivo: "só janelas sobrepostas — sem replicação independente" };
+  return { ...head, nao_sobrepostos: true, lacunas: lac, status: SeriesAssessmentStatus.AVALIAVEL, motivo: "≥2 verificados não-sobrepostos, span ≥14d" };
 }

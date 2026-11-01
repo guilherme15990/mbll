@@ -7,12 +7,10 @@
 // Custo: uma coleta do lote (mesmo cache da tela `/heroes`); o resto é cálculo em
 // memória. Falha do lote devolve 502 — sem WR não há número.
 //
-// A chave de cache carrega a VERSÃO do motor (`draft-score:<v>:<rank>:<days>`):
-// bumpar a métrica invalida automaticamente as entradas antigas (sem isso, uma
-// fórmula nova serviria o corpo velho por até 24 h — bug observado ao pivotar a
-// escala de "100·WR ancorado em 50" para "min–max do lote"). A tabela `cache` é
-// reconstruível, então sobra só a entrada órfã da versão anterior até o TTL.
-import { scoreHeroDraftScore, HERO_DRAFT_SCORE_VERSION } from "@radar/engine";
+// A chave de cache carrega o recorte (`draft-score:<rank>:<days>`). A tabela
+// `cache` é reconstruível; trocar a métrica exige limpar/invalidar as entradas
+// antigas manualmente (sem carimbo de versão no payload — ADR-063).
+import { scoreHeroDraftScore } from "@radar/engine";
 import { cacheGet, cacheSet } from "../infra/cacheStore.js";
 import { rankLot } from "../composition.js";
 import { createSingleFlight } from "./singleFlight.js";
@@ -22,7 +20,7 @@ const flights = createSingleFlight();
 const { fetchRankAll } = rankLot;
 
 export function heroDraftScoreBody(rank, days) {
-  const key = `draft-score:${HERO_DRAFT_SCORE_VERSION}:${rank}:${days}`;
+  const key = `draft-score:${rank}:${days}`;
   return flights.run(key, () => heroDraftScoreBodyImpl(key, rank, days));
 }
 

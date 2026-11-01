@@ -48,7 +48,7 @@ describe("GET /heroes — lote pontuado", () => {
     assert.equal(r.body.data[0].id, 1, "maior θ̂ primeiro (Alpha, win .56)");
     assert.deepEqual(r.body.exposure, { unit: "slot_share", status: "unvalidated" });
     assert.equal(r.body.pickSumCheck.ok, true, "INV-001: Σ pick ≈ 1");
-    assert.equal(typeof r.body.index_basis.method, "string");
+    assert.equal(r.body.index_basis.n, HEROES.length);
   });
 
   it("paginação no servidor: size/index refletem em data e total", async () => {
@@ -226,10 +226,9 @@ describe("GET /heroes/draft-score — Draft Score do herói (número único)", (
     const r = await call("/heroes/draft-score", { rank: "mythic", window: "7" });
     assert.equal(r.status, 200);
     envelope(r.body, [
-      "version", "rows", "meta", "rank", "days", "collectedAgoMs",
+      "rows", "meta", "rank", "days", "collectedAgoMs",
       "truncated", "stale", "ageMs",
     ], "/heroes/draft-score");
-    assert.equal(r.body.version, "hero-draft-score-v1");
     assert.equal(r.body.meta.calibrated, false);
     assert.equal(r.body.meta.n_heroes, HEROES.length);
     assert.equal(r.body.meta.with_data, HEROES.length);
@@ -268,7 +267,7 @@ describe("GET /builds/aggregate — visão de sistema", () => {
     const r = await call("/builds/aggregate", { lane: "mid", rank: "mythic", window: "7", top: "10" });
     assert.equal(r.status, 200);
     const expected = [
-      "version", "context", "coverage", "packages", "packages_provisional", "packages_total",
+      "context", "coverage", "packages", "packages_provisional", "packages_total",
       "packages_ok", "packages_provisional_count", "triples", "triples_total", "items",
       "items_total", "items_insufficient", "items_insufficient_count", "sets", "sets_total",
       "sets_counts", "sets_summary", "discovery_summary", "emblems", "emblems_insufficient",

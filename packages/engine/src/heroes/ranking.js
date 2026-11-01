@@ -3,6 +3,7 @@
 // Barrel público: src/index.js (nenhum nome público muda).
 
 import { PRACTICAL_DELTA } from "../core/thresholds.js";
+import { ClassificationStatus } from "../core/states.js";
 
 // ── hero/strength-index.js ──
 // hero/strength-index — vistas de θ̂ baseadas em POSTO. Puro, sem I/O, zero dependências.
@@ -12,14 +13,13 @@ import { PRACTICAL_DELTA } from "../core/thresholds.js";
 // exposição (pick/ban). Assim as vistas de θ̂ não podem divergir entre si:
 // θ̂_A > θ̂_B  ⇒  posto_A < posto_B  ⇒  pct_A > pct_B  ⇒  tier_A ≥ tier_B e índice_A > índice_B.
 // O índice é ordinal e relativo ao lote — não é chance de vitória (§7.1/§18).
-export const STRENGTH_INDEX_VERSION = "strength-index-v1";
 
 /**
  * Postos e índices relativos ao lote. Sem estado entre chamadas — reutilizável.
  * Valores não-finitos (null/NaN de heróis sem estimativa) recebem posto null e nunca
  * ganham posição numérica comum (V2 §5.3: ausência não vira posição mediana).
  */
-export class StrengthIndex {
+class StrengthIndex {
   /**
    * Posto médio 1-based, DECRESCENTE (1 = maior valor). Empates dividem o posto médio
    * (nunca zeram nem coroam um grupo empatado). O(n log n). Independe da ordem de entrada.
@@ -63,13 +63,13 @@ export class StrengthIndex {
 const defaultIndex = new StrengthIndex();
 
 /** Shims compatíveis — comportamento byte-idêntico ao anterior. */
-export function averageRanks(values) {
+function averageRanks(values) {
   return defaultIndex.averageRanks(values);
 }
-export function pctFromRank(avgRank, n) {
+function pctFromRank(avgRank, n) {
   return defaultIndex.pctFromRank(avgRank, n);
 }
-export function rankQuantiles(values) {
+function rankQuantiles(values) {
   return defaultIndex.rankQuantiles(values);
 }
 export function strengthIndexByRank(avgRank, n) {
@@ -82,41 +82,43 @@ export function strengthIndexByRank(avgRank, n) {
 // Spec V2 §7.2–§7.3: tier é ORDINAL e RELATIVO ao lote (fatia do ranking
 // 8%/17%/50%/17%/8%), nunca força absoluta nem confiança. Sem dados → "?", nunca Tier D.
 // `pct` vem de pctFromRank(). tier-v2: pct = (n − posto)/(n − 1).
-export const TIER_VERSION = "tier-v2";
+
+/** Tiers canônicos — "?" = sem dado (nunca Tier D). */
+export const Tier = Object.freeze({
+  S: "S",
+  A: "A",
+  B: "B",
+  C: "C",
+  D: "D",
+  UNKNOWN: "?",
+});
 
 /** Ordem crescente de força — útil p/ comparar tiers (índice; "?" não entra). */
-export const TIER_ORDER = Object.freeze(["D", "C", "B", "A", "S"]);
+export const TIER_ORDER = Object.freeze([Tier.D, Tier.C, Tier.B, Tier.A, Tier.S]);
 
 /**
  * Faixas de tier com cortes injetáveis (OCP: outro jogo/modo usa outros cortes
  * sem editar a regra; o padrão é o §7.2).
  */
-export class HeroTier {
+class HeroTier {
   #cuts;
-  #version;
 
   /**
    * @param {object} [opts]
    * @param {{S:number,A:number,B:number,C:number}} [opts.cuts] Limiares de pct.
-   * @param {string} [opts.version] Carimbo de versão (vai para `meta.tier_version`).
    */
-  constructor({ cuts = { S: 0.92, A: 0.75, B: 0.25, C: 0.08 }, version = TIER_VERSION } = {}) {
+  constructor({ cuts = { S: 0.92, A: 0.75, B: 0.25, C: 0.08 } } = {}) {
     this.#cuts = cuts;
-    this.#version = version;
-  }
-
-  get version() {
-    return this.#version;
   }
 
   /** Tier de um percentil — não-finito vira "?" (nunca rebaixa sem dado). */
   tierOf(pct) {
-    if (!Number.isFinite(pct)) return "?"; // antes: NaN/undefined caía em "D" (rebaixava sem dado)
-    if (pct >= this.#cuts.S) return "S";
-    if (pct >= this.#cuts.A) return "A";
-    if (pct >= this.#cuts.B) return "B";
-    if (pct >= this.#cuts.C) return "C";
-    return "D";
+    if (!Number.isFinite(pct)) return Tier.UNKNOWN; // antes: NaN/undefined caía em "D" (rebaixava sem dado)
+    if (pct >= this.#cuts.S) return Tier.S;
+    if (pct >= this.#cuts.A) return Tier.A;
+    if (pct >= this.#cuts.B) return Tier.B;
+    if (pct >= this.#cuts.C) return Tier.C;
+    return Tier.D;
   }
 }
 
@@ -159,7 +161,7 @@ export class LotRanking {
 
   /** Tier S/A/B/C/D (ou "?" em lote pequeno). */
   tier(i, smallSample) {
-    return smallSample ? "?" : tierOf(pctFromRank(this.#thetaRank[i], this.#n));
+    return smallSample ? Tier.UNKNOWN : tierOf(pctFromRank(this.#thetaRank[i], this.#n));
   }
 
   /** Índice 0–100 (100 = mais forte); null em lote pequeno (nunca número ao lado de "?"). */
@@ -199,7 +201,7 @@ const CONSISTENT_MIN_PICK = 0.01;
 /**
  * Agregados e seleções de lista. Sem estado — reutilizável.
  */
-export class HeroLists {
+class HeroLists {
   /** Desempate determinístico por id (numérico quando ambos são números; senão texto). */
   compareById(a, b) {
     const x = a && a.id;
@@ -313,7 +315,7 @@ const defaultLists = new HeroLists();
 const byId = (a, b) => defaultLists.compareById(a, b);
 
 /** Shims compatíveis — comportamento idêntico ao anterior. */
-export function compareById(a, b) {
+function compareById(a, b) {
   return byId(a, b);
 }
 export function medianOf(values) {
@@ -322,7 +324,7 @@ export function medianOf(values) {
 export function averageStrengthOf(heroes) {
   return defaultLists.averageStrengthOf(heroes);
 }
-export function averageStrengthOfDetailed(heroes) {
+function averageStrengthOfDetailed(heroes) {
   return defaultLists.averageStrengthOfDetailed(heroes);
 }
 export function medianPickOf(heroes) {
@@ -337,7 +339,7 @@ export function topBansByBan(heroes, n = 5) {
 export function topGemsByStrengthLowPick(heroes, avgStrength, medPick, n = 5) {
   return defaultLists.topGemsByStrengthLowPick(heroes, avgStrength, medPick, n);
 }
-export function selectLevelPopularityCandidates(heroes, n = 6) {
+function selectLevelPopularityCandidates(heroes, n = 6) {
   return defaultLists.selectLevelPopularityCandidates(heroes, n);
 }
 export function selectConsistentCandidates(heroes, n = 6) {
@@ -365,7 +367,7 @@ export function selectLaneTopHeroesDetailed(rows, lanesMap, lane, n = 3) {
 /**
  * Ordenação e posição relativa. Sem estado — reutilizável.
  */
-export class HeroSorting {
+class HeroSorting {
   /**
    * @param rows heróis
    * @param sort "wrAdj"|"strength_index"|"win"|"pick"|"ban"|"q"|"B" ("d" = alias de "wrAdj")
@@ -463,8 +465,8 @@ export function getRankProfileLabel(d, a, b) {
   const prob = d.prob_above ?? 0;
   // "classified" legado + "provisional_model_based" (V2 §8) — ambos descritivos do
   // ponto estimado; o caveat abaixo marca a proveniência proxy.
-  const usable = d.classification_status === "classified" || d.classification_status === "provisional_model_based";
-  const caveat = d.classification_status === "provisional_model_based" ? " Estimativa model-based (sem contagens validadas)." : "";
+  const usable = d.classification_status === ClassificationStatus.CLASSIFIED || d.classification_status === ClassificationStatus.PROVISIONAL_MODEL_BASED;
+  const caveat = d.classification_status === ClassificationStatus.PROVISIONAL_MODEL_BASED ? " Estimativa model-based (sem contagens validadas)." : "";
 
   if (!usable || D == null || !Number.isFinite(D)) {
     return {

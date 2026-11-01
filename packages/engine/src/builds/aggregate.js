@@ -5,6 +5,8 @@
 import { CONTRAST_EVIDENCE_RULE, CONTRAST_MIN, CONTRAST_SHRINK_K, contrastEstimates, valueFieldsOf } from "./contrast.js";
 import { MIN_LIFT_SIGNAL, POPULAR_PICK_MIN, PRACTICAL_DELTA, RARE_PICK_MAX } from "../core/thresholds.js";
 import { scoreRouteItemsets } from "./itemsets.js";
+import { BuildReferenceKind } from "./lift.js";
+import { DeltaStatus, ExposureStatus, ExposureUnit } from "../core/states.js";
 
 // ── builds/build-tags.js ──
 // Tags de build (PRD Build §10, Camada A) — FONTE ÚNICA.
@@ -15,7 +17,90 @@ import { scoreRouteItemsets } from "./itemsets.js";
 // O mapa tom→classes CSS (BUILD_TAG_CLASS) é presentacional e fica na web.
 // Cortes canônicos em ./thresholds.js (popular/raro/lift — mesmos das tags×quadrantes).
 
+// Structs dos estados possíveis (fonte única dos nomes canônicos; sem literal solto).
+export const BuildTagKey = Object.freeze({
+  POPULAR: "popular",
+  EMERGENTE: "emergente",
+  SITUACIONAL: "situacional",
+});
+export const BuildTagTone = Object.freeze({
+  POPULAR: "popular",
+  EDGE: "edge",
+  SITU: "situ",
+});
+const SupportStatus = Object.freeze({
+  OK: "ok",
+  INSUFFICIENT: "insufficient",
+});
+/** Modo de combinação dos mínimos de suporte (todos vs qualquer um). */
+const SupportMode = Object.freeze({
+  AND: "and",
+  OR: "or",
+});
 
+/** Tipo de agregado de build (o que a linha descreve). */
+const AggregateKind = Object.freeze({
+  PACKAGE: "package",
+  EMBLEM: "emblem",
+  ITEM: "item",
+});
+
+/** Estado da soma de pick (participação catalogada, não cobertura). */
+const PickSumStatus = Object.freeze({
+  CATALOGED_PARTICIPATION_NOT_COVERAGE: "cataloged_participation_not_coverage",
+});
+
+const CellStatus = Object.freeze({
+  OK: "ok",
+  EMPTY: "empty",
+  ERROR: "error",
+  STALE: "stale",
+});
+
+export const PatternScope = Object.freeze({
+  CROSS_HERO: "cross_hero",
+  TWO_HEROES: "two_heroes",
+  SINGLE_HERO: "single_hero",
+});
+export const DiscoveryStatus = Object.freeze({
+  PROVISIONAL: "provisional",
+  CONSOLIDATED: "consolidated",
+  EMERGING: "emerging",
+  LOCAL: "local",
+});
+export const WeightingSensitivity = Object.freeze({
+  STABLE: "stable",
+  LARGE_SHIFT: "large_shift",
+  SIGN_FLIP: "sign_flip",
+  UNKNOWN: "unknown",
+});
+
+/** Tipo de equipamento na fonte (nome cru normalizado). */
+const EquipmentType = Object.freeze({
+  ATTACK: "attack",
+  MAGIC: "magic",
+  DEFENSE: "defense",
+  ROAM: "roam",
+  JUNGLE: "jungle",
+  MOVEMENT: "movement",
+});
+
+/** Arquétipos de equipamento derivados de tipo + tips. */
+const EquipmentArchetype = Object.freeze({
+  PHYSICAL_ATTACK: "physical_attack",
+  MAGIC_ATTACK: "magic_attack",
+  PHYSICAL_DEFENSE: "physical_defense",
+  MAGIC_DEFENSE: "magic_defense",
+  HYBRID_DEFENSE: "hybrid_defense",
+  GENERIC_DEFENSE: "generic_defense",
+  ATTACK_UTILITY: "attack_utility",
+  MAGIC_UTILITY: "magic_utility",
+  ROAM: "roam",
+  JUNGLE: "jungle",
+  MOVEMENT: "movement",
+  UNCLASSIFIED: "unclassified",
+  MIXED: "mixed",
+});
 
 /**
  * @param b {{ pick: number|null, lift_vs_most_used?: number|null }}
@@ -28,24 +113,24 @@ export function getBuildTags(b) {
   const tags = [];
   if (pick >= POPULAR_PICK_MIN) {
     tags.push({
-      key: "popular",
-      label: "popular",
-      tone: "popular",
+      key: BuildTagKey.POPULAR,
+      label: BuildTagKey.POPULAR,
+      tone: BuildTagTone.POPULAR,
       title: "Frequente no meta (pick ≥ 5%). Frequência não é vantagem — ver lift.",
     });
   }
   if (pick < RARE_PICK_MAX && liftOk && l > MIN_LIFT_SIGNAL) {
     tags.push({
-      key: "emergente",
-      label: "emergente",
-      tone: "edge",
+      key: BuildTagKey.EMERGENTE,
+      label: BuildTagKey.EMERGENTE,
+      tone: BuildTagTone.EDGE,
       title: "Pouco usada com sinal favorável. Acompanhar em snapshots seguintes, sem validar precocemente.",
     });
   } else if (liftOk && l > PRACTICAL_DELTA) {
     tags.push({
-      key: "situacional",
-      label: "situacional",
-      tone: "situ",
+      key: BuildTagKey.SITUACIONAL,
+      label: BuildTagKey.SITUACIONAL,
+      tone: BuildTagTone.SITU,
       title: "Vantagem observada neste contexto de rota/rank. Não generalizar para qualquer partida.",
     });
   }
@@ -71,37 +156,36 @@ export function getBuildTags(b) {
 
 
 
-export const AGGREGATE_VERSION = "builds-aggregate-v5";
-export const PACKAGE_INSEPARABLE_MIN = 0.8;
-export const PACKAGE_MIN_BOTH = 3;
-export const PACKAGE_MIN_CONTEXTS = 3;
-export const PACKAGE_MIN_BUILDS = 5;
-export const ITEM_MIN_CONTEXTS = 3;
-export const ITEM_MIN_BUILDS = 5;
-export const SET_MIN_HEROES = 2;
-export const SET_MIN_BUILDS = 3;
-export const SET_MAX_PER_ARCHETYPE = 5;
-export const RUNE_MIN_BUILDS = 3;
-export const RUNE_MIN_CONTEXTS = 2;
-export const EMBLEM_MIN_CONTEXTS = 3;
-export const EMBLEM_MIN_BUILDS = 5;
-export const ITEMS_MAX_ROWS = 12;
-export const EMBLEMS_MAX_ROWS = 12;
-export const PACKAGES_MAX_ROWS = 10;
-export const RUNES_MAX_ROWS = 10;
-export const TALENTS_MAX_PER_TIER = 6;
+const PACKAGE_INSEPARABLE_MIN = 0.8;
+const PACKAGE_MIN_BOTH = 3;
+const PACKAGE_MIN_CONTEXTS = 3;
+const PACKAGE_MIN_BUILDS = 5;
+const ITEM_MIN_CONTEXTS = 3;
+const ITEM_MIN_BUILDS = 5;
+const SET_MIN_HEROES = 2;
+const SET_MIN_BUILDS = 3;
+const SET_MAX_PER_ARCHETYPE = 5;
+const RUNE_MIN_BUILDS = 3;
+const RUNE_MIN_CONTEXTS = 2;
+const EMBLEM_MIN_CONTEXTS = 3;
+const EMBLEM_MIN_BUILDS = 5;
+const ITEMS_MAX_ROWS = 12;
+const EMBLEMS_MAX_ROWS = 12;
+const PACKAGES_MAX_ROWS = 10;
+const RUNES_MAX_ROWS = 10;
+const TALENTS_MAX_PER_TIER = 6;
 // Combinador: índice aditivo de efeitos marginais observados. O valor de cada
 // componente é o delta em pp contra a build mais usada do herói, encolhido por
 // suporte (m/(m+k)). Não é previsão nem win rate da combinação (ADR-030).
-export const COMBINER_SHRINK_K = 3;
-export const COMBINER_BASE = 100;
-export const COMBINER_POINTS_PER_PP = 10;
-export const COMBINER_SLOTS = { items: 6, emblems: 1, talents: 3, spells: 1 };
-export const VARIANTS_MAX_CORES = 12;
+const COMBINER_SHRINK_K = 3;
+const COMBINER_BASE = 100;
+const COMBINER_POINTS_PER_PP = 10;
+const COMBINER_SLOTS = { items: 6, emblems: 1, talents: 3, spells: 1 };
+const VARIANTS_MAX_CORES = 12;
 export const PRACTICAL_DELTA_PP = 2;
 
 
-export const ARCHETYPE_LABELS = {
+const ARCHETYPE_LABELS = {
   physical_attack: "Ataque físico",
   magic_attack: "Ataque mágico",
   physical_defense: "Defesa física",
@@ -155,27 +239,27 @@ const PATTERN_LABELS = {
 };
 
 function patternScope(h) {
-  if (h >= 3) return "cross_hero";
-  if (h === 2) return "two_heroes";
-  return "single_hero";
+  if (h >= 3) return PatternScope.CROSS_HERO;
+  if (h === 2) return PatternScope.TWO_HEROES;
+  return PatternScope.SINGLE_HERO;
 }
 
 function discoveryStatus(support, h) {
-  if (support?.status !== "ok") return "provisional";
-  if (h >= 3) return "consolidated";
-  if (h === 2) return "emerging";
-  return "local";
+  if (support?.status !== SupportStatus.OK) return DiscoveryStatus.PROVISIONAL;
+  if (h >= 3) return DiscoveryStatus.CONSOLIDATED;
+  if (h === 2) return DiscoveryStatus.EMERGING;
+  return DiscoveryStatus.LOCAL;
 }
 
 function weightingSensitivity(weightedDelta, unweightedDelta) {
-  if (!Number.isFinite(weightedDelta) || !Number.isFinite(unweightedDelta)) return "unknown";
+  if (!Number.isFinite(weightedDelta) || !Number.isFinite(unweightedDelta)) return WeightingSensitivity.UNKNOWN;
   const w = Math.abs(weightedDelta);
   const u = Math.abs(unweightedDelta);
   if (Math.sign(weightedDelta) !== Math.sign(unweightedDelta) && w >= PRACTICAL_DELTA && u >= PRACTICAL_DELTA) {
-    return "sign_flip";
+    return WeightingSensitivity.SIGN_FLIP;
   }
-  if (Math.abs(weightedDelta - unweightedDelta) >= PRACTICAL_DELTA) return "large_shift";
-  return "stable";
+  if (Math.abs(weightedDelta - unweightedDelta) >= PRACTICAL_DELTA) return WeightingSensitivity.LARGE_SHIFT;
+  return WeightingSensitivity.STABLE;
 }
 
 
@@ -200,7 +284,7 @@ function unclassified(id, name = null, icon = null, type = null, tips = null, re
     icon,
     type,
     tips,
-    archetype: "unclassified",
+    archetype: EquipmentArchetype.UNCLASSIFIED,
     archetype_label: ARCHETYPE_LABELS.unclassified,
     reason,
   };
@@ -225,29 +309,29 @@ export function classifyEquipmentItem(raw) {
 
   const has = (...keys) => keys.some((k) => low.includes(k));
 
-  if (type === "attack") {
+  if (type === EquipmentType.ATTACK) {
     if (has("physical atk", "physical attack", "crit", "attack speed", "lifesteal", "penetration")) {
-      return { id, name, icon, type: typeRaw, tips, archetype: "physical_attack", archetype_label: ARCHETYPE_LABELS.physical_attack };
+      return { id, name, icon, type: typeRaw, tips, archetype: EquipmentArchetype.PHYSICAL_ATTACK, archetype_label: ARCHETYPE_LABELS.physical_attack };
     }
-    return { id, name, icon, type: typeRaw, tips, archetype: "attack_utility", archetype_label: ARCHETYPE_LABELS.attack_utility };
+    return { id, name, icon, type: typeRaw, tips, archetype: EquipmentArchetype.ATTACK_UTILITY, archetype_label: ARCHETYPE_LABELS.attack_utility };
   }
-  if (type === "magic") {
+  if (type === EquipmentType.MAGIC) {
     if (has("magic power", "magic pen", "magic lifesteal")) {
-      return { id, name, icon, type: typeRaw, tips, archetype: "magic_attack", archetype_label: ARCHETYPE_LABELS.magic_attack };
+      return { id, name, icon, type: typeRaw, tips, archetype: EquipmentArchetype.MAGIC_ATTACK, archetype_label: ARCHETYPE_LABELS.magic_attack };
     }
-    return { id, name, icon, type: typeRaw, tips, archetype: "magic_utility", archetype_label: ARCHETYPE_LABELS.magic_utility };
+    return { id, name, icon, type: typeRaw, tips, archetype: EquipmentArchetype.MAGIC_UTILITY, archetype_label: ARCHETYPE_LABELS.magic_utility };
   }
-  if (type === "defense") {
+  if (type === EquipmentType.DEFENSE) {
     const p = has("physical defense");
     const m = has("magic defense");
-    if (p && m) return { id, name, icon, type: typeRaw, tips, archetype: "hybrid_defense", archetype_label: ARCHETYPE_LABELS.hybrid_defense };
-    if (p) return { id, name, icon, type: typeRaw, tips, archetype: "physical_defense", archetype_label: ARCHETYPE_LABELS.physical_defense };
-    if (m) return { id, name, icon, type: typeRaw, tips, archetype: "magic_defense", archetype_label: ARCHETYPE_LABELS.magic_defense };
-    return { id, name, icon, type: typeRaw, tips, archetype: "generic_defense", archetype_label: ARCHETYPE_LABELS.generic_defense };
+    if (p && m) return { id, name, icon, type: typeRaw, tips, archetype: EquipmentArchetype.HYBRID_DEFENSE, archetype_label: ARCHETYPE_LABELS.hybrid_defense };
+    if (p) return { id, name, icon, type: typeRaw, tips, archetype: EquipmentArchetype.PHYSICAL_DEFENSE, archetype_label: ARCHETYPE_LABELS.physical_defense };
+    if (m) return { id, name, icon, type: typeRaw, tips, archetype: EquipmentArchetype.MAGIC_DEFENSE, archetype_label: ARCHETYPE_LABELS.magic_defense };
+    return { id, name, icon, type: typeRaw, tips, archetype: EquipmentArchetype.GENERIC_DEFENSE, archetype_label: ARCHETYPE_LABELS.generic_defense };
   }
-  if (type === "roam") return { id, name, icon, type: typeRaw, tips, archetype: "roam", archetype_label: ARCHETYPE_LABELS.roam };
-  if (type === "jungle") return { id, name, icon, type: typeRaw, tips, archetype: "jungle", archetype_label: ARCHETYPE_LABELS.jungle };
-  if (type === "movement") return { id, name, icon, type: typeRaw, tips, archetype: "movement", archetype_label: ARCHETYPE_LABELS.movement };
+  if (type === EquipmentType.ROAM) return { id, name, icon, type: typeRaw, tips, archetype: EquipmentArchetype.ROAM, archetype_label: ARCHETYPE_LABELS.roam };
+  if (type === EquipmentType.JUNGLE) return { id, name, icon, type: typeRaw, tips, archetype: EquipmentArchetype.JUNGLE, archetype_label: ARCHETYPE_LABELS.jungle };
+  if (type === EquipmentType.MOVEMENT) return { id, name, icon, type: typeRaw, tips, archetype: EquipmentArchetype.MOVEMENT, archetype_label: ARCHETYPE_LABELS.movement };
 
   return unclassified(id, name, icon, typeRaw || null, tips, "tipo sem arquétipo");
 }
@@ -309,7 +393,7 @@ function itemOf(id, equipment) {
     icon: null,
     type: null,
     tips: null,
-    archetype: "unclassified",
+    archetype: EquipmentArchetype.UNCLASSIFIED,
     archetype_label: ARCHETYPE_LABELS.unclassified,
   };
 }
@@ -319,17 +403,17 @@ function itemsOf(ids, equipment) {
 }
 
 /** Maioria dos arquétipos; empate = `mixed`. */
-export function archetypeOfItems(ids, equipment) {
+function archetypeOfItems(ids, equipment) {
   const counts = {};
   for (const id of ids ?? []) {
-    const a = equipment?.[id]?.archetype ?? "unclassified";
+    const a = equipment?.[id]?.archetype ?? EquipmentArchetype.UNCLASSIFIED;
     counts[a] = (counts[a] ?? 0) + 1;
   }
   const entries = Object.entries(counts);
-  if (!entries.length) return "unclassified";
+  if (!entries.length) return EquipmentArchetype.UNCLASSIFIED;
   const max = Math.max(...entries.map(([, n]) => n));
   const winners = entries.filter(([, n]) => n === max).map(([a]) => a);
-  return winners.length === 1 ? winners[0] : "mixed";
+  return winners.length === 1 ? winners[0] : EquipmentArchetype.MIXED;
 }
 
 /** Converte um build cru da Academy no registro interno. */
@@ -416,7 +500,7 @@ export function parseBuild(raw, hero, catalogs = {}, context = {}) {
   };
 }
 
-export function parseRawBuilds(rawBuilds, hero, catalogs, context) {
+function parseRawBuilds(rawBuilds, hero, catalogs, context) {
   const rows = [];
   for (const raw of rawBuilds ?? []) {
     const builds = Array.isArray(raw?.build) ? raw.build : [raw];
@@ -494,12 +578,12 @@ function contextMetric(contexts, predicate) {
   };
 }
 
-function supportStatus(k, m, h, minContexts, minBuilds, mode = "and") {
-  const ok = mode === "or"
+function supportStatus(k, m, h, minContexts, minBuilds, mode = SupportMode.AND) {
+  const ok = mode === SupportMode.OR
     ? (k >= minContexts || m >= minBuilds)
     : (k >= minContexts && m >= minBuilds);
   return {
-    status: ok ? "ok" : "insufficient",
+    status: ok ? SupportStatus.OK : SupportStatus.INSUFFICIENT,
     k,
     m,
     h,
@@ -509,13 +593,13 @@ function supportStatus(k, m, h, minContexts, minBuilds, mode = "and") {
 }
 
 function deltaStatus(deltaFrac, support) {
-  if (support?.status !== "ok" || !Number.isFinite(deltaFrac)) return "insufficient";
-  if (Math.abs(deltaFrac) < PRACTICAL_DELTA) return "no_practical_difference";
-  return deltaFrac > 0 ? "positive" : "negative";
+  if (support?.status !== SupportStatus.OK || !Number.isFinite(deltaFrac)) return DeltaStatus.INSUFFICIENT;
+  if (Math.abs(deltaFrac) < PRACTICAL_DELTA) return DeltaStatus.NO_PRACTICAL_DIFFERENCE;
+  return deltaFrac > 0 ? DeltaStatus.POSITIVE : DeltaStatus.NEGATIVE;
 }
 
 function withMetricsRow(base, metric, support) {
-  const ok = support.status === "ok";
+  const ok = support.status === SupportStatus.OK;
   return {
     ...base,
     contexts: metric.k,
@@ -527,7 +611,7 @@ function withMetricsRow(base, metric, support) {
     win_median: ok ? metric.win_median : null,
     share_positive: ok ? metric.share_positive : null,
     delta_status: deltaStatus(metric.delta_frac_median, support),
-    weighting_sensitivity: ok ? metric.weighting_sensitivity : "unknown",
+    weighting_sensitivity: ok ? metric.weighting_sensitivity : WeightingSensitivity.UNKNOWN,
     support,
   };
 }
@@ -591,11 +675,11 @@ export function detectPackages(contexts, equipment) {
     const set = new Set(ids);
     if (packages.some((p) => [...p.item_ids].every((id) => set.has(id)))) continue;
     const metric = contextMetric(contexts, (b) => ids.every((id) => b.item_set?.has(id)));
-    const support = supportStatus(metric.k, metric.m, metric.h, PACKAGE_MIN_CONTEXTS, PACKAGE_MIN_BUILDS, "and");
+    const support = supportStatus(metric.k, metric.m, metric.h, PACKAGE_MIN_CONTEXTS, PACKAGE_MIN_BUILDS, SupportMode.AND);
     const archetype = archetypeOfItems(ids, equipment);
     const scope = patternScope(metric.h);
     packages.push(withMetricsRow({
-      kind: "package",
+      kind: AggregateKind.PACKAGE,
       package_id: `pkg:${ids.join("+")}`,
       item_ids: ids,
       package_size: ids.length,
@@ -605,7 +689,7 @@ export function detectPackages(contexts, equipment) {
       archetype_label: ARCHETYPE_LABELS[archetype] ?? archetype,
       // `inseparable` só é afirmado quando há suporte de ranking; a coocorrência
       // observada continua registrada em `inseparable_observed`.
-      inseparable: support.status === "ok",
+      inseparable: support.status === SupportStatus.OK,
       inseparable_observed: true,
       pattern_scope: scope,
       pattern_label: PATTERN_LABELS[scope],
@@ -613,7 +697,7 @@ export function detectPackages(contexts, equipment) {
       cooccurrence: {
         p_both_min: PACKAGE_INSEPARABLE_MIN,
         n_both_min: PACKAGE_MIN_BOTH,
-        support_min: { contexts: PACKAGE_MIN_CONTEXTS, builds: PACKAGE_MIN_BUILDS, mode: "and" },
+        support_min: { contexts: PACKAGE_MIN_CONTEXTS, builds: PACKAGE_MIN_BUILDS, mode: SupportMode.AND },
       },
       total_builds: totalBuilds,
     }, metric, support));
@@ -645,7 +729,7 @@ function setsFromContexts(contexts, equipment) {
 
   for (const b of builds) {
     // Botas (Movement) nunca entram nos quatro arquétipos.
-    const ids = (b.item_ids ?? []).filter((id) => equipment?.[id]?.archetype !== "movement");
+    const ids = (b.item_ids ?? []).filter((id) => equipment?.[id]?.archetype !== EquipmentArchetype.MOVEMENT);
     if (ids.length < 2) continue;
     for (const size of [2, 3]) {
       for (const combo of combinations(ids, size)) {
@@ -658,8 +742,8 @@ function setsFromContexts(contexts, equipment) {
   const rows = [];
   for (const ids of candidates.values()) {
     const metric = contextMetric(contexts, (b) => ids.every((id) => b.item_set?.has(id)));
-    const support = supportStatus(metric.k, metric.m, metric.h, SET_MIN_HEROES, SET_MIN_BUILDS, "or");
-    if (support.status !== "ok") continue;
+    const support = supportStatus(metric.k, metric.m, metric.h, SET_MIN_HEROES, SET_MIN_BUILDS, SupportMode.OR);
+    if (support.status !== SupportStatus.OK) continue;
     const archetype = archetypeOfItems(ids, equipment);
     const scope = patternScope(metric.h);
     rows.push({
@@ -700,13 +784,13 @@ function setsFromContexts(contexts, equipment) {
   for (const row of rows) counts[row.archetype] = (counts[row.archetype] ?? 0) + 1;
   const summary = {
     total: rows.length,
-    consolidated: rows.filter((r) => r.discovery_status === "consolidated").length,
-    emerging: rows.filter((r) => r.discovery_status === "emerging").length,
-    local: rows.filter((r) => r.discovery_status === "local").length,
+    consolidated: rows.filter((r) => r.discovery_status === DiscoveryStatus.CONSOLIDATED).length,
+    emerging: rows.filter((r) => r.discovery_status === DiscoveryStatus.EMERGING).length,
+    local: rows.filter((r) => r.discovery_status === DiscoveryStatus.LOCAL).length,
     by_scope: {
-      cross_hero: rows.filter((r) => r.pattern_scope === "cross_hero").length,
-      two_heroes: rows.filter((r) => r.pattern_scope === "two_heroes").length,
-      single_hero: rows.filter((r) => r.pattern_scope === "single_hero").length,
+      cross_hero: rows.filter((r) => r.pattern_scope === PatternScope.CROSS_HERO).length,
+      two_heroes: rows.filter((r) => r.pattern_scope === PatternScope.TWO_HEROES).length,
+      single_hero: rows.filter((r) => r.pattern_scope === PatternScope.SINGLE_HERO).length,
     },
   };
 
@@ -754,11 +838,11 @@ function triplesFromContexts(contexts, equipment) {
       win_min: row.winMin,
       win_max: row.winMax,
       delta_wr_pp_max: toPp(row.maxLiftMost),
-      delta_status: deltaStatus(row.maxLiftMost, { status: "ok" }),
+      delta_status: deltaStatus(row.maxLiftMost, { status: SupportStatus.OK }),
       emergent: row.emergent,
       pattern_scope: scope,
       pattern_label: PATTERN_LABELS[scope],
-      discovery_status: discoveryStatus({ status: "ok" }, row.k),
+      discovery_status: discoveryStatus({ status: SupportStatus.OK }, row.k),
       label: `Trinca · ${row.itemIds.length} itens`,
       caveat: "coocorrência intra-build; não é taxa de vitória causal",
     };
@@ -783,10 +867,10 @@ function emblemRowsFromContexts(contexts) {
   const insufficient = [];
   for (const [id, emblem] of byId) {
     const metric = contextMetric(contexts, (b) => b.emblem?.id === id);
-    const support = supportStatus(metric.k, metric.m, metric.h, EMBLEM_MIN_CONTEXTS, EMBLEM_MIN_BUILDS, "and");
+    const support = supportStatus(metric.k, metric.m, metric.h, EMBLEM_MIN_CONTEXTS, EMBLEM_MIN_BUILDS, SupportMode.AND);
     const scope = patternScope(metric.h);
     const row = {
-      kind: "emblem",
+      kind: AggregateKind.EMBLEM,
       emblem_id: id,
       name: emblem.name ?? null,
       icon: emblem.icon ?? null,
@@ -797,7 +881,7 @@ function emblemRowsFromContexts(contexts) {
       discovery_status: discoveryStatus(support, metric.h),
       ...withMetricsRow({ total_builds: totalBuilds }, metric, support),
     };
-    if (support.status === "ok") rows.push(row);
+    if (support.status === SupportStatus.OK) rows.push(row);
     else insufficient.push({
       emblem_id: id,
       name: row.name,
@@ -834,8 +918,8 @@ function runePagesFromContexts(contexts, emblemNameById) {
   let insufficient = 0;
   for (const [key, rep] of pages) {
     const metric = contextMetric(contexts, (b) => runePageKey(b) === key);
-    const support = supportStatus(metric.k, metric.m, metric.h, RUNE_MIN_CONTEXTS, RUNE_MIN_BUILDS, "and");
-    if (support.status !== "ok") {
+    const support = supportStatus(metric.k, metric.m, metric.h, RUNE_MIN_CONTEXTS, RUNE_MIN_BUILDS, SupportMode.AND);
+    if (support.status !== SupportStatus.OK) {
       insufficient++;
       continue;
     }
@@ -891,8 +975,8 @@ function talentRows(contexts, emblems) {
   const rows = [];
   for (const id of ids) {
     const metric = contextMetric(contexts, (b) => (b.talents ?? []).some((t) => t.id === id));
-    const support = supportStatus(metric.k, metric.m, metric.h, RUNE_MIN_CONTEXTS, RUNE_MIN_BUILDS, "and");
-    if (support.status !== "ok") continue;
+    const support = supportStatus(metric.k, metric.m, metric.h, RUNE_MIN_CONTEXTS, RUNE_MIN_BUILDS, SupportMode.AND);
+    if (support.status !== SupportStatus.OK) continue;
     const meta = emblems[id];
     const scope = patternScope(metric.h);
     rows.push({
@@ -950,8 +1034,8 @@ function spellRows(contexts) {
   const rows = [];
   for (const [key, spell] of names) {
     const metric = contextMetric(contexts, (b) => normalizeName(b.spell?.name) === key);
-    const support = supportStatus(metric.k, metric.m, metric.h, RUNE_MIN_CONTEXTS, RUNE_MIN_BUILDS, "and");
-    if (support.status !== "ok") continue;
+    const support = supportStatus(metric.k, metric.m, metric.h, RUNE_MIN_CONTEXTS, RUNE_MIN_BUILDS, SupportMode.AND);
+    if (support.status !== SupportStatus.OK) continue;
     const scope = patternScope(metric.h);
     rows.push({
       name: spell?.name ?? null,
@@ -983,10 +1067,10 @@ function spellRows(contexts) {
  */
 function componentEffect(contexts, predicate, totalBuilds, minContexts, minBuilds) {
   const metric = contextMetric(contexts, predicate);
-  const support = supportStatus(metric.k, metric.m, metric.h, minContexts, minBuilds, "and");
+  const support = supportStatus(metric.k, metric.m, metric.h, minContexts, minBuilds, SupportMode.AND);
   const delta = toPp(metric.delta_frac_median);
   const shrink = metric.m > 0 ? metric.m / (metric.m + COMBINER_SHRINK_K) : 0;
-  const ok = support.status === "ok";
+  const ok = support.status === SupportStatus.OK;
   return {
     contexts: metric.k,
     builds: metric.m,
@@ -1147,10 +1231,10 @@ function variantsFromContexts(contexts, equipment) {
     const variants = builds.map((b) => {
       const delta = Number.isFinite(b.win) && Number.isFinite(modal.win) ? round4(b.win - modal.win) : null;
       const status = delta == null
-        ? "insufficient"
+        ? DeltaStatus.INSUFFICIENT
         : Math.abs(delta) < PRACTICAL_DELTA
-          ? "no_practical_difference"
-          : delta > 0 ? "positive" : "negative";
+          ? DeltaStatus.NO_PRACTICAL_DIFFERENCE
+          : delta > 0 ? DeltaStatus.POSITIVE : DeltaStatus.NEGATIVE;
       return {
         variant_key: b.variant_key,
         order: b.order,
@@ -1190,10 +1274,10 @@ function variantsFromContexts(contexts, equipment) {
       variant_count: variants.length,
       order_only: orderOnly,
       total_pick: totalPickRounded,
-      pattern_scope: "single_hero",
+      pattern_scope: PatternScope.SINGLE_HERO,
       pattern_label: PATTERN_LABELS.single_hero,
-      discovery_status: "local",
-      support: { status: "ok", k: 1, m: builds.length, h: 1, min: { contexts: 1, builds: 1, mode: "and" } },
+      discovery_status: DiscoveryStatus.LOCAL,
+      support: { status: SupportStatus.OK, k: 1, m: builds.length, h: 1, min: { contexts: 1, builds: 1, mode: SupportMode.AND } },
     });
   }
 
@@ -1230,7 +1314,7 @@ function topBuildsFromContexts(contexts, equipment, emblemStrengthById = new Map
         delta_wr_pp_vs_most_used: toPp(deltaMost),
         delta_wr_pp_vs_mean: toPp(deltaMean),
         reference_win: refMost,
-        reference_kind: "mais-usada",
+        reference_kind: BuildReferenceKind.MAIS_USADA,
         references: { most_used_win: refMost, hero_mean_win: refMean },
         hero_strength: heroStrength,
         build_strength: buildStrength,
@@ -1259,7 +1343,7 @@ function topBuildsFromContexts(contexts, equipment, emblemStrengthById = new Map
         pick: ctx.hero?.pick ?? null,
         ban: ctx.hero?.ban ?? null,
       },
-      cell_status: ctx.status ?? (builds.length ? "ok" : "empty"),
+      cell_status: ctx.status ?? (builds.length ? CellStatus.OK : CellStatus.EMPTY),
       error: ctx.error ?? null,
       stale: !!ctx.stale,
       age_ms: ctx.ageMs ?? null,
@@ -1295,7 +1379,7 @@ export function buildAggregate(input) {
       hero,
       builds,
       refs,
-      status: ctx.status ?? (builds.length ? "ok" : "empty"),
+      status: ctx.status ?? (builds.length ? CellStatus.OK : CellStatus.EMPTY),
       error: ctx.error ?? null,
       stale: !!ctx.stale,
       ageMs: ctx.ageMs ?? null,
@@ -1305,13 +1389,13 @@ export function buildAggregate(input) {
   const cells = parsedContexts.map((ctx) => ({
     hero_id: ctx.hero?.id ?? null,
     hero_name: ctx.hero?.name ?? null,
-    status: ctx.status === "error"
-      ? "error"
+    status: ctx.status === CellStatus.ERROR
+      ? CellStatus.ERROR
       : ctx.stale
-        ? "stale"
+        ? CellStatus.STALE
         : ctx.builds.length
-          ? "ok"
-          : "empty",
+          ? CellStatus.OK
+          : CellStatus.EMPTY,
     builds: ctx.builds.length,
     reason: ctx.error ?? (ctx.builds.length ? null : "sem builds catalogadas nesta lane"),
     stale: !!ctx.stale,
@@ -1323,8 +1407,8 @@ export function buildAggregate(input) {
   const pickSum = round4(allBuilds.reduce((s, b) => s + (Number.isFinite(b.pick) ? b.pick : 0), 0));
 
   const packagesRaw = detectPackages(parsedContexts, equipment);
-  const packagesSupported = packagesRaw.filter((p) => p.support.status === "ok");
-  const packagesProvisional = packagesRaw.filter((p) => p.support.status !== "ok");
+  const packagesSupported = packagesRaw.filter((p) => p.support.status === SupportStatus.OK);
+  const packagesProvisional = packagesRaw.filter((p) => p.support.status !== SupportStatus.OK);
   // Itens de QUALQUER pacote observado não são ranqueados sozinhos — inclusive
   // os provisórios, pois a coocorrência já foi observada.
   const packageIds = new Set(packagesRaw.flatMap((p) => p.item_ids));
@@ -1338,11 +1422,11 @@ export function buildAggregate(input) {
   for (const id of itemIds) {
     if (packageIds.has(id)) continue;
     const metric = contextMetric(parsedContexts, (b) => b.item_set?.has(id));
-    const support = supportStatus(metric.k, metric.m, metric.h, ITEM_MIN_CONTEXTS, ITEM_MIN_BUILDS, "and");
+    const support = supportStatus(metric.k, metric.m, metric.h, ITEM_MIN_CONTEXTS, ITEM_MIN_BUILDS, SupportMode.AND);
     const item = itemOf(id, equipment);
     const scope = patternScope(metric.h);
     const row = {
-      kind: "item",
+      kind: AggregateKind.ITEM,
       item_id: id,
       name: item.name,
       icon: item.icon,
@@ -1356,7 +1440,7 @@ export function buildAggregate(input) {
       discovery_status: discoveryStatus(support, metric.h),
       ...withMetricsRow({ total_builds: totalBuilds }, metric, support),
     };
-    if (support.status === "ok") itemRows.push(row);
+    if (support.status === SupportStatus.OK) itemRows.push(row);
     else insufficientItems.push({
       item_id: id,
       name: item.name,
@@ -1399,10 +1483,10 @@ export function buildAggregate(input) {
 
   const countByStatus = (rows) => ({
     total: rows.length,
-    consolidated: rows.filter((r) => r.discovery_status === "consolidated").length,
-    emerging: rows.filter((r) => r.discovery_status === "emerging").length,
-    local: rows.filter((r) => r.discovery_status === "local").length,
-    provisional: rows.filter((r) => r.discovery_status === "provisional").length,
+    consolidated: rows.filter((r) => r.discovery_status === DiscoveryStatus.CONSOLIDATED).length,
+    emerging: rows.filter((r) => r.discovery_status === DiscoveryStatus.EMERGING).length,
+    local: rows.filter((r) => r.discovery_status === DiscoveryStatus.LOCAL).length,
+    provisional: rows.filter((r) => r.discovery_status === DiscoveryStatus.PROVISIONAL).length,
   });
   const discoverySummary = {
     triples: countByStatus(triples),
@@ -1425,16 +1509,15 @@ export function buildAggregate(input) {
   ];
   const weightingSensitivityCounts = { stable: 0, large_shift: 0, sign_flip: 0, unknown: 0 };
   for (const row of sensitivityRows) {
-    const key = row.weighting_sensitivity ?? "unknown";
+    const key = row.weighting_sensitivity ?? WeightingSensitivity.UNKNOWN;
     weightingSensitivityCounts[key] = (weightingSensitivityCounts[key] ?? 0) + 1;
   }
 
   const itemsCataloged = Object.keys(equipment ?? {}).length;
-  const itemsUnclassified = Object.values(equipment ?? {}).filter((i) => i?.archetype === "unclassified").length;
-  const partial = cells.some((c) => c.status === "error");
+  const itemsUnclassified = Object.values(equipment ?? {}).filter((i) => i?.archetype === EquipmentArchetype.UNCLASSIFIED).length;
+  const partial = cells.some((c) => c.status === CellStatus.ERROR);
 
   return {
-    version: AGGREGATE_VERSION,
     context: {
       rank,
       lane,
@@ -1459,13 +1542,13 @@ export function buildAggregate(input) {
       items_unclassified: coverage.items_unclassified ?? itemsUnclassified,
       pick_sum: pickSum,
       pick_sum_per_hero: round4(pickSum / Math.max(1, parsedContexts.filter((c) => c.builds.length).length)),
-      pick_sum_status: "cataloged_participation_not_coverage",
+      pick_sum_status: PickSumStatus.CATALOGED_PARTICIPATION_NOT_COVERAGE,
       weighting_sensitivity_counts: weightingSensitivityCounts,
-      cells_error: cells.filter((c) => c.status === "error").length,
-      cells_empty: cells.filter((c) => c.status === "empty").length,
+      cells_error: cells.filter((c) => c.status === CellStatus.ERROR).length,
+      cells_empty: cells.filter((c) => c.status === CellStatus.EMPTY).length,
       partial,
-      unit: "slot_share",
-      exposure_status: "unvalidated",
+      unit: ExposureUnit.SLOT_SHARE,
+      exposure_status: ExposureStatus.UNVALIDATED,
     },
     packages: packagesSupported.slice(0, PACKAGES_MAX_ROWS),
     packages_provisional: packagesProvisional.slice(0, PACKAGES_MAX_ROWS),
@@ -1503,10 +1586,10 @@ export function buildAggregate(input) {
       lift_semantics: "reserved_for_ratio_metric_only",
       pick_weighting: "hypothesis_not_validated",
       support: {
-        item: { contexts: ITEM_MIN_CONTEXTS, builds: ITEM_MIN_BUILDS, mode: "and" },
-        emblem: { contexts: EMBLEM_MIN_CONTEXTS, builds: EMBLEM_MIN_BUILDS, mode: "and" },
-        package: { contexts: PACKAGE_MIN_CONTEXTS, builds: PACKAGE_MIN_BUILDS, mode: "and" },
-        set: { contexts: SET_MIN_HEROES, builds: SET_MIN_BUILDS, mode: "or" },
+        item: { contexts: ITEM_MIN_CONTEXTS, builds: ITEM_MIN_BUILDS, mode: SupportMode.AND },
+        emblem: { contexts: EMBLEM_MIN_CONTEXTS, builds: EMBLEM_MIN_BUILDS, mode: SupportMode.AND },
+        package: { contexts: PACKAGE_MIN_CONTEXTS, builds: PACKAGE_MIN_BUILDS, mode: SupportMode.AND },
+        set: { contexts: SET_MIN_HEROES, builds: SET_MIN_BUILDS, mode: SupportMode.OR },
       },
       pattern_scope: {
         cross_hero: "h >= 3",

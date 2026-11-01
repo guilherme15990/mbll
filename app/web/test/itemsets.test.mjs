@@ -2,7 +2,6 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { getBuildTags } from "../src/shared/domain/buildLabel.ts";
 import {
-  ITEMSET_SCORE_VERSION,
   scoreAtomicItemset,
   scoreRouteItemsets,
 } from "../src/shared/domain/itemsets.ts";
@@ -43,11 +42,7 @@ const ctx = (heroId, builds, refMost, refMean, lane = "gold") => ({
   lane,
 });
 
-describe("itemset-score-v1 (fórmula versionada)", () => {
-  it("versão da fórmula citada em toda exibição", () => {
-    assert.equal(ITEMSET_SCORE_VERSION, "itemset-score-v1");
-  });
-
+describe("itemset-score (fórmula)", () => {
   it("getBuildTags: popular/emergente/situacional + silêncio no inconclusivo", () => {
     assert.deepEqual(
       getBuildTags({ pick: 0.008, lift_vs_most_used: 0.05 }).map((t) => t.key),
@@ -81,7 +76,6 @@ describe("itemset-score-v1 (fórmula versionada)", () => {
     assert.ok(Math.abs(s.liftMost - 0.05) < 1e-9);
     assert.equal(s.ajustado, null);
     assert.equal(s.causal, null);
-    assert.equal(s.formula, "itemset-score-v1");
   });
 
   it("B_u == 0 vira sem_suporte (nunca 0 inventado)", () => {

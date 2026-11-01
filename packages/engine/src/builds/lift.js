@@ -2,6 +2,27 @@
 // Consolidado (ADR-061): reúne builds/build-lift.js, builds/build-adjusted.js, builds/builds-ordering.js.
 // Barrel público: src/index.js (nenhum nome público muda).
 
+import { CausalStatus, ClassificationStatus, ExposureStatus } from "../core/states.js";
+
+/** Estado de suporte de um atributo contrastado. */
+const BuildSupport = Object.freeze({
+  OK: "ok",
+  FINO: "fino",
+  SEM_CONTRASTE: "sem-contraste",
+  SEM_PESO: "sem-peso",
+});
+
+/** Unidade declarada do lift (nunca inferida). */
+const BuildUnit = Object.freeze({
+  FRACTION_0_1: "fraction_0_1",
+  UNKNOWN: "unknown",
+});
+
+/** Referência do lift de build (PRD build §4). */
+export const BuildReferenceKind = Object.freeze({
+  MAIS_USADA: "mais-usada",
+});
+
 
 // ── builds/build-lift.js ──
 // builds/build-lift — lift bruto de build Camada A (corpo idêntico ao ex-engine,
@@ -10,15 +31,15 @@
 // Puro, sem I/O, zero dependências.
 /** BDL: L(b,h,c)=WR(b,h,c)−WR_ref(h,c) (PRD build §4). 3 referências (mais usada, média do herói, comparável→mesma que mais usada sem covariável).
  * Camada A (bruto) entregável; B ajustado e C causal = NULL sem dados por partida (D-BLD-01..08). */
-export function buildLift({ win, refWin, hasSupport = true, refKind = "mais-usada" } = {}) {
+export function buildLift({ win, refWin, hasSupport = true, refKind = BuildReferenceKind.MAIS_USADA } = {}) {
   if (!hasSupport || ![win, refWin].every(Number.isFinite)) {
-    return { lift_raw: null, lift_adjusted: null, adjusted_association: null, causal_build_lift: null, reference_kind: refKind, uncertainty_method: null, causal_status: "nao-avaliado", exposure_status: "unvalidated", classification_status: "inconclusive" };
+    return { lift_raw: null, lift_adjusted: null, adjusted_association: null, causal_build_lift: null, reference_kind: refKind, uncertainty_method: null, causal_status: CausalStatus.NAO_AVALIADO, exposure_status: ExposureStatus.UNVALIDATED, classification_status: ClassificationStatus.INCONCLUSIVE };
   }
   // V2 §5.2/EC-012: fora de [0,1] (ex: 53) = unidade inválida → null + inconclusive, nunca lift espúrio.
   if (win < 0 || win > 1 || refWin < 0 || refWin > 1) {
-    return { lift_raw: null, lift_adjusted: null, adjusted_association: null, causal_build_lift: null, reference_kind: refKind, unit: "unknown", reference_semantics_validated: false, sample_size_available: false, uncertainty_method: null, causal_status: "nao-avaliado", exposure_status: "unvalidated", classification_status: "inconclusive" };
+    return { lift_raw: null, lift_adjusted: null, adjusted_association: null, causal_build_lift: null, reference_kind: refKind, unit: BuildUnit.UNKNOWN, reference_semantics_validated: false, sample_size_available: false, uncertainty_method: null, causal_status: CausalStatus.NAO_AVALIADO, exposure_status: ExposureStatus.UNVALIDATED, classification_status: ClassificationStatus.INCONCLUSIVE };
   }
-  return { lift_raw: +(win - refWin).toFixed(4), lift_adjusted: null, adjusted_association: null, causal_build_lift: null, reference_kind: refKind, unit: "fraction_0_1", reference_semantics_validated: false, sample_size_available: false, uncertainty_method: null, causal_status: "nao-avaliado", exposure_status: "unvalidated", classification_status: "provisional" };
+  return { lift_raw: +(win - refWin).toFixed(4), lift_adjusted: null, adjusted_association: null, causal_build_lift: null, reference_kind: refKind, unit: BuildUnit.FRACTION_0_1, reference_semantics_validated: false, sample_size_available: false, uncertainty_method: null, causal_status: CausalStatus.NAO_AVALIADO, exposure_status: ExposureStatus.UNVALIDATED, classification_status: ClassificationStatus.PROVISIONAL };
 }
 /** Referências de build: mais usada (max pick), média do herói, e rótulo de suporte. */
 export function buildReferences(builds = []) {
@@ -39,9 +60,8 @@ export function buildReferences(builds = []) {
 // não aleatórias (viés de seleção declarado em `warnings`).
 // Pura, sem I/O, zero dependências.
 
-export const BUILD_ADJUSTED_VERSION = "build-adjusted-v1";
 // K do encolhimento (fixo, documentado): lift × w/(w+K), w = contagem harmônica.
-export const BUILD_ADJUST_K = 1;
+const BUILD_ADJUST_K = 1;
 
 /**
  * @param builds [{win, pick, ...}] do MESMO herói+lane
@@ -66,7 +86,7 @@ export function adjustedLiftByAttr(builds, getAttrs) {
   for (const [attr, g] of attrs) {
     g.without = rows.filter((b) => !new Set(getAttrs(b)).has(attr));
     if (!g.with.length || !g.without.length) {
-      out.push({ attr, lift_raw: null, lift_adj: null, nWith: g.with.length, nWithout: g.without.length, support: "sem-contraste", warnings: ["sem-contraste-no-contexto"] });
+      out.push({ attr, lift_raw: null, lift_adj: null, nWith: g.with.length, nWithout: g.without.length, support: BuildSupport.SEM_CONTRASTE, warnings: ["sem-contraste-no-contexto"] });
       continue;
     }
     const wmean = (xs) => {
@@ -77,7 +97,7 @@ export function adjustedLiftByAttr(builds, getAttrs) {
     const mWith = wmean(g.with);
     const mWithout = wmean(g.without);
     if (mWith == null || mWithout == null) {
-      out.push({ attr, lift_raw: null, lift_adj: null, nWith: g.with.length, nWithout: g.without.length, support: "sem-peso", warnings: ["sem-peso"] });
+      out.push({ attr, lift_raw: null, lift_adj: null, nWith: g.with.length, nWithout: g.without.length, support: BuildSupport.SEM_PESO, warnings: ["sem-peso"] });
       continue;
     }
     const lift = mWith - mWithout;
@@ -88,7 +108,7 @@ export function adjustedLiftByAttr(builds, getAttrs) {
       lift_adj: +((lift * w) / (w + BUILD_ADJUST_K)).toFixed(4),
       nWith: g.with.length,
       nWithout: g.without.length,
-      support: g.with.length + g.without.length >= 4 ? "ok" : "fino",
+      support: g.with.length + g.without.length >= 4 ? BuildSupport.OK : BuildSupport.FINO,
       warnings: ["associacao-ajustada-nao-causal", "builds-recomendadas-vies-de-selecao"],
     });
   }

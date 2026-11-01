@@ -2,6 +2,9 @@
 // Consolidado (ADR-061): reúne hero/hero-result-assembler.js, hero/hero-row-validator.js.
 // Barrel público: src/index.js (nenhum nome público muda).
 
+import { Tier } from "./ranking.js";
+import { DataStatus, InferenceStatus, UncertaintyStatus } from "../core/states.js";
+
 
 // ── hero/hero-result-assembler.js ──
 // hero/scoring/hero-result-assembler — monta o objeto de saída por herói (contrato V2 §19).
@@ -45,10 +48,10 @@ export class HeroResultAssembler {
       isGem: flags.isGem,
       degenerate,
       smallSample,
-      data_status: "ok",
+      data_status: DataStatus.OK,
       // V2 §19: proveniência por herói — ativa o teto proxy do HeroTrustPolicy na UI.
       sample_size_method: "not_provided_by_api",
-      inference_status: "experimental_candidates_only",
+      inference_status: InferenceStatus.EXPERIMENTAL_CANDIDATES_ONLY,
       // DESVIO (a): posterior_mean no topo — a ConfiancaSection exibe por exigência do PRD.
       posterior_mean: trioStar.posterior_mean,
       // DESVIO (b): z no topo — views/semana ordenam por ele.
@@ -69,22 +72,22 @@ export class HeroResultAssembler {
     const out = {
       ...hero,
       wrAdj: null,
-      tier: "?",
+      tier: Tier.UNKNOWN,
       strength_index: null,
       se: null,
       B: 0,
       credible_interval_95: null,
       posterior_prob_above_threshold: null,
-      uncertainty_status: "insufficient_exposure",
+      uncertainty_status: UncertaintyStatus.INSUFFICIENT_EXPOSURE,
       q: null,
       strong: false,
       weak: false,
       isGem: false,
       degenerate: false,
       smallSample,
-      data_status: "insufficient_exposure",
+      data_status: DataStatus.INSUFFICIENT_EXPOSURE,
       sample_size_method: "not_provided_by_api",
-      inference_status: "experimental_candidates_only",
+      inference_status: InferenceStatus.EXPERIMENTAL_CANDIDATES_ONLY,
       posterior_mean: null,
       z: null,
     };
